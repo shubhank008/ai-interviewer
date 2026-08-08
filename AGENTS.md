@@ -51,13 +51,28 @@ anything visual, and a surprise that cost an hour gets appended to the
 invariants below before the feature closes.
 
 A feature typically walks: `/sdd-feature` → actual feature implementation →
-test → `/landmine-check` → commit -> `/no-mistakes`.
+test → `/landmine-check` → focused commits → `/no-mistakes`.
+
+### Commit and publish protocol
+
+- Every feature or major change must be split into focused, semantic commits. Keep specifications, plans, contracts, implementation slices, tests, documentation, and cleanup separately traceable when they are independently meaningful. Do not collapse a feature's entire lifecycle into one oversized commit.
+- The agent that completes a feature owns its final publication steps: inspect the worktree, commit all intended changes, invoke `/no-mistakes`, and drive the gate through push, PR, and CI monitoring. Do not finish with uncommitted feature work.
+- Never push directly. `/no-mistakes` is the only path for publishing a branch or generating a pull request.
+- After a pipeline-created fix commit, synchronize the local branch with the pipeline-published head before reporting completion.
+
+### Autonomous gate decisions
+
+- A no-mistakes run must not stall waiting for the user at an ordinary review, lint, documentation, test, or CI decision gate. The agent must inspect the finding, apply the smallest safe fix when appropriate, or affirmatively approve/skip it according to the configured intent, then continue monitoring.
+- Ask the user only when proceeding requires a genuinely ambiguous product, privacy, security, destructive, or authorization decision that cannot be resolved from the specification. Record the reason for the escalation in the final report.
 
 ## Architecture invariants
 
 Each of these describes a real failure, hurdle or constraint of this project. Violate one and you will spend hours looking in the wrong
 place.
 
+- Feature work must remain traceable through multiple focused semantic commits; a completed agent run is incomplete while intended changes remain uncommitted.
+- The completing agent must run `/no-mistakes` after committing and must drive its ordinary approval gates to completion rather than leaving a pipeline parked for user input.
+- Pipeline-generated commits remain part of the feature history and must be synchronized locally before the task is reported complete.
 
 ## Testing strategy
 
