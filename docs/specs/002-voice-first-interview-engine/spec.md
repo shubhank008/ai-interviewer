@@ -26,12 +26,12 @@ This slice is provider-independent. Deterministic Phase 1 providers exercise the
 
 ## Acceptance
 
-- [ ] Marker contract written (`contracts/log-markers.md`) before implementation
-- [ ] Session lifecycle supports start, active turn progression, cancellation, failure, and completion
-- [ ] Recruiter and technical modes produce distinct guarded question plans
-- [ ] Turn sequencing rejects duplicates, gaps, and turns after terminal state
-- [ ] Lifecycle events have per-session monotonic ordering and correlation identifiers
-- [ ] Follow-up preparation is invalidated when the latest answer changes topic
-- [ ] Behavior-driven unit tests and deterministic mock-turn/state-machine coverage pass
-- [ ] No vendor, transport, persistence, or secret concerns are introduced
-- [ ] Available linting, type validation, and test commands are run and reported
+- [x] Marker contract written (`contracts/log-markers.md`) before implementation
+- [x] Session lifecycle supports start, active turn progression, cancellation, failure, and completion
+- [x] Recruiter and technical modes produce distinct guarded question plans
+- [x] Turn sequencing rejects duplicates, gaps, and turns after terminal state
+- [x] Lifecycle events have per-session monotonic ordering and correlation identifiers
+- [x] Follow-up preparation is invalidated when the latest answer changes topic
+- [x] Behavior-driven unit tests and deterministic mock-turn/state-machine coverage pass
+- [x] No vendor, transport, persistence, or secret concerns are introduced
+- [x] Available Python test and compilation commands are run; Markdown lint is unavailable in this workspace

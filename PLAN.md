@@ -37,12 +37,14 @@ This document tracks the initial implementation roadmap for the voice-native AI 
 
 ### Phase 2: Voice-first interview engine
 
-- [ ] Implement the voice-first interview session state machine.
-- [ ] Implement recruiter and technical interview modes.
-- [ ] Implement persona, topic, evidence, turn, interruption, and completion state.
-- [ ] Implement question planning and guarded follow-up preparation.
-- [ ] Implement event ordering, correlation IDs, idempotency, and cancellation.
-- [ ] Build mock audio-turn coverage using deterministic STT, LLM, and TTS providers.
+- [x] Implement the voice-first interview session state machine.
+- [x] Implement recruiter and technical interview modes.
+- [x] Implement session lifecycle, topic, turn, cancellation, failure, and completion state.
+- [x] Implement question planning and guarded follow-up preparation.
+- [x] Implement event ordering, correlation IDs, sequence guards, and cancellation.
+- [x] Build mock audio-turn coverage using deterministic STT, LLM, and TTS providers.
+
+The Phase 2 vertical slice is implemented in `src/interviewer_domain/session.py` and covered by `tests/test_session_engine.py`. It intentionally stops before browser transport, vendor integrations, and persistence.
 
 ### Phase 3: Job-description and resume intelligence
 
