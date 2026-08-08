@@ -1,0 +1,18 @@
+{
+  "name": "01kzhbftr2mc1htm06f6pnk100",
+  "version": "1.0.0",
+  "description": "A browser-based, voice-native mock interview platform for practicing realistic recruiter and technical interviews with an adaptive LLM interviewer.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "markdownlint-cli": "^0.49.1"
+  }
+}

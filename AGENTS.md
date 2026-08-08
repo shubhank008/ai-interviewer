@@ -4,16 +4,14 @@
 
 > This file is read automatically by Coding Agent at the start of every session.
 > It is the highest-leverage file in the repo: everything here is context the
-> agent gets for free, and everything not here has to be rediscovered — usually
+> agent gets for free, and everything not here has to be rediscovered -- usually
 > by breaking something first. Keep the **Architecture invariants** section and add to it.
-
-
 
 ## Where code lives
 
 | Path | What |
 |------|------|
-| `docs/specs/` | One directory per feature: spec + plan + marker contract (templates provided) |
+| `docs/specs/` | One directory per feature: spec + plan + marker contract |
 | `.agents/skills/` | The skills below. Read the one that matches before writing code |
 
 ## Which skill, when
@@ -21,12 +19,14 @@
 Invoke the skill **before** writing the code, not after it breaks.
 
 | Reach for | When |
-|---|---|
+|-----------|------|
 | `/sdd-feature` | Starting any feature, ability, item, or system. The gated loop |
 | `/no-mistakes` | Pushing or Generating PR for anything to the GIT repo |
 
 ## 1. The Autonomous State Machine
+
 You must strictly follow this lifecycle for every feature or bug fix without human intervention:
+
 * **Think:** Analyze the `SPEC.md`, current feature request, and existing codebase.
 * **Research:** Map out the required abstract interfaces and API payloads.
 * **Plan:** Generate a step-by-step implementation checklist.
@@ -36,6 +36,7 @@ You must strictly follow this lifecycle for every feature or bug fix without hum
 * **Publish:** Commit the changes using semantic commit messages.
 
 ## Gatekeeping & Testing Rules
+
 * **Strict Gatekeeping:** Code cannot be published unless it passes linting and type checking.
 * **Unit Testing:** Every concrete class (e.g., `KokoroTTSProvider`) must have a corresponding unit test isolating its methods.
 * **E2E Mock Testing:** You must write and utilize tests that simulate a human interacting with the platform. This involves feeding a dummy text/audio payload into the pipeline and verifying the backend successfully returns an appropriate audio response and state update.
@@ -43,7 +44,7 @@ You must strictly follow this lifecycle for every feature or bug fix without hum
 
 ## Workflow
 
-New features follow the SDD loop — invoke `/sdd-feature` when starting one:
+New features follow the SDD loop -- invoke `/sdd-feature` when starting one:
 spec → plan → **marker contract** → implement → **evidence** → **landmine**.
 The last three arrows are the ones that catch this engine: the contract is
 written before the code, the evidence is a frame and not a log line for
@@ -51,20 +52,34 @@ anything visual, and a surprise that cost an hour gets appended to the
 invariants below before the feature closes.
 
 A feature typically walks: `/sdd-feature` → actual feature implementation →
-test → `/landmine-check` → commit -> `/no-mistakes`.
+test → `/landmine-check` → focused commits → `/no-mistakes`.
+
+### Commit and publish protocol
+
+* Every feature or major change must be split into focused, semantic commits. Keep specifications, plans, contracts, implementation slices, tests, documentation, and cleanup separately traceable when they are independently meaningful. Do not collapse a feature's entire lifecycle into one oversized commit.
+* The agent that completes a feature owns its final publication steps: inspect the worktree, commit all intended changes, invoke `/no-mistakes`, and drive the gate through push, PR, and CI monitoring. Do not finish with uncommitted feature work.
+* Never push directly. `/no-mistakes` is the only path for publishing a branch or generating a pull request.
+* After a pipeline-created fix commit, synchronize the local branch with the pipeline-published head before reporting completion.
+
+### Autonomous gate decisions
+
+* A no-mistakes run must not stall waiting for the user at an ordinary review, lint, documentation, test, or CI decision gate. The agent must inspect the finding, apply the smallest safe fix when appropriate, or affirmatively approve/skip it according to the configured intent, then continue monitoring.
+* Ask the user only when proceeding requires a genuinely ambiguous product, privacy, security, destructive, or authorization decision that cannot be resolved from the specification. Record the reason for the escalation in the final report.
 
 ## Architecture invariants
 
 Each of these describes a real failure, hurdle or constraint of this project. Violate one and you will spend hours looking in the wrong
 place.
 
+* Feature work must remain traceable through multiple focused semantic commits; a completed agent run is incomplete while intended changes remain uncommitted.
+* The completing agent must run `/no-mistakes` after committing and must drive its ordinary approval gates to completion rather than leaving a pipeline parked for user input.
+* Pipeline-generated commits remain part of the feature history and must be synchronized locally before the task is reported complete.
 
 ## Testing strategy
 
-
 ## Conventions
 
-- Donot use em-dashes or emojis. Comment every method and important code. Maintain upto-date documentation so a new developer can easily takeover. English everywhere.
-- Plan ahead using a PLAN.md and keep it updated after every feature or update.
-- **When something surprises you, write it down here.** A landmine that costs
+* Donot use em-dashes or emojis. Comment every method and important code. Maintain upto-date documentation so a new developer can easily takeover. English everywhere.
+* Plan ahead using a PLAN.md and keep it updated after every feature or update.
+* **When something surprises you, write it down here.** A landmine that costs
   an hour and is not recorded costs that hour again.
