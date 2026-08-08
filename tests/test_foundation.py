@@ -65,6 +65,52 @@ class FoundationTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, ErrorCode.CANCELLED)
         self.assertEqual(events.events[-1].name, "turn.failed")
 
+    def test_list_transcript_filters_by_session(self) -> None:
+        """list_transcript returns only segments belonging to the requested session."""
+        session_a = InterviewSession("user-a", InterviewMode.RECRUITER)
+        session_b = InterviewSession("user-b", InterviewMode.TECHNICAL)
+        store = InMemoryDataStore()
+        events = InMemoryEventBus()
+        runner = MockTurnRunner(InMemorySTT(), InMemoryLLM(), InMemoryTTS(), store, events)
+        turn_a = Turn(session_a.id, 1, "candidate", b"audio-a")
+        turn_b = Turn(session_b.id, 1, "candidate", b"audio-b")
+        asyncio.run(runner.run(turn_a))
+        asyncio.run(runner.run(turn_b))
+        segments_a = store.list_transcript(session_a.id)
+        segments_b = store.list_transcript(session_b.id)
+        self.assertEqual(len(segments_a), 1)
+        self.assertEqual(len(segments_b), 1)
+        self.assertNotEqual(segments_a[0].turn_id, segments_b[0].turn_id)
+
+    def test_multi_turn_session_lifecycle_sequences(self) -> None:
+        """Multiple turns in the same session emit monotonically increasing sequences."""
+        session = InterviewSession("candidate-1", InterviewMode.TECHNICAL)
+        store = InMemoryDataStore()
+        events = InMemoryEventBus()
+        runner = MockTurnRunner(InMemorySTT(), InMemoryLLM(), InMemoryTTS(), store, events)
+        turn_1 = Turn(session.id, 1, "candidate", b"audio-1")
+        turn_2 = Turn(session.id, 2, "candidate", b"audio-2")
+        asyncio.run(runner.run(turn_1))
+        asyncio.run(runner.run(turn_2))
+        sequences = [event.sequence for event in events.events]
+        self.assertEqual(sequences, [1, 2, 3, 4, 5, 6])
+
+    def test_multi_session_lifecycle_sequences(self) -> None:
+        """Turns in different sessions maintain independent sequence counters."""
+        session_a = InterviewSession("user-a", InterviewMode.RECRUITER)
+        session_b = InterviewSession("user-b", InterviewMode.TECHNICAL)
+        store = InMemoryDataStore()
+        events = InMemoryEventBus()
+        runner = MockTurnRunner(InMemorySTT(), InMemoryLLM(), InMemoryTTS(), store, events)
+        turn_a = Turn(session_a.id, 1, "candidate", b"audio-a")
+        turn_b = Turn(session_b.id, 1, "candidate", b"audio-b")
+        asyncio.run(runner.run(turn_a))
+        asyncio.run(runner.run(turn_b))
+        events_a = [e for e in events.events if e.session_id == session_a.id]
+        events_b = [e for e in events.events if e.session_id == session_b.id]
+        self.assertEqual([e.sequence for e in events_a], [1, 2, 3])
+        self.assertEqual([e.sequence for e in events_b], [1, 2, 3])
+
 
 if __name__ == "__main__":
     unittest.main()

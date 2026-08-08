@@ -82,15 +82,24 @@ class InMemoryDataStore:
     def __init__(self) -> None:
         self.transcripts: dict[UUID, list[TranscriptSegment]] = defaultdict(list)
         self.recordings: dict[UUID, Recording] = {}
+        self._turn_sessions: dict[UUID, UUID] = {}
+
+    def link_turn_session(self, turn_id: UUID, session_id: UUID) -> None:
+        """Register the mapping from a turn to its owning session."""
+        self._turn_sessions[turn_id] = session_id
 
     def save_transcript(self, segment: TranscriptSegment) -> None:
         """Append a transcript segment by its turn identifier."""
         self.transcripts[segment.turn_id].append(segment)
 
     def list_transcript(self, session_id: UUID) -> list[TranscriptSegment]:
-        """Return all stored segments, using turn identifiers as the boundary."""
-        del session_id
-        return [segment for values in self.transcripts.values() for segment in values]
+        """Return segments whose turns belong to the given session."""
+        return [
+            segment
+            for turn_id, segments in self.transcripts.items()
+            if self._turn_sessions.get(turn_id) == session_id
+            for segment in segments
+        ]
 
     def save_recording(self, recording: Recording) -> None:
         """Store recording metadata by session identifier."""
