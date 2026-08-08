@@ -29,11 +29,11 @@ This document tracks the initial implementation roadmap for the voice-native AI 
 
 ### Phase 1: Domain model and capability interfaces
 
-- [ ] Define interview, turn, event, transcript, recording, evaluation, and provider measurement models.
-- [ ] Define `LLMProvider`, `STTProvider`, `TTSProvider`, `DataStore`, and `AuthProvider` interfaces.
-- [ ] Define `DocumentParser`, `EmbeddingProvider`, `VectorStore`, `AudioTransport`, `EventBus`, `StorageProvider`, `ResearchProvider`, and `ObservabilityProvider` interfaces.
-- [ ] Define normalized provider errors, cancellation, timeout, health, and capability contracts.
-- [ ] Add deterministic in-memory providers for tests.
+- [x] Define interview, turn, event, transcript, recording, evaluation, and provider measurement models.
+- [x] Define `LLMProvider`, `STTProvider`, `TTSProvider`, `DataStore`, and `AuthProvider` interfaces.
+- [x] Define `DocumentParser`, `EmbeddingProvider`, `VectorStore`, `AudioTransport`, `EventBus`, `StorageProvider`, `ResearchProvider`, and `ObservabilityProvider` interfaces.
+- [x] Define normalized provider errors, cancellation, timeout, health, and capability contracts.
+- [x] Add deterministic in-memory providers for tests and a provider-independent mock turn.
 
 ### Phase 2: Voice-first interview engine
 
