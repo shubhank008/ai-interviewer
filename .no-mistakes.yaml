@@ -69,8 +69,8 @@ auto_fix:
   rebase: 3
   lint: 3
   test: 3
-  review: 3
-  document: 3
+  review: 5
+  document: 5
   ci: 3
 
 # How many times the CI step may re-run a single check the provider reported as
