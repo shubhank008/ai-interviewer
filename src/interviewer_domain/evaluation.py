@@ -227,7 +227,7 @@ class DeterministicEvaluator:
                 }
             )
         overall = _clip(
-            sum(float(item["weight"]) * int(item["score"]) for item in dimensions)
+            sum(float(str(item["weight"])) * int(str(item["score"])) for item in dimensions)
         )
         supported = [
             item["label"]
