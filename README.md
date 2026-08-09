@@ -28,12 +28,14 @@ The initial application stack is React with Tailwind v4 and shadcn/ui for a mini
 
 Phase 4 adds provider-neutral adapters in `src/interviewer_domain/provider_adapters.py` for Faster-Whisper-compatible STT, Piper/Kokoro-compatible TTS, and OpenRouter-compatible LLM transports. These adapters are optional: tests inject deterministic backends, do not access the network, and do not require credentials or model downloads. `FallbackRouter` and `ProviderFlags` provide configuration seams without placing vendor names in interview business logic. `ProviderBenchmark` records first-byte and end-to-end latency, fixture quality, estimated cost, failures, and CPU time. See `docs/specs/004-provider-benchmark-harness/` for the contract and limitations.
 
-The planned browser communication model is:
+The browser communication model is:
 
-- WebRTC for live microphone and agent audio
-- WebSocket for interview state, transcript events, interruptions, and playback control
-- HTTP REST APIs for setup, uploads, history, recordings, transcripts, and results
-- Optional backend Pub/Sub or event-bus workflows for asynchronous processing and fan-out
+- WebRTC for live microphone and agent audio. Media frames never enter the control channel.
+- WebSocket for ordered interview state, transcript events, interruptions, playback control, and WebRTC signaling.
+- Versioned HTTP REST resources under `/api/v1` for setup and session bootstrap; later phases add uploads, history, recordings, transcripts, and results.
+- Optional backend Pub/Sub or event-bus workflows for asynchronous processing and fan-out.
+
+Phase 5 implements these provider-independent seams in `src/interviewer_domain/transport.py`. `LocalSessionEventChannel` supports strictly ordered, correlated, idempotent events and replay after an acknowledged cursor. `LocalWebRTCMediaTransport` and `LocalBrowserControlTransport` make the media/control boundary executable offline. See [`docs/specs/005-browser-transport-session-events/`](docs/specs/005-browser-transport-session-events/) for the schemas, marker contract, and test plan.
 
 Candidate provider implementations include local Faster-Whisper, hosted Groq Whisper, local Kokoro or Piper, and OpenRouter or self-hosted LLMs. These are comparison candidates, not final production decisions. Local development is Docker-first and CPU-only, with an approximate 4 GB RAM and 250 GB storage target.
 
@@ -41,7 +43,7 @@ Resume input is PDF-only with a 5 MB limit, while job descriptions are supplied 
 
 ## Project status
 
-The repository has completed the domain and capability foundation, the Phase 2 voice-first session engine, and the Phase 3 local document ingestion and retrieval slice. The provider-independent Python package is under `src/interviewer_domain/`, with deterministic providers, a mock voice-shaped turn, recruiter or technical session state-machine coverage, and local PDF/text parsing with topic retrieval in `tests/`. Run `python -m unittest discover -s tests -v` for the local test gate. Read [`SPEC.md`](SPEC.md) for the product specification and [`PLAN.md`](PLAN.md) for the SDD implementation roadmap. The first implementation will build the voice loop directly rather than creating a separate text-only interview mode.
+The repository has completed the domain and capability foundation, the Phase 2 voice-first session engine, the Phase 3 local document ingestion and retrieval slice, the Phase 4 provider-neutral adapter and benchmark harness, and the Phase 5 browser transport and session events slice. The provider-independent Python package is under `src/interviewer_domain/`, with deterministic providers, a mock voice-shaped turn, recruiter or technical session state-machine coverage, local PDF/text parsing with topic retrieval, provider-neutral STT/TTS/LLM adapters with fallback routing and benchmarking, and versioned REST/WebSocket/WebRTC transport seams in `tests/`. Run `python -m unittest discover -s tests -v` for the local test gate. Read [`SPEC.md`](SPEC.md) for the product specification and [`PLAN.md`](PLAN.md) for the SDD implementation roadmap. The first implementation will build the voice loop directly rather than creating a separate text-only interview mode.
 
 Each feature will be developed through the repository's SDD workflow:
 
