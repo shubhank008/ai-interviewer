@@ -1,45 +1,30 @@
-import { useState } from 'react'
+/* eslint-disable no-unused-vars */
+import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createSessionRequest, historyRequest } from './api.js'
+import { createSessionRequest, historyRequest, setupValidation } from './api.js'
+import { localAuthProvider } from './auth.js'
+import { ActiveView, AuthScreen, HistoryView, ResultsView, SetupView, Shell } from './ui.jsx'
 import './style.css'
 
-const developmentToken = import.meta.env.VITE_DEV_TOKEN || 'dev-token'
+const auth = localAuthProvider()
+const token = 'dev-token'
+const client = { validate: setupValidation, create: (mode, authToken) => createSessionRequest(mode, authToken) }
 
-export function App() {
+export function App({ authProvider = auth, fetcher = fetch }) {
+  const [user, setUser] = useState(undefined)
   const [view, setView] = useState('setup')
-  const [mode, setMode] = useState('technical')
   const [session, setSession] = useState(null)
   const [history, setHistory] = useState([])
-  const [message, setMessage] = useState('Ready for a focused practice session.')
-
-  async function start() {
-    const request = createSessionRequest(mode, developmentToken)
-    const response = await fetch(request.url, request.init)
-    if (!response.ok) { setMessage(`Session start failed (${response.status}).`); return }
-    const data = await response.json()
-    setSession(data)
-    setMessage('Session created. The voice loop can now begin.')
-    setView('active')
-  }
-
-  async function loadHistory() {
-    const request = historyRequest(developmentToken)
-    const response = await fetch(request.url, request.init)
-    if (!response.ok) { setMessage(`History load failed (${response.status}).`); return }
-    const data = await response.json()
-    setHistory(data.payload.interviews)
-    setView('history')
-  }
-
-  return <main className="shell">
-    <header><div><span className="eyebrow">INTERVIEW STUDIO</span><h1>Practice with intent.</h1></div><span className="status"><i /> Local mock mode</span></header>
-    <nav>{[['setup', 'Setup'], ['active', 'Live interview'], ['history', 'History'], ['results', 'Results']].map(([key, label]) => <button className={view === key ? 'selected' : ''} onClick={key === 'history' ? loadHistory : () => setView(key)} key={key}>{label}</button>)}</nav>
-    {view === 'setup' && <section className="card hero"><span className="eyebrow">01 / SETUP</span><h2>A calmer way to get interview-ready.</h2><p>Bring a role, choose a mode, and rehearse answers in a private local session. Your practice data stays in the configured service boundary.</p><label>Interview mode<select value={mode} onChange={event => setMode(event.target.value)}><option value="technical">Technical / hiring manager</option><option value="recruiter">Recruiter screen</option></select></label><button className="primary" onClick={start}>Start mock interview <b>→</b></button></section>}
-    {view === 'active' && <section className="card"><span className="eyebrow">02 / LIVE INTERVIEW</span><h2>{session ? 'Your interviewer is ready.' : 'No active session yet.'}</h2><div className="voice-orb"><span>●</span></div><p className="center">{message}</p><div className="transcript"><span>TRANSCRIPT</span><p>{session ? 'Your live transcript will appear here as audio is connected.' : 'Start a session from Setup to begin.'}</p></div></section>}
-    {view === 'history' && <section className="card"><span className="eyebrow">03 / HISTORY</span><h2>Revisit your practice.</h2>{history.length ? history.map(item => <article className="history-row" key={item.id}><div><strong>{item.mode} interview</strong><small>{item.status} · retained locally</small></div><button onClick={() => setView('results')}>Open replay →</button></article>) : <p>No sessions yet. Complete your first setup to see it here.</p>}</section>}
-    {view === 'results' && <section className="card"><span className="eyebrow">04 / RESULTS</span><h2>Feedback that points forward.</h2><div className="score"><strong>--</strong><span>/ 100</span></div><p>Complete an interview to unlock the versioned evaluation, evidence-linked transcript, strengths, and next recommendations.</p><button className="secondary" onClick={() => setView('setup')}>Start another session</button></section>}
-    <footer><span>Deterministic local environment</span><span>Retention: 14 days</span></footer>
-  </main>
+  const [loading, setLoading] = useState(false)
+  const [offline, setOffline] = useState(!navigator.onLine)
+  useEffect(() => { authProvider.restore().then(setUser).catch(() => setUser(null)); const online = () => setOffline(false); const offlineEvent = () => setOffline(true); window.addEventListener('online', online); window.addEventListener('offline', offlineEvent); return () => { window.removeEventListener('online', online); window.removeEventListener('offline', offlineEvent) } }, [authProvider])
+  useEffect(() => { const setup = () => setView('setup'); window.addEventListener('go-setup', setup); return () => window.removeEventListener('go-setup', setup) }, [])
+  async function loadHistory() { setLoading(true); try { const request = historyRequest(token); const response = await fetcher(request.url, request.init); if (!response.ok) throw new Error('history'); const data = await response.json(); setHistory(data.payload?.interviews || []); setView('history') } catch { setHistory([]); setView('history') } finally { setLoading(false) } }
+  function deleteInterview(id) { setHistory(current => current.filter(item => item.id !== id)) }
+  if (user === undefined) return <main className="loading-screen"><span className="auth-mark">◎</span><p>Restoring your workspace…</p></main>
+  if (!user) return <AuthScreen auth={authProvider} onAuthenticated={setUser} />
+  function navigate(next) { if (next === 'history') loadHistory(); else setView(next) }
+  return <Shell user={user} activeView={view} onView={navigate} onSignOut={async () => { await authProvider.signOut(); setUser(null) }}>{offline && <div className="offline-bar">You are offline. Local controls remain available; synced resources may be out of date.</div>}{view === 'setup' && <SetupView api={client} token={token} onStarted={data => { setSession(data); setView('active') }} />}{view === 'active' && <ActiveView session={session} onComplete={() => setView('results')} />}{view === 'history' && <HistoryView history={history} loading={loading} onOpen={() => setView('results')} onDelete={deleteInterview} />}{view === 'results' && <ResultsView />}</Shell>
 }
 
 createRoot(document.getElementById('root')).render(<App />)
