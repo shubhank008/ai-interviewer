@@ -113,6 +113,7 @@ class PersistentDataStore(Protocol):
     def save_transcript(self, user_id: str, interview_id: UUID, segment: TranscriptSegment) -> None: ...
     def save_recording(self, user_id: str, interview_id: UUID, recording: Recording) -> None: ...
     def save_evaluation(self, user_id: str, interview_id: UUID, evaluation: Evaluation) -> None: ...
+    def get_evaluation(self, user_id: str, interview_id: UUID) -> Evaluation | None: ...
     def save_document_reference(self, user_id: str, interview_id: UUID, key: str) -> None: ...
     def delete_interview(self, user_id: str, interview_id: UUID) -> None: ...
 
@@ -200,6 +201,13 @@ class InMemoryPersistentDataStore:
         self.get_interview(user_id, interview_id)
         self.evaluations[interview_id] = evaluation
 
+    def get_evaluation(self, user_id: str, interview_id: UUID) -> Evaluation | None:
+        """Return an owned interview evaluation or None when absent."""
+        record = self.interviews.get(interview_id)
+        if record is None or record.user_id != user_id:
+            return None
+        return self.evaluations.get(interview_id)
+
     def save_document_reference(self, user_id: str, interview_id: UUID, key: str) -> None:
         """Persist a document storage reference after checking ownership."""
         self.get_interview(user_id, interview_id)
@@ -266,6 +274,12 @@ class FirestoreDataStore:
         """Persist evaluation metadata in the interview document."""
         self.get_interview(user_id, interview_id)
         self.backend.set(f"{self.collection}/{interview_id}", "evaluation", asdict(evaluation))
+
+    def get_evaluation(self, user_id: str, interview_id: UUID) -> Evaluation | None:
+        """Return an owned evaluation document or None when absent."""
+        self.get_interview(user_id, interview_id)
+        value = self.backend.get(f"{self.collection}/{interview_id}", "evaluation")
+        return _evaluation_from_json(value) if value is not None else None
 
     def save_document_reference(self, user_id: str, interview_id: UUID, key: str) -> None:
         """Persist an opaque document reference for an owned interview."""
@@ -413,7 +427,7 @@ class PersistenceService:
         record = self.data.get_interview(user_id, interview_id)
         payload: dict[str, Any] = {"interview": _json_record(record), "available": view in {"active", "replay", "transcript", "results"}}
         if view == "results":
-            evaluation = getattr(self.data, "evaluations", {}).get(interview_id)
+            evaluation = self.data.get_evaluation(user_id, interview_id)
             if evaluation is not None:
                 from .evaluation import evaluation_dict
                 payload["evaluation"] = evaluation_dict(evaluation)
@@ -433,3 +447,19 @@ def _json_record(record: InterviewRecord) -> dict[str, Any]:
 def _record_from_json(value: dict[str, Any]) -> InterviewRecord:
     """Restore normalized metadata from a provider document."""
     return InterviewRecord(str(value["user_id"]), InterviewMode(value["mode"]), UUID(str(value["id"])), datetime.fromisoformat(value["created_at"]), datetime.fromisoformat(value["expires_at"]) if value.get("expires_at") else None, str(value.get("status", "created")))
+
+
+def _evaluation_from_json(value: dict[str, Any]) -> Evaluation:
+    """Restore an evaluation document from a provider store."""
+    return Evaluation(
+        UUID(str(value["session_id"])),
+        str(value["rubric_version"]),
+        int(value["score"]) if value.get("score") is not None else None,
+        tuple(entry for entry in value.get("dimensions", ())),
+        str(value.get("mode", "")),
+        dict(value.get("context", {})),
+        str(value.get("summary", "")),
+        tuple(value.get("strengths", ())),
+        tuple(value.get("weaknesses", ())),
+        tuple(value.get("recommendations", ())),
+    )
