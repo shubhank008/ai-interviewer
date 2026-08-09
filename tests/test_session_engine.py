@@ -100,7 +100,7 @@ class SessionEngineTests(unittest.TestCase):
             asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"")))
         self.assertEqual(engine.session.status, SessionStatus.FAILED.value)
         self.assertEqual(events.events[-1].name, "session.failed")
-        print("[ENGINE] cancellation-failure-ok")
+        print("[ENGINE] provider-failure-ok")
 
     def test_planner_rejects_empty_follow_up_context(self) -> None:
         """Follow-up preparation requires substantive current context."""
