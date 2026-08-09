@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel, Field
 
 from interviewer_domain.configuration import (
@@ -25,7 +25,18 @@ from interviewer_domain.persistence import (
     UserIdentity,
 )
 from interviewer_domain.providers import InMemoryStorage
-from interviewer_domain.transport import CreateSessionRequest, RestResourceCatalog
+from interviewer_domain.transport import (
+    BrowserSessionState,
+    CreateSessionRequest,
+    LocalWebRTCBoundary,
+    RestResourceCatalog,
+    SessionCommand,
+    SessionCommandType,
+    SessionEventType,
+    SignalingMessage,
+    SignalingType,
+    TransportValidationError,
+)
 
 APP_VERSION = "0.11.0"
 settings = RuntimeSettings.from_env()
@@ -49,6 +60,8 @@ class InterviewApplication:
         self.rate_limiter = FixedWindowRateLimiter(
             limit=settings.rate_limit, window_seconds=settings.rate_window_seconds
         )
+        self.browser_sessions: dict[UUID, BrowserSessionState] = {}
+        self.media_boundaries: dict[UUID, LocalWebRTCBoundary] = {}
 
     async def user_id(self, token: str) -> str:
         """Resolve a bearer token without exposing token details."""
@@ -133,6 +146,8 @@ async def create_session(
     response = RestResourceCatalog.create_session(
         CreateSessionRequest(user_id, payload.mode), record.id
     )
+    application.browser_sessions[record.id] = BrowserSessionState(record.id, user_id)
+    application.media_boundaries[record.id] = LocalWebRTCBoundary(record.id)
     result: dict[str, object] = {
         key: value for key, value in response.to_dict().items()
     }
@@ -170,3 +185,101 @@ async def complete(
         return {"id": str(interview_id), "status": "completed"}
     except ProviderError as error:
         raise _safe_error(error) from error
+
+
+async def _websocket_user(websocket: WebSocket) -> str | None:
+    """Resolve the development bearer token supplied to a browser socket."""
+    token = websocket.query_params.get("token", "")
+    try:
+        return await application.auth.validate(token)
+    except ProviderError:
+        return None
+
+
+@app.websocket("/ws/v1/sessions/{session_id}")
+async def session_websocket(websocket: WebSocket, session_id: UUID) -> None:
+    """Serve authenticated control events while keeping media off the socket."""
+    user_id = await _websocket_user(websocket)
+    state = application.browser_sessions.get(session_id)
+    if user_id is None or state is None:
+        await websocket.accept()
+        await websocket.close(code=4401, reason="authentication required")
+        return
+    try:
+        state.authorize(user_id)
+    except TransportValidationError:
+        await websocket.accept()
+        await websocket.close(code=4403, reason="session access denied")
+        return
+    await websocket.accept()
+    correlation_id = f"ws-{session_id}"
+    try:
+        while True:
+            raw = await websocket.receive_json()
+            command = SessionCommand.from_dict(raw)
+            if command.session_id != session_id:
+                raise TransportValidationError("command session does not match socket")
+            if command.command_type == SessionCommandType.CONNECT:
+                events = state.connect(user_id, command.acknowledged_sequence)
+                events.append(state.publish(SessionEventType.CONNECTION, {"state": "connected"}, command.correlation_id))
+                for event in events:
+                    await websocket.send_json(event.to_dict())
+            elif command.command_type == SessionCommandType.ACK:
+                state.acknowledge(user_id, command.acknowledged_sequence)
+            elif command.command_type == SessionCommandType.HEARTBEAT:
+                event = state.publish(SessionEventType.HEARTBEAT, {"state": "alive"}, command.correlation_id)
+                await websocket.send_json(event.to_dict())
+            elif command.command_type == SessionCommandType.CANCEL:
+                event = state.cancel(user_id, command.correlation_id)
+                await websocket.send_json(event.to_dict())
+            elif command.command_type == SessionCommandType.INTERRUPT:
+                event = state.interrupt(user_id, command.correlation_id)
+                await websocket.send_json(event.to_dict())
+            elif command.command_type == SessionCommandType.SIGNALING:
+                message = SignalingMessage(
+                    session_id,
+                    SignalingType(str(command.payload.get("type", ""))),
+                    dict(command.payload.get("payload", {})),
+                    command.correlation_id,
+                )
+                application.media_boundaries[session_id].accept_signaling(message)
+                event = state.publish(SessionEventType.CONNECTION, {"state": "signaling-received", "type": message.message_type.value}, command.correlation_id)
+                await websocket.send_json(event.to_dict())
+            elif command.command_type == SessionCommandType.CLOSE:
+                state.disconnect(user_id)
+                await websocket.close(code=1000, reason="client closed")
+                return
+            else:
+                raise TransportValidationError("unsupported session command")
+    except WebSocketDisconnect:
+        state.disconnect(user_id)
+    except (TransportValidationError, KeyError, ValueError) as error:
+        event = state.publish(SessionEventType.ERROR, {"code": "invalid_control", "message": str(error)}, correlation_id)
+        await websocket.send_json(event.to_dict())
+        await websocket.close(code=1003, reason="invalid control payload")
+
+
+@app.websocket("/ws/v1/sessions/{session_id}/signaling")
+async def signaling_websocket(websocket: WebSocket, session_id: UUID) -> None:
+    """Accept authenticated offer, answer, and ICE signaling only."""
+    user_id = await _websocket_user(websocket)
+    state = application.browser_sessions.get(session_id)
+    if user_id is None or state is None:
+        await websocket.accept()
+        await websocket.close(code=4401, reason="authentication required")
+        return
+    try:
+        state.authorize(user_id)
+        await websocket.accept()
+        raw = await websocket.receive_json()
+        message = SignalingMessage(
+            session_id,
+            SignalingType(str(raw["type"])),
+            dict(raw.get("payload", {})),
+            str(raw["correlation_id"]),
+        )
+        application.media_boundaries[session_id].accept_signaling(message)
+        await websocket.send_json({"ok": True, "type": message.message_type.value, "session_id": str(session_id)})
+        await websocket.close(code=1000)
+    except (TransportValidationError, KeyError, ValueError):
+        await websocket.close(code=1003, reason="invalid signaling")
