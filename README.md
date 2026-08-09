@@ -26,6 +26,8 @@ The project uses capability-based interfaces rather than vendor-specific busines
 
 The initial application stack is React with Tailwind v4 and shadcn/ui for a minimal, clean, mobile-friendly frontend, and FastAPI for the backend. The system is split into frontend, API, audio, and worker services.
 
+Phase 4 adds provider-neutral adapters in `src/interviewer_domain/provider_adapters.py` for Faster-Whisper-compatible STT, Piper/Kokoro-compatible TTS, and OpenRouter-compatible LLM transports. These adapters are optional: tests inject deterministic backends, do not access the network, and do not require credentials or model downloads. `FallbackRouter` and `ProviderFlags` provide configuration seams without placing vendor names in interview business logic. `ProviderBenchmark` records first-byte and end-to-end latency, fixture quality, estimated cost, failures, and CPU time. See `docs/specs/004-provider-benchmark-harness/` for the contract and limitations.
+
 The planned browser communication model is:
 
 - WebRTC for live microphone and agent audio

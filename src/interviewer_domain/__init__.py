@@ -13,6 +13,9 @@ from .models import (
 from .documents import LocalDocumentParser
 from .retrieval import DeterministicEmbeddingProvider, InMemoryVectorStore, TopicRetriever
 from .session import InterviewSessionEngine, QuestionPlanner, SessionStateError
+from .benchmark import BenchmarkReport, ProviderBenchmark
+from .provider_adapters import FasterWhisperSTT, OpenRouterLLM, PiperKokoroTTS
+from .routing import FallbackRouter, ProviderFlags
 
 __all__ = [
     "DeterministicEmbeddingProvider",
@@ -30,4 +33,11 @@ __all__ = [
     "SessionStateError",
     "SessionStatus",
     "Turn",
+    "BenchmarkReport",
+    "ProviderBenchmark",
+    "FasterWhisperSTT",
+    "OpenRouterLLM",
+    "PiperKokoroTTS",
+    "FallbackRouter",
+    "ProviderFlags",
 ]

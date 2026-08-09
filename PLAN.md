@@ -60,12 +60,14 @@ The completed local Phase 3 slice is specified in `docs/specs/003-job-descriptio
 
 ### Phase 4: Provider implementations and benchmark harness
 
-- [ ] Implement a local Faster-Whisper `STTProvider`.
+- [x] Implement a local Faster-Whisper-compatible `STTProvider` adapter with optional injected backend.
 - [ ] Implement a hosted Groq Whisper `STTProvider`.
-- [ ] Implement local Kokoro and/or Piper `TTSProvider` adapters.
-- [ ] Implement the first hosted or OpenRouter `LLMProvider` adapters.
-- [ ] Add provider health checks, configuration, fallback routing, and feature flags.
-- [ ] Build repeatable A/B benchmarks for first-byte latency, end-to-end turn latency, quality, cost, failures, and resource consumption.
+- [x] Implement a provider-neutral local Kokoro/Piper-compatible `TTSProvider` adapter.
+- [x] Implement an optional OpenRouter-compatible `LLMProvider` adapter.
+- [x] Add normalized provider health, capability discovery, configuration flags, and fallback routing.
+- [x] Build a deterministic benchmark for first-byte latency, end-to-end turn latency, fixture quality, estimated cost, failures, and CPU resource use.
+
+The Phase 4 slice is specified in `docs/specs/004-provider-benchmark-harness/`. Optional adapters do not import or download third-party packages at module load, so CPU-only tests remain offline and secret-free. Concrete model transports can be injected by deployment configuration. The deterministic benchmark uses in-memory providers and records fixture quality separately from production speech quality.
 
 ### Phase 5: Browser and backend communication
 

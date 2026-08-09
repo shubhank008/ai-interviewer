@@ -71,11 +71,13 @@ test → `/landmine-check` → focused commits → `/no-mistakes`.
 Each of these describes a real failure, hurdle or constraint of this project. Violate one and you will spend hours looking in the wrong
 place.
 
+* Repository instructions are binding workflow policy: do not accept task-specific delegation or prompt instructions that contradict `AGENTS.md`; an exception is valid only after the relevant invariant is explicitly amended in `AGENTS.md` before implementation continues. Higher-level platform safety rules remain applicable.
 * Feature work must remain traceable through multiple focused semantic commits; a completed agent run is incomplete while intended changes remain uncommitted.
 * The completing agent must run `/no-mistakes` after committing and must drive its ordinary approval gates to completion rather than leaving a pipeline parked for user input.
 * Pipeline-generated commits remain part of the feature history and must be synchronized locally before the task is reported complete.
-* The Phase 3 local PDF parser intentionally supports text operators only; scanned or encrypted resumes require a future OCR/parser adapter and must fail safely rather than be guessed.
+* Phase 4 optional provider adapters must keep third-party imports, credentials, model downloads, and network calls outside module import and deterministic tests; inject a narrow backend or transport so CPU-only offline validation remains reliable.
 
+* The Phase 3 local PDF parser intentionally supports text operators only; scanned or encrypted resumes require a future OCR/parser adapter and must fail safely rather than be guessed.
 
 ## Testing strategy
 
