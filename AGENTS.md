@@ -79,7 +79,6 @@ place.
 
 * The Phase 3 local PDF parser intentionally supports text operators only; scanned or encrypted resumes require a future OCR/parser adapter and must fail safely rather than be guessed.
 
-
 ## Testing strategy
 
 ## Conventions
