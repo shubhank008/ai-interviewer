@@ -90,6 +90,13 @@ npm run build --prefix frontend
 
 `tests/test_phase9_production.py` calls real ASGI routes and public domain interfaces across ingestion, retrieval, provider routing, live voice, transport, persistence, evaluation, failure, reconnect, cancellation, partial audio, authorization, retention, rate limits, benchmarks, and privacy boundaries. It does not grep source strings or depend on credentials, network, browser automation, or heavyweight models.
 
+## Phase 11 runtime configuration and provider readiness
+
+Copy `.env.example` to the deployment environment and set `APP_PROFILE=local` for the credential-free deterministic path. `RuntimeSettings` validates environment values and preserves the existing 5 MB PDF and 14-day retention decisions. `APP_PROFILE=production` requires explicit Firebase, Firestore, storage, and provider configuration instead of silently selecting in-memory providers. The API's `/api/v1/readiness` endpoint reports redacted profile, capability, and health information.
+
+Production-shaped STT, TTS, and LLM adapters are `FasterWhisperSTT`, `PiperKokoroTTS`, and `OpenRouterLLM`, selected through existing capability interfaces and injected backend or transport seams. `FallbackRouter` tries configured providers in order. The default tests never download models or call networks. See [`docs/provider-readiness.md`](docs/provider-readiness.md) for provider data sharing, retention, cost, latency, and failure characteristics. Run `./scripts/test_phase11.sh` to verify all Phase 11 markers and forbidden-pattern guards. This evidence does not claim real provider, Firebase, browser, or WebRTC readiness.
+
+
 For the strict Phase 10 gate, install the pinned development tools and run:
 
 ```bash

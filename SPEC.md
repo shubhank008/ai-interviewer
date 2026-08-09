@@ -239,6 +239,11 @@ Missing tools, skipped commands, coverage regressions, failed builds, and missin
 
 Phase 10 establishes the credential-free offline portion of this policy: pinned Python and Node development tools, strict local scripts, an 80% aggregate backend coverage floor, frontend seam coverage, and a real GitHub Actions job with report uploads. Browser, provider, and per-surface release thresholds remain later gates and must not be inferred from this offline result.
 
+### 8.4 Phase 11 runtime readiness boundary
+
+Phase 11 provides typed environment configuration with explicit `local` and `production` profiles. The local profile uses deterministic in-memory capabilities and requires no credentials or network. The production profile must fail before serving traffic when required Firebase, storage, or provider configuration is absent. Startup diagnostics expose only profile, provider names, configuration-presence flags, limits, and normalized health states. Provider-shaped adapters are exercised through injected seams; deterministic evidence must not be described as real provider or browser readiness.
+
+
 ## 9. Delivery phases
 
 1. **Domain and capability foundation:** define normalized models, interfaces, errors, provider routing, configuration, and local test providers.
