@@ -8,7 +8,7 @@ from uuid import uuid4
 sys.path.insert(0, "src")
 
 from interviewer_domain.benchmark import ProviderBenchmark
-from interviewer_domain.contracts import CancellationToken, ErrorCode, ProviderError
+from interviewer_domain.contracts import CancellationToken, ErrorCode, HealthStatus, ProviderError
 from interviewer_domain.models import InterviewMode, InterviewSession, Turn
 from interviewer_domain.provider_adapters import FasterWhisperSTT, OpenRouterLLM, PiperKokoroTTS
 from interviewer_domain.providers import InMemoryLLM, InMemorySTT, InMemoryTTS
@@ -36,6 +36,18 @@ class TransportFixture:
         self.payload = payload
         self.api_key = api_key
         return {"choices": [{"message": {"content": "fixture response"}}]}
+
+
+class HealthCapableFixture:
+    """Deterministic provider that satisfies the HealthCapable protocol."""
+
+    def __init__(self, name: str, healthy: bool = True) -> None:
+        self.name = name
+        self.healthy = healthy
+
+    async def health(self) -> HealthStatus:
+        """Return the preset health status."""
+        return HealthStatus(self.healthy, f"{self.name}-status")
 
 
 class ProviderBenchmarkTests(unittest.TestCase):
@@ -85,6 +97,19 @@ class ProviderBenchmarkTests(unittest.TestCase):
 
         self.assertEqual(asyncio.run(router.run(call, CancellationToken())), "local")
         print("[BENCHMARK] fallback-routing-ok")
+
+    def test_fallback_router_health_returns_all_statuses(self) -> None:
+        """Router.health() returns health status from each provider."""
+        primary = HealthCapableFixture("primary", healthy=True)
+        fallback = HealthCapableFixture("fallback", healthy=False)
+        router = FallbackRouter([primary, fallback], "llm")
+        statuses = asyncio.run(router.health())
+        self.assertEqual(len(statuses), 2)
+        self.assertTrue(statuses[0].healthy)
+        self.assertEqual(statuses[0].detail, "primary-status")
+        self.assertFalse(statuses[1].healthy)
+        self.assertEqual(statuses[1].detail, "fallback-status")
+        print("[BENCHMARK] fallback-health-ok")
 
     def test_deterministic_report_contains_all_required_metrics(self) -> None:
         """The real provider chain produces repeatable, complete benchmark records."""

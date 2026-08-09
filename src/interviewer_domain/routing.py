@@ -1,5 +1,6 @@
 """Configuration seams and provider-independent fallback routing."""
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Generic, Protocol, Sequence, TypeVar
 
@@ -33,7 +34,7 @@ class FallbackRouter(Generic[T]):
         self.providers = tuple(providers)
         self.operation = operation
 
-    async def run(self, call, token: CancellationToken) -> object:
+    async def run(self, call: Callable[[T, CancellationToken], Awaitable[object]], token: CancellationToken) -> object:
         """Call providers until one succeeds or all fail."""
         last_error: ProviderError | None = None
         for provider in self.providers:
