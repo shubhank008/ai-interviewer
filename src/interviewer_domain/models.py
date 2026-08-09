@@ -149,10 +149,17 @@ class Evaluation:
         """Validate score and structured dimension bounds."""
         if self.score is not None and not 0 <= self.score <= 100:
             raise ValueError("evaluation score must be between 0 and 100")
-        weights = [float(dimension["weight"]) for dimension in self.dimensions if "weight" in dimension]
+        weights = [
+            float(dimension["weight"])
+            for dimension in self.dimensions
+            if "weight" in dimension
+        ]
         if weights and abs(sum(weights) - 1.0) > 0.00001:
             raise ValueError("evaluation dimension weights must sum to one")
-        if any("score" in dimension and not 0 <= int(dimension["score"]) <= 100 for dimension in self.dimensions):
+        if any(
+            "score" in dimension and not 0 <= int(dimension["score"]) <= 100
+            for dimension in self.dimensions
+        ):
             raise ValueError("evaluation dimension scores must be between 0 and 100")
 
 

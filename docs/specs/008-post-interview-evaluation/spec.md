@@ -28,12 +28,12 @@ Evaluation is provider-independent. The first implementation is a deterministic 
 
 ## Acceptance
 
-- [ ] Marker contract written (`contracts/log-markers.md`) BEFORE implementation
-- [ ] Pure deterministic evaluator unit tests cover both modes and edge cases
-- [ ] Real mock evaluation path exercises transcript, context, evaluator, persistence, and results resource
-- [ ] Scores are bounded and weights normalize deterministically
-- [ ] Missing and ambiguous evidence is represented safely
-- [ ] Failed, cancelled, empty, and active interviews are rejected safely
-- [ ] Access control and retention boundaries remain enforced through persistence interfaces
-- [ ] Lint, type, compile, and full available test gates pass
-- [ ] Durable surprises are recorded in `AGENTS.md` if discovered
+- [x] Marker contract written (`contracts/log-markers.md`) BEFORE implementation
+- [x] Pure deterministic evaluator unit tests cover both modes and edge cases
+- [x] Real mock evaluation path exercises transcript, context, evaluator, persistence, and results resource
+- [x] Scores are bounded and weights normalize deterministically
+- [x] Missing and ambiguous evidence is represented safely
+- [x] Failed, cancelled, empty, and active interviews are rejected safely
+- [x] Access control and retention boundaries remain enforced through persistence interfaces
+- [x] Lint, type, compile, and full available test gates pass
+- [x] Durable surprises are recorded in `AGENTS.md` if discovered

@@ -35,21 +35,36 @@ class EvaluationTests(unittest.TestCase):
         technical = normalized_rubric(InterviewMode.TECHNICAL)
         self.assertAlmostEqual(sum(item.weight for item in recruiter), 1.0)
         self.assertAlmostEqual(sum(item.weight for item in technical), 1.0)
-        self.assertNotEqual(tuple(item.key for item in recruiter), tuple(item.key for item in technical))
+        self.assertNotEqual(
+            tuple(item.key for item in recruiter), tuple(item.key for item in technical)
+        )
         self.assertEqual(len(recruiter), 5)
-        self.assertTrue(all(0 <= item.weight <= 1 and item.weight for item in technical))
+        self.assertTrue(
+            all(0 <= item.weight <= 1 and item.weight for item in technical)
+        )
         print("[EVALUATION] rubric-quality-ok")
 
     def test_missing_ambiguous_and_score_bounds(self) -> None:
         """Missing evidence is explicit and mixed evidence lowers confidence safely."""
-        transcript = self._transcript("I led the system design and delivered clear impact.", "I am unclear and not sure, but I collaborated with the team.")
-        result = DeterministicEvaluator().evaluate(InterviewContext(InterviewMode.TECHNICAL, "Engineer", "senior"), transcript)
+        transcript = self._transcript(
+            "I led the system design and delivered clear impact.",
+            "I am unclear and not sure, but I collaborated with the team.",
+        )
+        result = DeterministicEvaluator().evaluate(
+            InterviewContext(InterviewMode.TECHNICAL, "Engineer", "senior"), transcript
+        )
         self.assertTrue(0 <= result.score <= 100)
-        self.assertTrue(any(item["evidence_status"] == "ambiguous" for item in result.dimensions))
+        self.assertTrue(
+            any(item["evidence_status"] == "ambiguous" for item in result.dimensions)
+        )
         self.assertTrue(all(0 <= item["score"] <= 100 for item in result.dimensions))
         empty = self._transcript("hello")
-        result = DeterministicEvaluator().evaluate(InterviewContext(InterviewMode.RECRUITER, "Recruiter", "mid"), empty)
-        self.assertTrue(any(item["evidence_status"] == "missing" for item in result.dimensions))
+        result = DeterministicEvaluator().evaluate(
+            InterviewContext(InterviewMode.RECRUITER, "Recruiter", "mid"), empty
+        )
+        self.assertTrue(
+            any(item["evidence_status"] == "missing" for item in result.dimensions)
+        )
 
     def test_deterministic_output_and_mock_persistence_path(self) -> None:
         """The complete evaluation and results path works without external services."""
@@ -57,16 +72,32 @@ class EvaluationTests(unittest.TestCase):
         data = InMemoryPersistentDataStore()
         with tempfile.TemporaryDirectory() as directory:
             persistence = PersistenceService(data, LocalFilesystemStorage(directory))
-            created = persistence.create_interview("alice", InterviewMode.RECRUITER, now)
+            created = persistence.create_interview(
+                "alice", InterviewMode.RECRUITER, now
+            )
             record = replace(created, status="completed")
             data.save_interview(record)
-            turns = self._transcript("I am motivated by this role and communicate clearly.", "I led a team and delivered impact with feedback.")
-            context = InterviewContext(InterviewMode.RECRUITER, "Platform Engineer", "senior", "build reliable systems", "led teams")
+            turns = self._transcript(
+                "I am motivated by this role and communicate clearly.",
+                "I led a team and delivered impact with feedback.",
+            )
+            context = InterviewContext(
+                InterviewMode.RECRUITER,
+                "Platform Engineer",
+                "senior",
+                "build reliable systems",
+                "led teams",
+            )
             service = PostInterviewEvaluationService(data)
             first = service.evaluate("alice", record.id, context, turns)
             second = service.evaluate("alice", record.id, context, turns)
             self.assertEqual(first, second)
-            self.assertEqual(persistence.resource("alice", "results", record.id, now).payload["evaluation"]["score"], first.score)
+            self.assertEqual(
+                persistence.resource("alice", "results", record.id, now).payload[
+                    "evaluation"
+                ]["score"],
+                first.score,
+            )
         print("[EVALUATION] deterministic-ok")
         print("[EVALUATION] mock-path-ok")
 
@@ -78,7 +109,9 @@ class EvaluationTests(unittest.TestCase):
         active = InterviewRecord("alice", InterviewMode.TECHNICAL, created_at=now)
         data.save_interview(active)
         context = InterviewContext(InterviewMode.TECHNICAL, "Engineer", "senior")
-        transcript = self._transcript("I can reason through the system design tradeoff.")
+        transcript = self._transcript(
+            "I can reason through the system design tradeoff."
+        )
         service = PostInterviewEvaluationService(data)
         with self.assertRaises(ProviderError) as active_error:
             service.evaluate("alice", active.id, context, transcript)

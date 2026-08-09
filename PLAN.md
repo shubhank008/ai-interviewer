@@ -157,7 +157,6 @@ The first feature specifications should be created in this order:
 - Browser audio codec, recording format, and the best-fit codec per provider.
 - Initial local development database and queue or Pub/Sub substitute.
 - Candidate hosted LLMs and local LLM feasibility under CPU-only constraints.
-- Initial evaluation rubric weights for each interview mode.
 - Deployment target for the first end-to-end vertical slice.
 
 ## Definition of done for each feature
