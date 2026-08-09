@@ -162,13 +162,13 @@ Phase 11 is specified in `docs/specs/011-runtime-configuration-and-provider-read
 
 ### Phase 12: Production frontend and Firebase identity
 
-- [ ] Replace the Phase 9 shell with a maintainable React and Tailwind design system with an abstract component and token layer.
-- [ ] Implement signup, login, logout, session restoration, protected routes, error states, loading states, and Firebase Authentication integration.
-- [ ] Implement job-description entry, PDF resume selection/upload/progress/error handling, interview-mode selection, and setup validation.
-- [ ] Implement active interview controls, microphone permissions, connection state, mute/stop/reconnect controls, live transcript, and interruption feedback.
-- [ ] Implement history, replay, transcript, evaluation, deletion, retention, and account states using real API resources.
-- [ ] Add accessible responsive design and visual evidence for the primary user journeys.
-- [ ] Keep visual code separate from domain/API clients so agents can redesign the UI without changing interview behavior.
+- [x] Replace the Phase 9 shell with a maintainable React and Tailwind design system with an abstract component and token layer.
+- [x] Implement signup, login, logout, session restoration, protected routes, error states, loading states, and Firebase Authentication integration.
+- [x] Implement job-description entry, PDF resume selection/upload/progress/error handling, interview-mode selection, and setup validation.
+- [x] Implement active interview controls, microphone permissions, connection state, mute/stop/reconnect controls, live transcript, and interruption feedback.
+- [x] Implement history, replay, transcript, evaluation, deletion, retention, and account states using real API resources.
+- [x] Add accessible responsive design and visual evidence for the primary user journeys.
+- [x] Keep visual code separate from domain/API clients so agents can redesign the UI without changing interview behavior.
 
 ### Phase 13: Usable browser WebSocket and WebRTC voice loop
 
