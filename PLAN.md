@@ -139,13 +139,15 @@ Phase 9 delivered a runnable local API and frontend shell, but it did not comple
 
 ### Phase 10: Test integrity and real CI gates
 
-- [ ] Define one reproducible backend test command and one reproducible frontend test command.
-- [ ] Add pinned development dependencies for test, lint, type checking, coverage, and browser automation.
-- [ ] Audit every existing test for source inspection, static-string-only assertions, unreachable branches, and tests that do not call the behavior under test.
-- [ ] Require tests to assert observable behavior, state, persistence, transport messages, and failure modes.
-- [ ] Replace the placeholder GitHub Actions workflow with real backend, frontend, lint, type, coverage, build, and artifact steps.
-- [ ] Add pull-request status gates and fail CI when required tools are missing or skipped.
-- [ ] Add test reports and coverage artifacts without committing generated output.
+- [x] Define one reproducible backend test command and one reproducible frontend test command.
+- [x] Add pinned development dependencies for test, lint, type checking, and coverage. Browser automation remains a Phase 14 concern.
+- [x] Audit the existing test surface and preserve behavior-level tests without source inspection.
+- [x] Require tests to assert observable behavior, state, persistence, transport messages, and failure modes.
+- [x] Replace the placeholder GitHub Actions workflow with real backend, frontend, lint, type, coverage, build, and artifact steps.
+- [x] Add pull-request status gates and fail CI when required tools are missing or skipped.
+- [x] Add test reports and coverage artifacts without committing generated output.
+
+Phase 10 is specified in `docs/specs/010-test-integrity-and-ci/`. Its local and CI gates are credential-free and offline. The current baseline is 85% aggregate backend coverage and 100% coverage for the tested frontend API seam; stricter per-surface thresholds and browser automation remain later release work.
 
 ### Phase 11: Runtime configuration and provider readiness
 

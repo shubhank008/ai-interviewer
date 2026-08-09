@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { createSessionRequest, historyRequest } from './api.js'
 import './style.css'
 
-const api = '/api/v1'
+const developmentToken = import.meta.env.VITE_DEV_TOKEN || 'dev-token'
 
-function App() {
+export function App() {
   const [view, setView] = useState('setup')
   const [mode, setMode] = useState('technical')
   const [session, setSession] = useState(null)
@@ -12,7 +13,8 @@ function App() {
   const [message, setMessage] = useState('Ready for a focused practice session.')
 
   async function start() {
-    const response = await fetch(`${api}/sessions`, { method: 'POST', headers: { Authorization: 'Bearer dev-token', 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) })
+    const request = createSessionRequest(mode, developmentToken)
+    const response = await fetch(request.url, request.init)
     if (!response.ok) { setMessage(`Session start failed (${response.status}).`); return }
     const data = await response.json()
     setSession(data)
@@ -21,7 +23,8 @@ function App() {
   }
 
   async function loadHistory() {
-    const response = await fetch(`${api}/history`, { headers: { Authorization: 'Bearer dev-token' } })
+    const request = historyRequest(developmentToken)
+    const response = await fetch(request.url, request.init)
     if (!response.ok) { setMessage(`History load failed (${response.status}).`); return }
     const data = await response.json()
     setHistory(data.payload.interviews)

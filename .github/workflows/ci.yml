@@ -6,19 +6,69 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
 jobs:
   validate:
-    name: Run Validation Checks
+    name: Reproducible validation gates
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Placeholder CI Check
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install Python dependencies
+        run: python -m pip install --requirement requirements-dev.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Backend quality gates
+        run: ./scripts/lint_and_typecheck.sh
+
+      - name: Backend tests, coverage, and offline evidence
+        run: ./scripts/test_backend.sh
+        env:
+          CI: "true"
+
+      - name: Frontend lint, tests, coverage, and build
+        run: ./scripts/test_frontend.sh
+        env:
+          CI: "true"
+
+      - name: Validate required checks are not placeholders
         run: |
-          echo "Simulating CI checks to satisfy no-mistakes..."
-          echo "✅ Linting passed (placeholder)"
-          echo "✅ Type checks passed (placeholder)"
-          echo "✅ Tests passed (placeholder)"
-          exit 0
+          ! grep -R -E 'placeholder|skipped required check' scripts
+          grep -q 'actions/setup-python@v5' .github/workflows/ci.yml
+          grep -q 'actions/setup-node@v4' .github/workflows/ci.yml
+          test -x scripts/lint_and_typecheck.sh
+          test -x scripts/test_backend.sh
+          test -x scripts/test_frontend.sh
+          printf '%s\n' '[PHASE10] ci-config-ok'
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase10-coverage
+          path: |
+            coverage.xml
+            htmlcov/
+            frontend/coverage/
+          if-no-files-found: warn

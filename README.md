@@ -49,7 +49,7 @@ Resume input is PDF-only with a 5 MB limit, while job descriptions are supplied 
 
 ## Project status
 
-The repository has completed the domain and capability foundation, the Phase 2 voice-first session engine, the Phase 3 local document ingestion and retrieval slice, the Phase 4 provider-neutral adapter and benchmark harness, the Phase 5 browser transport and session events slice, the Phase 6 live voice orchestration loop, the Phase 7 provider-independent persistence and user-identity layer, and the Phase 8 deterministic post-interview evaluation. The provider-independent Python package is under `src/interviewer_domain/`, with deterministic providers, a mock voice-shaped turn, recruiter or technical session state-machine coverage, local PDF/text parsing with topic retrieval, provider-neutral STT/TTS/LLM adapters with fallback routing and benchmarking, versioned REST/WebSocket/WebRTC transport seams, cancellable streaming live-voice orchestration with digest-guarded prefetch, ordered TTS scheduling, and timestamped artifacts, owner-checked persistence with retention and deletion, and a deterministic evaluator with mode-specific rubrics and evidence-linked feedback in `tests/`. Run `python -m unittest discover -s tests -v` for the local test gate. Read [`SPEC.md`](SPEC.md) for the product specification and [`PLAN.md`](PLAN.md) for the SDD implementation roadmap. The first implementation will build the voice loop directly rather than creating a separate text-only interview mode.
+The repository has completed the domain and capability foundation, the Phase 2 voice-first session engine, the Phase 3 local document ingestion and retrieval slice, the Phase 4 provider-neutral adapter and benchmark harness, the Phase 5 browser transport and session events slice, the Phase 6 live voice orchestration loop, the Phase 7 provider-independent persistence and user-identity layer, the Phase 8 deterministic post-interview evaluation, the Phase 9 production runtime and API/frontend shell, and the Phase 10 test integrity and CI gates. The provider-independent Python package is under `src/interviewer_domain/`, with deterministic providers, a mock voice-shaped turn, recruiter or technical session state-machine coverage, local PDF/text parsing with topic retrieval, provider-neutral STT/TTS/LLM adapters with fallback routing and benchmarking, versioned REST/WebSocket/WebRTC transport seams, cancellable streaming live-voice orchestration with digest-guarded prefetch, ordered TTS scheduling, and timestamped artifacts, owner-checked persistence with retention and deletion, and a deterministic evaluator with mode-specific rubrics and evidence-linked feedback in `tests/`. Run `python -m unittest discover -s tests -v` for the local test gate. Read [`SPEC.md`](SPEC.md) for the product specification and [`PLAN.md`](PLAN.md) for the SDD implementation roadmap. The first implementation will build the voice loop directly rather than creating a separate text-only interview mode.
 
 Each feature will be developed through the repository's SDD workflow:
 
@@ -89,6 +89,18 @@ npm run build --prefix frontend
 ```
 
 `tests/test_phase9_production.py` calls real ASGI routes and public domain interfaces across ingestion, retrieval, provider routing, live voice, transport, persistence, evaluation, failure, reconnect, cancellation, partial audio, authorization, retention, rate limits, benchmarks, and privacy boundaries. It does not grep source strings or depend on credentials, network, browser automation, or heavyweight models.
+
+For the strict Phase 10 gate, install the pinned development tools and run:
+
+```bash
+pip install -r requirements-dev.txt
+./scripts/lint_and_typecheck.sh
+./scripts/test_backend.sh
+npm ci --prefix frontend
+./scripts/test_frontend.sh
+```
+
+The backend gate runs 50 offline unittest cases, the mock interview evidence path, and an enforced 80% aggregate coverage floor. The frontend gate runs ESLint, Node tests with an 80% line/function/statement and 70% branch coverage floor, and a production Vite build. These gates are credential-free and do not claim provider, browser, or production readiness. Generated coverage and frontend build output are ignored by Git. GitHub Actions runs the same scripts and uploads coverage reports.
 
 ### Docker, deployment, and architecture
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
-set -u
-PYTHONPATH=src python -m compileall -q src tests
-if command -v ruff >/dev/null 2>&1; then ruff check src tests; else echo 'ruff not installed; compile check completed'; fi
-if command -v mypy >/dev/null 2>&1; then mypy src; else echo 'mypy not installed; type check skipped'; fi
-npm run build --prefix frontend
-printf '%s\n' '[PHASE9] frontend-build-ok'
+set -eu
+
+export PYTHONPATH="src${PYTHONPATH:+:${PYTHONPATH}}"
+python -m compileall -q src tests
+python -m ruff check src tests
+python -m mypy src
+printf '%s\n' '[PHASE10] backend-quality-ok'
