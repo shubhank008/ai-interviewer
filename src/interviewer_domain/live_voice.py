@@ -61,7 +61,6 @@ class AudioScheduler:
 
     def __init__(self) -> None:
         self._interrupted = False
-        self.played: list[TimestampedAudio] = []
 
     def interrupt(self) -> None:
         """Prevent any not-yet-scheduled chunk from being played."""
@@ -84,7 +83,6 @@ class AudioScheduler:
             for item in pending
             if not self._interrupted
         )
-        self.played.extend(output)
         return output
 
 
