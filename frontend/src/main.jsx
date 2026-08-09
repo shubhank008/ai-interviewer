@@ -13,6 +13,7 @@ function App() {
 
   async function start() {
     const response = await fetch(`${api}/sessions`, { method: 'POST', headers: { Authorization: 'Bearer dev-token', 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) })
+    if (!response.ok) { setMessage(`Session start failed (${response.status}).`); return }
     const data = await response.json()
     setSession(data)
     setMessage('Session created. The voice loop can now begin.')
@@ -21,7 +22,9 @@ function App() {
 
   async function loadHistory() {
     const response = await fetch(`${api}/history`, { headers: { Authorization: 'Bearer dev-token' } })
-    setHistory((await response.json()).payload.interviews)
+    if (!response.ok) { setMessage(`History load failed (${response.status}).`); return }
+    const data = await response.json()
+    setHistory(data.payload.interviews)
     setView('history')
   }
 

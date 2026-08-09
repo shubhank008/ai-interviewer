@@ -23,6 +23,7 @@ from interviewer_domain.persistence import (
     InterviewRecord,
 )
 from interviewer_domain.providers import (
+    InMemoryDataStore,
     InMemoryEventBus,
     InMemoryLLM,
     InMemoryStreamingLLM,
@@ -94,9 +95,7 @@ class Phase9Tests(unittest.TestCase):
         asyncio.run(retriever.index(chunks))
         self.assertTrue(asyncio.run(retriever.retrieve("Python APIs", 1)))
         session = InterviewSession("candidate", InterviewMode.TECHNICAL)
-        store = __import__(
-            "interviewer_domain.providers", fromlist=["InMemoryDataStore"]
-        ).InMemoryDataStore()
+        store = InMemoryDataStore()
         events = InMemoryEventBus()
         voice = LiveVoiceOrchestrator(
             session,
