@@ -8,7 +8,12 @@ from pathlib import Path
 from uuid import uuid4
 
 from interviewer_domain.contracts import ErrorCode, ProviderError
-from interviewer_domain.models import Evaluation, InterviewMode, Recording, TranscriptSegment
+from interviewer_domain.models import (
+    Evaluation,
+    InterviewMode,
+    Recording,
+    TranscriptSegment,
+)
 from interviewer_domain.persistence import (
     FirebaseAuthAdapter,
     FirestoreDataStore,

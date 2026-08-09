@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import mimetypes
 import shutil
 from dataclasses import asdict, dataclass, field
@@ -39,7 +38,7 @@ class InterviewRecord:
     expires_at: datetime | None = None
     status: str = "created"
 
-    def with_retention(self, days: int = DEFAULT_RETENTION_DAYS) -> "InterviewRecord":
+    def with_retention(self, days: int = DEFAULT_RETENTION_DAYS) -> InterviewRecord:
         """Return this record with a deterministic retention boundary."""
         if days < 1:
             raise ValueError("retention days must be positive")
