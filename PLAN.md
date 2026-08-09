@@ -4,6 +4,12 @@
 
 This document tracks the initial implementation roadmap for the voice-native AI mock interview platform. `SPEC.md` defines the product and architecture requirements. Each implementation slice must receive a focused feature specification and plan under `docs/specs/` before code is written.
 
+## Current status
+
+Phases 0 through 9 provide the provider-independent domain foundation, deterministic offline pipeline, persistence seams, evaluation, and an initial API/frontend shell. The repository is not yet ready for a live demo. The mandatory production-readiness program is phases 10 through 16: real CI, configuration, selected providers, complete frontend identity and setup, browser WebSocket/WebRTC integration, full user E2E acceptance, opt-in provider integrations, enforced coverage, and release rehearsal.
+
+A passing offline test suite proves deterministic code-path behavior only. It does not prove that Firebase, storage, STT, TTS, LLM, WebRTC, browser permissions, deployment configuration, or production observability work together.
+
 ## Guiding principles
 
 - Build capability interfaces before provider integrations.
@@ -98,7 +104,7 @@ The Phase 6 local live voice slice is specified in `docs/specs/006-live-voice-lo
 - [x] Add Firestore behind `DataStore`.
 - [x] Add local filesystem or Docker-volume storage through `StorageProvider`.
 - [x] Add remote or S3-compatible storage implementations for deployment environments.
-- [x] Define provider-neutral interview setup, active interview, history, replay, transcript, and results resource contracts. No frontend tree exists yet, so no React stack was invented in this phase.
+- [x] Define provider-neutral interview setup, active interview, history, replay, transcript, and results resource contracts. The real browser UI and Firebase flows are intentionally deferred to the post-Phase-9 production-readiness program.
 - [x] Enforce access control, 14-day retention, complete dataset deletion, upload validation, and rate limits.
 
 The Phase 7 slice is specified in `docs/specs/007-persistence-user-identity/`. It provides injected Firebase Auth, Firestore, local filesystem, and S3-compatible seams, ownership and retention enforcement, complete deletion, bounded PDF uploads, fixed-window rate limiting, and deterministic UI-independent resource contracts.
@@ -125,21 +131,90 @@ The Phase 8 local evaluation slice is specified in `docs/specs/008-post-intervie
 - [ ] Add hosted observability dashboards and select production providers from deployment-specific evidence.
 - [x] Document Docker/local deployment and hosted component boundaries.
 
-Phase 9 is specified in `docs/specs/009-production-hardening/`. The deterministic production boundary is intentionally credential-free: FastAPI composes in-memory capabilities locally, while deployment adapters remain replaceable behind existing interfaces. The frontend is a runnable Vite application rather than a placeholder, and the offline gate executes public methods and ASGI routes instead of inspecting source strings.
+Phase 9 is specified in `docs/specs/009-production-hardening/`. Its deterministic production boundary is intentionally credential-free: FastAPI composes in-memory capabilities locally, while deployment adapters remain replaceable behind existing interfaces. It provides a runnable Vite/API shell and real offline evidence, but not Firebase signup, configured providers, browser WebSocket/WebRTC media, or live-demo readiness. The offline gate executes public methods and ASGI routes instead of inspecting source strings.
+
+## Post-Phase-9 production-readiness program
+
+Phase 9 delivered a runnable local API and frontend shell, but it did not complete a production browser interview. The following phases are mandatory before the first live demo. They are intentionally separated so a green offline test suite cannot be mistaken for provider, browser, or production readiness.
+
+### Phase 10: Test integrity and real CI gates
+
+- [ ] Define one reproducible backend test command and one reproducible frontend test command.
+- [ ] Add pinned development dependencies for test, lint, type checking, coverage, and browser automation.
+- [ ] Audit every existing test for source inspection, static-string-only assertions, unreachable branches, and tests that do not call the behavior under test.
+- [ ] Require tests to assert observable behavior, state, persistence, transport messages, and failure modes.
+- [ ] Replace the placeholder GitHub Actions workflow with real backend, frontend, lint, type, coverage, build, and artifact steps.
+- [ ] Add pull-request status gates and fail CI when required tools are missing or skipped.
+- [ ] Add test reports and coverage artifacts without committing generated output.
+
+### Phase 11: Runtime configuration and provider readiness
+
+- [ ] Add `.env.example` with documented, non-secret configuration for Firebase, Firestore, storage, STT, TTS, LLM, WebRTC, CORS, retention, rate limits, and observability.
+- [ ] Add typed configuration loading, environment validation, safe defaults, and startup diagnostics that never print secrets.
+- [ ] Add a local development profile using deterministic providers and a production profile requiring explicitly configured providers.
+- [ ] Add provider capability and health checks with fail-fast behavior for required production capabilities.
+- [ ] Implement and benchmark at least one usable production STT, TTS, and LLM path, including fallback behavior.
+- [ ] Document data-sharing, retention, cost, latency, and failure characteristics for every selected provider.
+
+### Phase 12: Production frontend and Firebase identity
+
+- [ ] Replace the Phase 9 shell with a maintainable React and Tailwind design system with an abstract component and token layer.
+- [ ] Implement signup, login, logout, session restoration, protected routes, error states, loading states, and Firebase Authentication integration.
+- [ ] Implement job-description entry, PDF resume selection/upload/progress/error handling, interview-mode selection, and setup validation.
+- [ ] Implement active interview controls, microphone permissions, connection state, mute/stop/reconnect controls, live transcript, and interruption feedback.
+- [ ] Implement history, replay, transcript, evaluation, deletion, retention, and account states using real API resources.
+- [ ] Add accessible responsive design and visual evidence for the primary user journeys.
+- [ ] Keep visual code separate from domain/API clients so agents can redesign the UI without changing interview behavior.
+
+### Phase 13: Usable browser WebSocket and WebRTC voice loop
+
+- [ ] Implement authenticated WebSocket session connection, event envelopes, sequence cursors, reconnect replay, heartbeat, and close/error handling in the API.
+- [ ] Implement authenticated WebRTC signaling, ICE exchange, media-track negotiation, microphone capture, agent audio playback, and teardown.
+- [ ] Connect browser media to the live voice orchestrator and route control/transcript/status events through WebSocket.
+- [ ] Implement browser interruption, cancellation, stale-response rejection, partial transcript updates, final transcript updates, and provider fallback UI.
+- [ ] Persist final audio, transcript, event, and evaluation artifacts through the configured providers.
+- [ ] Add a local deterministic browser mode and a real configured-provider mode without mixing their credentials or behavior.
+
+### Phase 14: Full programmatic user E2E acceptance
+
+- [ ] Build a repeatable user-journey test: signup/login, provide job description, upload a valid local PDF resume, select mode, start, conduct turns, interrupt/reconnect, complete, and view results.
+- [ ] Simulate the candidate voice using a test candidate LLM plus TTS, feed audio through the same browser/media path, and transcribe it through the configured STT path.
+- [ ] Run the interviewer and candidate simulations as separate provider instances; never replace the production pipeline with expected strings.
+- [ ] Verify provider routing, RAG context, session state, WebSocket events, WebRTC media, timestamped transcript, persisted recording, evaluation, score, and deletion.
+- [ ] Add negative journeys for invalid login, unauthorized access, invalid PDF, provider outage, microphone denial, reconnect, cancellation, timeout, and incomplete interviews.
+- [ ] Produce human-readable evidence artifacts and clear pass/fail diagnostics for each journey.
+
+### Phase 15: Opt-in provider integration suite
+
+- [ ] Add separately tagged integration tests for Firebase Auth, Firestore, object storage, STT, TTS, LLM, and WebRTC infrastructure.
+- [ ] Run integrations only when the required environment variables and explicit CI secrets are present; never make them part of the default offline suite.
+- [ ] Validate real authentication claims, provider payload translation, streaming, cancellation, rate limits, cost, latency, retries, and data deletion.
+- [ ] Redact credentials and personal data from logs and test artifacts.
+- [ ] Record provider versions, model names, region, timing, cost, quality, and known limitations.
+
+### Phase 16: Coverage and live-demo release gate
+
+- [ ] Enforce separate backend domain, API, frontend, and browser E2E coverage thresholds in CI.
+- [ ] Require changed production code to have behavior-level tests and require every concrete provider adapter to have an integration or deterministic contract test.
+- [ ] Add coverage trend artifacts and prevent threshold regressions.
+- [ ] Run a clean Docker release candidate from documented instructions.
+- [ ] Verify production configuration, Firebase auth, storage, provider health, HTTPS, CORS, retention, deletion, monitoring, rollback, and incident procedures.
+- [ ] Run a scripted live-demo rehearsal and record the exact selected provider configuration and known limitations.
+- [ ] Declare demo readiness only after all mandatory gates pass; offline deterministic tests alone are insufficient.
 
 ## SDD feature order
 
-The first feature specifications should be created in this order:
+Feature specifications have been completed through `009-production-hardening`. New specifications must be created in this order:
 
-1. `001-domain-capability-foundation`
-2. `002-voice-first-interview-engine`
-3. `003-job-description-resume-rag`
-4. `004-provider-benchmark-harness`
-5. `005-browser-transport-session-events`
-6. `006-live-voice-loop`
-7. `007-persistence-and-user-identity`
-8. `008-post-interview-evaluation`
-9. `009-production-hardening`
+1. `010-test-integrity-and-ci`
+2. `011-runtime-configuration-and-provider-readiness`
+3. `012-production-frontend-and-firebase-identity`
+4. `013-browser-webrtc-websocket-voice-loop`
+5. `014-full-user-e2e-acceptance`
+6. `015-provider-integration-suite`
+7. `016-coverage-and-live-demo-readiness`
+
+Each phase may contain smaller implementation slices, but no phase may be marked complete using only static fixtures or an offline mock when its acceptance criteria require configured infrastructure.
 
 ## Resolved decisions
 
