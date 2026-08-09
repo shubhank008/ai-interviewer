@@ -1,0 +1,10 @@
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+OK
+[WS] ordered session events delivered
+[WS] reconnect replay correlated
+[REST] schemas validated
+[WEBRTC] signaling validated
+[TRANSPORT] media and control separated

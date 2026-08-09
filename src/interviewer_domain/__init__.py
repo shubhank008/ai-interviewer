@@ -16,6 +16,21 @@ from .session import InterviewSessionEngine, QuestionPlanner, SessionStateError
 from .benchmark import BenchmarkReport, ProviderBenchmark
 from .provider_adapters import FasterWhisperSTT, OpenRouterLLM, PiperKokoroTTS
 from .routing import FallbackRouter, ProviderFlags
+from .transport import (
+    BrowserControlTransport,
+    BrowserMediaTransport,
+    CreateSessionRequest,
+    LocalBrowserControlTransport,
+    LocalSessionEventChannel,
+    LocalWebRTCMediaTransport,
+    RestResourceCatalog,
+    SessionEvent,
+    SessionEventType,
+    SessionResponse,
+    SignalingMessage,
+    SignalingType,
+    TransportValidationError,
+)
 
 __all__ = [
     "DeterministicEmbeddingProvider",
@@ -40,4 +55,17 @@ __all__ = [
     "PiperKokoroTTS",
     "FallbackRouter",
     "ProviderFlags",
+    "BrowserControlTransport",
+    "BrowserMediaTransport",
+    "CreateSessionRequest",
+    "LocalBrowserControlTransport",
+    "LocalSessionEventChannel",
+    "LocalWebRTCMediaTransport",
+    "RestResourceCatalog",
+    "SessionEvent",
+    "SessionEventType",
+    "SessionResponse",
+    "SignalingMessage",
+    "SignalingType",
+    "TransportValidationError",
 ]
