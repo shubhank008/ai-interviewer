@@ -28,12 +28,14 @@ The initial application stack is React with Tailwind v4 and shadcn/ui for a mini
 
 Phase 4 adds provider-neutral adapters in `src/interviewer_domain/provider_adapters.py` for Faster-Whisper-compatible STT, Piper/Kokoro-compatible TTS, and OpenRouter-compatible LLM transports. These adapters are optional: tests inject deterministic backends, do not access the network, and do not require credentials or model downloads. `FallbackRouter` and `ProviderFlags` provide configuration seams without placing vendor names in interview business logic. `ProviderBenchmark` records first-byte and end-to-end latency, fixture quality, estimated cost, failures, and CPU time. See `docs/specs/004-provider-benchmark-harness/` for the contract and limitations.
 
-The planned browser communication model is:
+The browser communication model is:
 
-- WebRTC for live microphone and agent audio
-- WebSocket for interview state, transcript events, interruptions, and playback control
-- HTTP REST APIs for setup, uploads, history, recordings, transcripts, and results
-- Optional backend Pub/Sub or event-bus workflows for asynchronous processing and fan-out
+- WebRTC for live microphone and agent audio. Media frames never enter the control channel.
+- WebSocket for ordered interview state, transcript events, interruptions, playback control, and WebRTC signaling.
+- Versioned HTTP REST resources under `/api/v1` for setup and session bootstrap; later phases add uploads, history, recordings, transcripts, and results.
+- Optional backend Pub/Sub or event-bus workflows for asynchronous processing and fan-out.
+
+Phase 5 implements these provider-independent seams in `src/interviewer_domain/transport.py`. `LocalSessionEventChannel` supports strictly ordered, correlated, idempotent events and replay after an acknowledged cursor. `LocalWebRTCMediaTransport` and `LocalBrowserControlTransport` make the media/control boundary executable offline. See [`docs/specs/005-browser-transport-session-events/`](docs/specs/005-browser-transport-session-events/) for the schemas, marker contract, and test plan.
 
 Candidate provider implementations include local Faster-Whisper, hosted Groq Whisper, local Kokoro or Piper, and OpenRouter or self-hosted LLMs. These are comparison candidates, not final production decisions. Local development is Docker-first and CPU-only, with an approximate 4 GB RAM and 250 GB storage target.
 

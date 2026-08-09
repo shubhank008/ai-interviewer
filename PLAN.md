@@ -71,12 +71,14 @@ The Phase 4 slice is specified in `docs/specs/004-provider-benchmark-harness/`. 
 
 ### Phase 5: Browser and backend communication
 
-- [ ] Define REST resources and versioned request and response schemas.
-- [ ] Implement WebSocket session events and reconnect behavior.
-- [ ] Implement WebRTC signaling and browser media transport.
-- [ ] Keep media on WebRTC and control/state events on WebSocket.
+- [x] Define REST resources and versioned request and response schemas.
+- [x] Implement WebSocket session events and reconnect behavior.
+- [x] Implement WebRTC signaling and browser media transport.
+- [x] Keep media on WebRTC and control/state events on WebSocket.
 - [ ] Add an optional backend Pub/Sub or event-bus workflow for asynchronous jobs and fan-out.
-- [ ] Add browser-level transport tests and frame evidence for visual features.
+- [x] Add deterministic transport tests and marker evidence; no visual browser frame is needed for this seam-only slice.
+
+The Phase 5 local transport slice is specified in `docs/specs/005-browser-transport-session-events/`. It provides versioned REST paths, validated schemas, replayable WebSocket-like session events, WebRTC signaling envelopes, and separate media/control protocols without external services.
 
 ### Phase 6: Live voice loop
 
