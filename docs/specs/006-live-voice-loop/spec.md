@@ -26,11 +26,11 @@ The session preserves final and partial transcript segments, timestamped audio a
 ## Acceptance
 
 - [x] Marker contract is written before implementation.
-- [ ] Provider-independent streaming interfaces support incremental STT, cancellable LLM generation, secondary responses, and TTS chunks.
-- [ ] Guarded prefetch results are rejected when their source answer digest is stale.
-- [ ] Audio scheduling preserves chunk order and stops playback after interruption.
-- [ ] Final transcript and audio artifacts retain speaker and millisecond timestamps.
-- [ ] Latency and fallback events are emitted through the existing event seam.
-- [ ] Unit tests cover every concrete deterministic class and a real mock live-voice turn.
-- [ ] Evidence prints every required marker and no forbidden failure pattern.
-- [ ] Documentation, roadmap, and durable landmines are updated.
+- [x] Provider-independent streaming interfaces support incremental STT, cancellable LLM generation, secondary responses, and TTS chunks.
+- [x] Guarded prefetch results are rejected when their source answer digest is stale.
+- [x] Audio scheduling preserves chunk order and stops playback after interruption.
+- [x] Final transcript and audio artifacts retain speaker and millisecond timestamps.
+- [x] Latency and fallback events are emitted through the existing event seam.
+- [x] Unit tests cover every concrete deterministic class and a real mock live-voice turn.
+- [x] Evidence prints every required marker and no forbidden failure pattern.
+- [x] Documentation, roadmap, and durable landmines are updated.

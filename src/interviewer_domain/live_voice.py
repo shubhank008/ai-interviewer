@@ -179,7 +179,7 @@ class LiveVoiceOrchestrator:
                 raise ProviderError(ErrorCode.INVALID_REQUEST, "streaming STT returned no text")
             answer = transcript[-1].text
             await self._emit("transcript.final", {"turn_id": str(turn.id), "text": answer})
-            secondary_text = self.accept_prefetch(answer, turn.sequence) if self.prefetch else None
+            secondary_text = self.accept_prefetch(answer, turn.sequence)
             if secondary_text is None and self.secondary is not None:
                 secondary_text = self._bound_secondary(await self.secondary.generate_secondary(answer, operation_token))
             if secondary_text:
@@ -213,7 +213,8 @@ class LiveVoiceOrchestrator:
                 if index:
                     await self._fallback("stt", index)
                 async for segment in provider.transcribe_stream(audio, turn_id, token):
-                    await self._emit("transcript.partial" if not segment.is_final else "transcript.final", {"turn_id": str(turn_id), "text": segment.text})
+                    if not segment.is_final:
+                        await self._emit("transcript.partial", {"turn_id": str(turn_id), "text": segment.text})
                     yield segment
                 return
             except ProviderError as error:
