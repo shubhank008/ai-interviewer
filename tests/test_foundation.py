@@ -3,7 +3,6 @@
 import asyncio
 import sys
 import unittest
-from uuid import uuid4
 
 sys.path.insert(0, "src")
 

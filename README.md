@@ -90,6 +90,18 @@ npm run build --prefix frontend
 
 `tests/test_phase9_production.py` calls real ASGI routes and public domain interfaces across ingestion, retrieval, provider routing, live voice, transport, persistence, evaluation, failure, reconnect, cancellation, partial audio, authorization, retention, rate limits, benchmarks, and privacy boundaries. It does not grep source strings or depend on credentials, network, browser automation, or heavyweight models.
 
+For the strict Phase 10 gate, install the pinned development tools and run:
+
+```bash
+pip install -r requirements-dev.txt
+./scripts/lint_and_typecheck.sh
+./scripts/test_backend.sh
+npm ci --prefix frontend
+./scripts/test_frontend.sh
+```
+
+The backend gate runs 50 offline unittest cases, the mock interview evidence path, and an enforced 80% aggregate coverage floor. The frontend gate runs ESLint, Node tests with an 80% line/function/statement and 70% branch coverage floor, and a production Vite build. These gates are credential-free and do not claim provider, browser, or production readiness. Generated coverage and frontend build output are ignored by Git. GitHub Actions runs the same scripts and uploads coverage reports.
+
 ### Docker, deployment, and architecture
 
 ```bash

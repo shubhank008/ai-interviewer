@@ -237,6 +237,8 @@ CI must execute, not simulate, the required checks on every pull request:
 
 Missing tools, skipped commands, coverage regressions, failed builds, and missing required artifacts must fail the relevant gate. Generated coverage, dependency, and browser artifacts must not be committed to source control.
 
+Phase 10 establishes the credential-free offline portion of this policy: pinned Python and Node development tools, strict local scripts, an 80% aggregate backend coverage floor, frontend seam coverage, and a real GitHub Actions job with report uploads. Browser, provider, and per-surface release thresholds remain later gates and must not be inferred from this offline result.
+
 ## 9. Delivery phases
 
 1. **Domain and capability foundation:** define normalized models, interfaces, errors, provider routing, configuration, and local test providers.

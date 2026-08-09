@@ -178,6 +178,7 @@ class DeterministicEvaluator:
                 ErrorCode.INVALID_REQUEST, "transcript has no final candidate evidence"
             )
         dimensions: list[dict[str, object]] = []
+        weighted_total = 0.0
         for dimension in normalized_rubric(context.mode):
             matches = [
                 segment
@@ -203,6 +204,7 @@ class DeterministicEvaluator:
             if ambiguous:
                 score -= 10
             score = _clip(score)
+            weighted_total += dimension.weight * score
             dimensions.append(
                 {
                     "key": dimension.key,
@@ -226,9 +228,7 @@ class DeterministicEvaluator:
                     else "No direct final candidate evidence was found; this is a gap, not an inferred claim.",
                 }
             )
-        overall = _clip(
-            sum(float(item["weight"]) * int(item["score"]) for item in dimensions)
-        )
+        overall = _clip(weighted_total)
         supported = [
             item["label"]
             for item in dimensions
