@@ -1,4 +1,15 @@
 """Domain and capability foundation for the voice-first interview platform."""
+from .configuration import (
+    CapabilityReadiness,
+    ConfigurationError,
+    ProviderBackends,
+    ProviderReadinessChecker,
+    RuntimeProfile,
+    RuntimeProviders,
+    RuntimeSettings,
+    compose_providers,
+)
+
 
 from .benchmark import BenchmarkReport, ProviderBenchmark
 from .documents import LocalDocumentParser
@@ -71,6 +82,8 @@ from .transport import (
 
 __all__ = [
     "DEFAULT_RETENTION_DAYS",
+    "CapabilityReadiness",
+    "ConfigurationError",
     "EVALUATION_VERSION",
     "MAX_RESUME_BYTES",
     "AudioScheduler",
@@ -106,6 +119,8 @@ __all__ = [
     "PersistenceService",
     "PiperKokoroTTS",
     "PostInterviewEvaluationService",
+    "ProviderBackends",
+    "ProviderReadinessChecker",
     "PrefetchGuard",
     "PrefetchedResponse",
     "ProviderBenchmark",
@@ -113,6 +128,9 @@ __all__ = [
     "QuestionPlan",
     "QuestionPlanner",
     "RestResourceCatalog",
+    "RuntimeProfile",
+    "RuntimeProviders",
+    "RuntimeSettings",
     "RetrievedEvidence",
     "S3CompatibleStorage",
     "SessionEvent",
@@ -120,6 +138,7 @@ __all__ = [
     "SessionResponse",
     "SessionStateError",
     "SessionStatus",
+    "compose_providers",
     "SignalingMessage",
     "SignalingType",
     "StoredArtifact",
