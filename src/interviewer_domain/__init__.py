@@ -20,6 +20,24 @@ from .retrieval import (
 )
 from .routing import FallbackRouter, ProviderFlags
 from .live_voice import AudioScheduler, LiveVoiceOrchestrator, LiveVoiceTurnResult, PrefetchGuard, PrefetchedResponse, TimestampedAudio
+from .persistence import (
+    DEFAULT_RETENTION_DAYS,
+    MAX_RESUME_BYTES,
+    FirebaseAuthAdapter,
+    FirestoreDataStore,
+    FixedWindowRateLimiter,
+    InMemoryAuthProvider,
+    InMemoryPersistentDataStore,
+    InterviewRecord,
+    LocalFilesystemStorage,
+    PersistenceService,
+    S3CompatibleStorage,
+    StoredArtifact,
+    UXResource,
+    Upload,
+    UploadValidator,
+    UserIdentity,
+)
 from .session import InterviewSessionEngine, QuestionPlanner, SessionStateError
 from .transport import (
     BrowserControlTransport,
@@ -40,6 +58,22 @@ from .transport import (
 __all__ = [
     "AudioScheduler",
     "BenchmarkReport",
+    "DEFAULT_RETENTION_DAYS",
+    "MAX_RESUME_BYTES",
+    "FirebaseAuthAdapter",
+    "FirestoreDataStore",
+    "FixedWindowRateLimiter",
+    "InMemoryAuthProvider",
+    "InMemoryPersistentDataStore",
+    "InterviewRecord",
+    "LocalFilesystemStorage",
+    "PersistenceService",
+    "S3CompatibleStorage",
+    "StoredArtifact",
+    "UXResource",
+    "Upload",
+    "UploadValidator",
+    "UserIdentity",
     "LiveVoiceOrchestrator",
     "LiveVoiceTurnResult",
     "PrefetchGuard",

@@ -1,0 +1,427 @@
+"""Provider-independent identity, persistence, retention, and storage services."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import mimetypes
+import shutil
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta, timezone
+from pathlib import Path, PurePosixPath
+from typing import Any, Protocol
+from uuid import UUID, uuid4
+
+from .contracts import ErrorCode, ProviderError
+from .models import Evaluation, InterviewMode, Recording, TranscriptSegment
+
+DEFAULT_RETENTION_DAYS = 14
+MAX_RESUME_BYTES = 5 * 1024 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class UserIdentity:
+    """Normalized authenticated identity claims."""
+
+    user_id: str
+    email: str | None = None
+    claims: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class InterviewRecord:
+    """Minimal durable interview metadata with an explicit owner and expiry."""
+
+    user_id: str
+    mode: InterviewMode
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime | None = None
+    status: str = "created"
+
+    def with_retention(self, days: int = DEFAULT_RETENTION_DAYS) -> "InterviewRecord":
+        """Return this record with a deterministic retention boundary."""
+        if days < 1:
+            raise ValueError("retention days must be positive")
+        return InterviewRecord(self.user_id, self.mode, self.id, self.created_at, self.created_at + timedelta(days=days), self.status)
+
+
+@dataclass(frozen=True, slots=True)
+class StoredArtifact:
+    """Metadata for an opaque user-owned file."""
+
+    interview_id: UUID
+    user_id: str
+    key: str
+    content_type: str
+    size: int
+    sha256: str
+    expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class Upload:
+    """Validated upload input before it crosses a storage boundary."""
+
+    filename: str
+    content: bytes
+    content_type: str
+
+
+@dataclass(frozen=True, slots=True)
+class UXResource:
+    """Stable UI-independent resource contract for a named user view."""
+
+    view: str
+    interview_id: UUID | None
+    payload: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize a view resource using JSON-safe values."""
+        return {"view": self.view, "interview_id": str(self.interview_id) if self.interview_id else None, "payload": self.payload}
+
+
+class AuthBackend(Protocol):
+    """Small backend seam for a hosted identity provider."""
+
+    def verify(self, token: str) -> dict[str, Any]: ...
+
+
+class FirestoreBackend(Protocol):
+    """Small document backend seam used by the Firestore adapter."""
+
+    def set(self, collection: str, document_id: str, value: dict[str, Any]) -> None: ...
+    def get(self, collection: str, document_id: str) -> dict[str, Any] | None: ...
+    def list(self, collection: str, field: str, value: str) -> list[dict[str, Any]]: ...
+    def delete_collection_value(self, collection: str, field: str, value: str) -> None: ...
+
+
+class ObjectBackend(Protocol):
+    """Small object backend seam for S3-compatible storage."""
+
+    def put_object(self, key: str, content: bytes, content_type: str) -> None: ...
+    def get_object(self, key: str) -> bytes: ...
+    def delete_prefix(self, prefix: str) -> None: ...
+
+
+class PersistentDataStore(Protocol):
+    """Durable data capability needed by the Phase 7 service."""
+
+    def save_interview(self, record: InterviewRecord) -> None: ...
+    def get_interview(self, user_id: str, interview_id: UUID) -> InterviewRecord: ...
+    def list_interviews(self, user_id: str, now: datetime) -> list[InterviewRecord]: ...
+    def save_transcript(self, user_id: str, interview_id: UUID, segment: TranscriptSegment) -> None: ...
+    def save_recording(self, user_id: str, interview_id: UUID, recording: Recording) -> None: ...
+    def save_evaluation(self, user_id: str, interview_id: UUID, evaluation: Evaluation) -> None: ...
+    def save_document_reference(self, user_id: str, interview_id: UUID, key: str) -> None: ...
+    def delete_interview(self, user_id: str, interview_id: UUID) -> None: ...
+
+
+class PersistentStorageProvider(Protocol):
+    """Durable opaque-file capability needed by the Phase 7 service."""
+
+    def put(self, key: str, content: bytes, content_type: str) -> None: ...
+    def get(self, key: str) -> bytes: ...
+    def delete_prefix(self, prefix: str) -> None: ...
+
+
+class InMemoryAuthProvider:
+    """Deterministic token identity provider for local tests."""
+
+    def __init__(self, tokens: dict[str, UserIdentity] | None = None) -> None:
+        self.tokens = tokens or {}
+
+    async def validate(self, token: str) -> str:
+        """Resolve a token to an opaque user ID without exposing claims."""
+        try:
+            return self.tokens[token].user_id
+        except KeyError as exc:
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "invalid authentication token") from exc
+
+
+class FirebaseAuthAdapter:
+    """Firebase Authentication adapter using an injected verification backend."""
+
+    def __init__(self, backend: AuthBackend) -> None:
+        self.backend = backend
+
+    async def validate(self, token: str) -> str:
+        """Verify a Firebase token while keeping SDK details outside the domain."""
+        if not token:
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "authentication token is empty")
+        try:
+            claims = self.backend.verify(token)
+            user_id = str(claims["uid"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "invalid authentication token") from exc
+        if not user_id:
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "authentication identity is empty")
+        return user_id
+
+
+class InMemoryPersistentDataStore:
+    """Complete deterministic data store for the real mock persistence path."""
+
+    def __init__(self) -> None:
+        self.interviews: dict[UUID, InterviewRecord] = {}
+        self.transcripts: dict[UUID, list[TranscriptSegment]] = {}
+        self.recordings: dict[UUID, Recording] = {}
+        self.evaluations: dict[UUID, Evaluation] = {}
+        self.documents: dict[UUID, list[str]] = {}
+
+    def save_interview(self, record: InterviewRecord) -> None:
+        """Save an interview metadata record."""
+        self.interviews[record.id] = record
+
+    def get_interview(self, user_id: str, interview_id: UUID, now: datetime | None = None) -> InterviewRecord:
+        """Return an owned, non-expired interview or a safe not-found error."""
+        record = self.interviews.get(interview_id)
+        current = now or datetime.now(timezone.utc)
+        if record is None or record.user_id != user_id or (record.expires_at is not None and record.expires_at <= current):
+            raise ProviderError(ErrorCode.UNAVAILABLE, "interview not found")
+        return record
+
+    def list_interviews(self, user_id: str, now: datetime) -> list[InterviewRecord]:
+        """List only owned records that remain within their retention boundary."""
+        return [r for r in self.interviews.values() if r.user_id == user_id and (r.expires_at is None or r.expires_at > now)]
+
+    def save_transcript(self, user_id: str, interview_id: UUID, segment: TranscriptSegment) -> None:
+        """Persist a transcript segment after checking interview ownership."""
+        self.get_interview(user_id, interview_id)
+        self.transcripts.setdefault(interview_id, []).append(segment)
+
+    def save_recording(self, user_id: str, interview_id: UUID, recording: Recording) -> None:
+        """Persist recording metadata after checking interview ownership."""
+        self.get_interview(user_id, interview_id)
+        self.recordings[interview_id] = recording
+
+    def save_evaluation(self, user_id: str, interview_id: UUID, evaluation: Evaluation) -> None:
+        """Persist evaluation metadata after checking interview ownership."""
+        self.get_interview(user_id, interview_id)
+        self.evaluations[interview_id] = evaluation
+
+    def save_document_reference(self, user_id: str, interview_id: UUID, key: str) -> None:
+        """Persist a document storage reference after checking ownership."""
+        self.get_interview(user_id, interview_id)
+        self.documents.setdefault(interview_id, []).append(key)
+
+    def delete_interview(self, user_id: str, interview_id: UUID) -> None:
+        """Delete every data category belonging to one owned interview, including expired data."""
+        record = self.interviews.get(interview_id)
+        if record is None or record.user_id != user_id:
+            raise ProviderError(ErrorCode.UNAVAILABLE, "interview not found")
+        self.interviews.pop(interview_id, None)
+        self.transcripts.pop(interview_id, None)
+        self.recordings.pop(interview_id, None)
+        self.evaluations.pop(interview_id, None)
+        self.documents.pop(interview_id, None)
+
+    def purge_expired(self, now: datetime) -> list[UUID]:
+        """Delete expired metadata and dependent in-store records."""
+        expired = [r for r in self.interviews.values() if r.expires_at is not None and r.expires_at <= now]
+        for record in expired:
+            self.interviews.pop(record.id, None)
+            self.transcripts.pop(record.id, None)
+            self.recordings.pop(record.id, None)
+            self.evaluations.pop(record.id, None)
+            self.documents.pop(record.id, None)
+        return [record.id for record in expired]
+
+
+class FirestoreDataStore:
+    """Firestore adapter using an injected document backend and normalized records."""
+
+    def __init__(self, backend: FirestoreBackend, collection: str = "interviews") -> None:
+        self.backend = backend
+        self.collection = collection
+
+    def save_interview(self, record: InterviewRecord) -> None:
+        """Write a normalized interview document."""
+        self.backend.set(self.collection, str(record.id), _json_record(record))
+
+    def get_interview(self, user_id: str, interview_id: UUID, now: datetime | None = None) -> InterviewRecord:
+        """Read and authorize one Firestore interview document."""
+        value = self.backend.get(self.collection, str(interview_id))
+        record = _record_from_json(value) if value is not None else None
+        current = now or datetime.now(timezone.utc)
+        if record is None or record.user_id != user_id or (record.expires_at is not None and record.expires_at <= current):
+            raise ProviderError(ErrorCode.UNAVAILABLE, "interview not found")
+        return record
+
+    def list_interviews(self, user_id: str, now: datetime) -> list[InterviewRecord]:
+        """List owned, non-expired Firestore interview documents."""
+        return [r for r in (_record_from_json(v) for v in self.backend.list(self.collection, "user_id", user_id)) if r.expires_at is None or r.expires_at > now]
+
+    def save_transcript(self, user_id: str, interview_id: UUID, segment: TranscriptSegment) -> None:
+        """Persist a transcript in the interview subcollection."""
+        self.get_interview(user_id, interview_id)
+        self.backend.set(f"{self.collection}/{interview_id}/transcripts", str(uuid4()), asdict(segment))
+
+    def save_recording(self, user_id: str, interview_id: UUID, recording: Recording) -> None:
+        """Persist recording metadata in the interview document."""
+        self.get_interview(user_id, interview_id)
+        self.backend.set(f"{self.collection}/{interview_id}", "recording", asdict(recording))
+
+    def save_evaluation(self, user_id: str, interview_id: UUID, evaluation: Evaluation) -> None:
+        """Persist evaluation metadata in the interview document."""
+        self.get_interview(user_id, interview_id)
+        self.backend.set(f"{self.collection}/{interview_id}", "evaluation", asdict(evaluation))
+
+    def save_document_reference(self, user_id: str, interview_id: UUID, key: str) -> None:
+        """Persist an opaque document reference for an owned interview."""
+        self.get_interview(user_id, interview_id)
+        self.backend.set(f"{self.collection}/{interview_id}", "document", {"key": key})
+
+    def delete_interview(self, user_id: str, interview_id: UUID) -> None:
+        """Delete all Firestore documents for an owned interview, including expired data."""
+        value = self.backend.get(self.collection, str(interview_id))
+        if value is None or value.get("user_id") != user_id:
+            raise ProviderError(ErrorCode.UNAVAILABLE, "interview not found")
+        self.backend.delete_collection_value(self.collection, "id", str(interview_id))
+
+
+class LocalFilesystemStorage:
+    """Filesystem storage rooted in a local directory or Docker volume."""
+
+    def __init__(self, root: str | Path) -> None:
+        self.root = Path(root).resolve()
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def _path(self, key: str) -> Path:
+        """Resolve a safe relative key below the configured root."""
+        path = (self.root / PurePosixPath(key)).resolve()
+        if self.root not in path.parents:
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "storage key escapes storage root")
+        return path
+
+    def put(self, key: str, content: bytes, content_type: str) -> None:
+        """Write bytes and a small content-type sidecar atomically enough for local use."""
+        path = self._path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        path.with_suffix(path.suffix + ".content-type").write_text(content_type, encoding="utf-8")
+
+    def get(self, key: str) -> bytes:
+        """Read an object or return a normalized not-found error."""
+        try:
+            return self._path(key).read_bytes()
+        except FileNotFoundError as exc:
+            raise ProviderError(ErrorCode.UNAVAILABLE, "storage key not found") from exc
+
+    def delete_prefix(self, prefix: str) -> None:
+        """Delete all objects under an interview prefix."""
+        path = self._path(prefix)
+        if path.exists():
+            shutil.rmtree(path) if path.is_dir() else path.unlink()
+
+
+class S3CompatibleStorage:
+    """S3-compatible adapter using an injected object client."""
+
+    def __init__(self, backend: ObjectBackend) -> None:
+        self.backend = backend
+
+    def put(self, key: str, content: bytes, content_type: str) -> None:
+        """Delegate object upload without importing an S3 SDK."""
+        self.backend.put_object(key, content, content_type)
+
+    def get(self, key: str) -> bytes:
+        """Read an object and normalize backend lookup failures."""
+        try:
+            return self.backend.get_object(key)
+        except KeyError as exc:
+            raise ProviderError(ErrorCode.UNAVAILABLE, "storage key not found") from exc
+
+    def delete_prefix(self, prefix: str) -> None:
+        """Delete all objects under an interview prefix."""
+        self.backend.delete_prefix(prefix)
+
+
+class UploadValidator:
+    """Validate untrusted resume uploads before persistence."""
+
+    def validate_resume(self, filename: str, content: bytes, content_type: str | None = None) -> Upload:
+        """Require a PDF signature, PDF-like name, and the configured size bound."""
+        if len(content) > MAX_RESUME_BYTES:
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "resume exceeds 5 MB limit")
+        if not filename.lower().endswith(".pdf") or not content.startswith(b"%PDF"):
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "resume must be a PDF")
+        normalized_type = content_type or mimetypes.guess_type(filename)[0] or "application/pdf"
+        if normalized_type != "application/pdf":
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "resume content type must be application/pdf")
+        return Upload(filename, content, normalized_type)
+
+
+class FixedWindowRateLimiter:
+    """Deterministic per-key fixed-window request limiter."""
+
+    def __init__(self, limit: int = 60, window_seconds: int = 60) -> None:
+        if limit < 1 or window_seconds < 1:
+            raise ValueError("rate-limit values must be positive")
+        self.limit = limit
+        self.window = timedelta(seconds=window_seconds)
+        self._state: dict[str, tuple[datetime, int]] = {}
+
+    def allow(self, key: str, now: datetime) -> bool:
+        """Return whether this request remains within the current window."""
+        started, count = self._state.get(key, (now, 0))
+        if now - started >= self.window:
+            started, count = now, 0
+        if count >= self.limit:
+            self._state[key] = (started, count)
+            return False
+        self._state[key] = (started, count + 1)
+        return True
+
+
+class PersistenceService:
+    """Coordinate ownership, retention, artifacts, and UI resource contracts."""
+
+    def __init__(self, data: PersistentDataStore, storage: PersistentStorageProvider, retention_days: int = DEFAULT_RETENTION_DAYS) -> None:
+        self.data = data
+        self.storage = storage
+        self.retention_days = retention_days
+
+    def create_interview(self, user_id: str, mode: InterviewMode, now: datetime) -> InterviewRecord:
+        """Create an owned interview with an explicit retention boundary."""
+        record = InterviewRecord(user_id, mode, created_at=now).with_retention(self.retention_days)
+        self.data.save_interview(record)
+        return record
+
+    def save_upload(self, user_id: str, interview_id: UUID, upload: Upload, now: datetime) -> StoredArtifact:
+        """Store a validated upload under an owner and interview scoped key."""
+        record = self.data.get_interview(user_id, interview_id)
+        key = f"users/{user_id}/interviews/{interview_id}/documents/{uuid4()}-{upload.filename}"
+        self.storage.put(key, upload.content, upload.content_type)
+        self.data.save_document_reference(user_id, interview_id, key)
+        return StoredArtifact(interview_id, user_id, key, upload.content_type, len(upload.content), hashlib.sha256(upload.content).hexdigest(), record.expires_at or now + timedelta(days=self.retention_days))
+
+    def delete_interview(self, user_id: str, interview_id: UUID) -> None:
+        """Delete metadata and all opaque files for one authorized interview."""
+        self.storage.delete_prefix(f"users/{user_id}/interviews/{interview_id}")
+        self.data.delete_interview(user_id, interview_id)
+
+    def resource(self, user_id: str, view: str, interview_id: UUID | None = None, now: datetime | None = None) -> UXResource:
+        """Build provider-neutral setup, active, history, replay, transcript, or results data."""
+        current = now or datetime.now(timezone.utc)
+        if view == "history":
+            return UXResource(view, None, {"interviews": [_json_record(r) for r in self.data.list_interviews(user_id, current)]})
+        if interview_id is None:
+            return UXResource(view, None, {"user_id": user_id})
+        record = self.data.get_interview(user_id, interview_id)
+        return UXResource(view, interview_id, {"interview": _json_record(record), "available": view in {"active", "replay", "transcript", "results"}})
+
+
+def _json_record(record: InterviewRecord) -> dict[str, Any]:
+    """Convert normalized metadata into a JSON-safe dictionary."""
+    value = asdict(record)
+    value["id"] = str(record.id)
+    value["mode"] = record.mode.value
+    value["created_at"] = record.created_at.isoformat()
+    value["expires_at"] = record.expires_at.isoformat() if record.expires_at else None
+    return value
+
+
+def _record_from_json(value: dict[str, Any]) -> InterviewRecord:
+    """Restore normalized metadata from a provider document."""
+    return InterviewRecord(str(value["user_id"]), InterviewMode(value["mode"]), UUID(str(value["id"])), datetime.fromisoformat(value["created_at"]), datetime.fromisoformat(value["expires_at"]) if value.get("expires_at") else None, str(value.get("status", "created")))
