@@ -90,6 +90,11 @@ A production interview is not complete until a real browser can:
 
 The local deterministic browser profile may use in-memory providers, but it must exercise the same API, WebSocket, WebRTC, persistence, and UI contracts. It must not be treated as evidence that configured production providers work.
 
+
+### 2.7 Phase 12 implementation status
+
+The React frontend now provides a protected, responsive application shell, deterministic local identity journey, setup validation, PDF selection and progress/error surfaces, live interview control states, history and feedback states, and a provider-neutral configured-auth seam. The local journey is verified with behavior tests and browser frames. Firebase configuration, real upload persistence, microphone/WebRTC/WebSocket media, replay, and completed evaluation retrieval remain deployment or subsequent integration work and are not claimed by local evidence.
+
 ## 3. Capability-based architecture
 
 Business logic must depend on capability interfaces, not vendors. Every production, local, test, and experimental implementation is an interchangeable provider selected through configuration and runtime routing.

@@ -97,6 +97,13 @@ Copy `.env.example` to the deployment environment and set `APP_PROFILE=local` fo
 Production-shaped STT, TTS, and LLM adapters are `FasterWhisperSTT`, `PiperKokoroTTS`, and `OpenRouterLLM`, selected through existing capability interfaces and injected backend or transport seams. `FallbackRouter` tries configured providers in order. The default tests never download models or call networks. See [`docs/provider-readiness.md`](docs/provider-readiness.md) for provider data sharing, retention, cost, latency, and failure characteristics. Run `./scripts/test_phase11.sh` to verify all Phase 11 markers and forbidden-pattern guards. This evidence does not claim real provider, Firebase, browser, or WebRTC readiness.
 
 
+## Phase 12 production frontend and identity
+
+Phase 12 adds the production-shaped React workspace in `frontend/src/`. It uses an editorial field-notebook visual system with responsive setup, live-room, history, feedback, loading, empty, validation, permission, reconnect, provider-error, deletion, retention, and offline states. Visual components live in `ui.jsx` and `style.css`; versioned request builders remain in `api.js`; identity is behind `AuthProvider`-shaped functions in `auth.js`.
+
+The default browser path uses a deterministic, credential-free local profile persisted in session storage. `configuredAuthProvider(adapter)` is the seam for a Firebase adapter, but Firebase credentials and SDK setup are intentionally not included. The local sign-in and setup screenshots are evidence of the UI composition only, not Firebase, WebSocket, WebRTC, microphone, or external provider readiness. Run `./scripts/test_phase12.sh` for exact marker evidence and `npm run test:coverage --prefix frontend` for the frontend behavior gate. Browser evidence is saved outside Git at `/home/openhands/.openhands/agent-canvas/conversations/067dc08685fd4d25a5d690c3f62dd0d9/observations/`.
+
+
 For the strict Phase 10 gate, install the pinned development tools and run:
 
 ```bash
