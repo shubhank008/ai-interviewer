@@ -124,7 +124,6 @@ class LocalSessionEventChannel:
         self.session_id = session_id
         self._events: deque[SessionEvent] = deque(maxlen=retention)
         self._next_sequence = 0
-        self._keys: set[str] = set()
 
     def publish(self, event_type: SessionEventType, payload: dict[str, Any], correlation_id: str, idempotency_key: str | None = None) -> SessionEvent:
         """Append one event or return the previously accepted idempotent event."""
@@ -137,7 +136,6 @@ class LocalSessionEventChannel:
         self._next_sequence += 1
         event = SessionEvent(self.session_id, self._next_sequence, event_type, dict(payload), correlation_id, key)
         self._events.append(event)
-        self._keys.add(key)
         return event
 
     def replay(self, session_id: UUID, after_sequence: int = 0) -> list[SessionEvent]:

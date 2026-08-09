@@ -73,6 +73,23 @@ class BrowserTransportTests(unittest.TestCase):
         print("[WEBRTC] signaling validated")
         print("[TRANSPORT] media and control separated")
 
+    def test_signaling_answer_and_ice_candidate_validation(self) -> None:
+        """Validate required fields for ANSWER and ICE_CANDIDATE signaling types."""
+        session_id = uuid4()
+        answer = SignalingMessage(session_id, SignalingType.ANSWER, {"sdp": "v=0"}, "negotiation-1")
+        self.assertEqual(SignalingType.ANSWER, answer.message_type)
+        with self.assertRaises(TransportValidationError):
+            SignalingMessage(session_id, SignalingType.ANSWER, {"sdp": ""}, "negotiation-1")
+        with self.assertRaises(TransportValidationError):
+            SignalingMessage(session_id, SignalingType.ANSWER, {}, "negotiation-1")
+        ice = SignalingMessage(session_id, SignalingType.ICE_CANDIDATE, {"candidate": "candidate:1"}, "negotiation-2")
+        self.assertEqual(SignalingType.ICE_CANDIDATE, ice.message_type)
+        with self.assertRaises(TransportValidationError):
+            SignalingMessage(session_id, SignalingType.ICE_CANDIDATE, {"candidate": ""}, "negotiation-2")
+        with self.assertRaises(TransportValidationError):
+            SignalingMessage(session_id, SignalingType.ICE_CANDIDATE, {}, "negotiation-2")
+        print("[WEBRTC] answer and ICE candidate validated")
+
 
 if __name__ == "__main__":
     unittest.main()
