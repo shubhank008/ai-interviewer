@@ -73,8 +73,7 @@ class LocalDocumentParser:
                 start_line = line_number + 1
         if current:
             candidate = " ".join(current)
-            if len(candidate) >= MIN_CHUNK_LENGTH or not chunks:
-                chunks.append(self._make_chunk(source, section, candidate, start_line))
+            chunks.append(self._make_chunk(source, section, candidate, start_line))
         return chunks
 
     @staticmethod

@@ -60,7 +60,7 @@ class DocumentRagTests(unittest.TestCase):
         results = asyncio.run(retriever.retrieve("Python distributed systems", 1))
         self.assertEqual(len(results), 1)
         self.assertIs(results[0].chunk.source, DocumentSource.RESUME)
-        self.assertGreaterEqual(results[0].score, -1.0)
+        self.assertGreater(results[0].score, 0.0, "relevant chunk must score above zero against unrelated noise")
         print("[RAG] retrieval-ok")
 
     def test_mock_ingestion_path(self) -> None:
