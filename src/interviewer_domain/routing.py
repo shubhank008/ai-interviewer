@@ -14,6 +14,7 @@ class HealthCapable(Protocol):
 
 
 T = TypeVar("T", bound="HealthCapable")
+C = TypeVar("C")
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,12 +35,12 @@ class FallbackRouter(Generic[T]):
         self.providers = tuple(providers)
         self.operation = operation
 
-    async def run(self, call: Callable[[T, CancellationToken], Awaitable[object]], token: CancellationToken) -> object:
+    async def run(self, call: Callable[[C, CancellationToken], Awaitable[object]], token: CancellationToken) -> object:
         """Call providers until one succeeds or all fail."""
         last_error: ProviderError | None = None
         for provider in self.providers:
             try:
-                return await call(provider, token)
+                return await call(provider, token)  # type: ignore[arg-type]
             except ProviderError as error:
                 last_error = error
                 if error.code in {ErrorCode.CANCELLED, ErrorCode.INVALID_REQUEST}:
