@@ -5,6 +5,7 @@
 The Phase 10 executable gate must print these exact strings after the corresponding real checks complete:
 
 - `[PHASE10] backend-tests-ok`
+- `[PHASE10] backend-quality-ok`
 - `[PHASE10] mock-interview-e2e-ok`
 - `[PHASE10] frontend-tests-ok`
 - `[PHASE10] frontend-build-ok`
