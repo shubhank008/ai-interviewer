@@ -1,5 +1,17 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openrouter/@preset/deepseek-v4-flash-baseten"
-  
+  "provider": {
+    "openrouter": {
+      "models": {
+        "~deepseek/deepseek-v4-flash-latest": {
+          "options": {
+            "provider": {
+              "order": ["baseten", "streamlake"],
+              "allow_fallbacks": false
+            }
+          }
+        }
+      }
+    }
+  } 
 }
