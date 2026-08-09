@@ -7,7 +7,13 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Mapping
 
-from .contracts import CapabilityDescriptor, HealthStatus, LLMProvider, STTProvider, TTSProvider
+from .contracts import (
+    CapabilityDescriptor,
+    HealthStatus,
+    LLMProvider,
+    STTProvider,
+    TTSProvider,
+)
 from .provider_adapters import (
     FasterWhisperSTT,
     OpenRouterLLM,
@@ -71,7 +77,9 @@ class RuntimeSettings:
         """Load and validate settings without reading secrets into diagnostics."""
         values = environ if environ is not None else os.environ
         try:
-            profile = RuntimeProfile(values.get("APP_PROFILE", RuntimeProfile.LOCAL.value).lower())
+            profile = RuntimeProfile(
+                values.get("APP_PROFILE", RuntimeProfile.LOCAL.value).lower()
+            )
         except ValueError as exc:
             raise ConfigurationError("APP_PROFILE has an unsupported value") from exc
         settings = cls(
@@ -95,13 +103,19 @@ class RuntimeSettings:
             llm_fallback_provider=values.get("LLM_FALLBACK_PROVIDER", "in-memory"),
             llm_api_key=_optional(values, "LLM_API_KEY"),
             llm_model=values.get("LLM_MODEL", "default"),
-            webrtc_ice_servers=values.get("WEBRTC_ICE_SERVERS", "stun:stun.l.google.com:19302"),
-            webrtc_sample_rate=_integer(values, "WEBRTC_SAMPLE_RATE", 48000, minimum=8000),
+            webrtc_ice_servers=values.get(
+                "WEBRTC_ICE_SERVERS", "stun:stun.l.google.com:19302"
+            ),
+            webrtc_sample_rate=_integer(
+                values, "WEBRTC_SAMPLE_RATE", 48000, minimum=8000
+            ),
             cors_origins=_csv(values.get("CORS_ORIGINS", "http://localhost:5173")),
             retention_days=_integer(values, "RETENTION_DAYS", 14, minimum=1),
             rate_limit=_integer(values, "RATE_LIMIT", 60, minimum=1),
             rate_window_seconds=_integer(values, "RATE_WINDOW_SECONDS", 60, minimum=1),
-            health_timeout_seconds=_number(values, "HEALTH_TIMEOUT_SECONDS", 2.0, minimum=0.1),
+            health_timeout_seconds=_number(
+                values, "HEALTH_TIMEOUT_SECONDS", 2.0, minimum=0.1
+            ),
             log_level=values.get("LOG_LEVEL", "INFO").upper(),
             metrics_enabled=_boolean(values, "METRICS_ENABLED", False),
             tracing_enabled=_boolean(values, "TRACING_ENABLED", False),
@@ -122,7 +136,11 @@ class RuntimeSettings:
             "TTS_PROVIDER": self.tts_provider,
             "LLM_PROVIDER": self.llm_provider,
         }
-        missing = [name for name, value in required.items() if not value or value == "in-memory"]
+        missing = [
+            name
+            for name, value in required.items()
+            if not value or value == "in-memory"
+        ]
         if self.storage_backend != "local" and not self.storage_bucket:
             missing.append("STORAGE_BUCKET")
         if self.stt_provider in {"groq", "hosted"} and not self.stt_api_key:
@@ -132,29 +150,52 @@ class RuntimeSettings:
         if self.llm_provider in {"openrouter", "hosted"} and not self.llm_api_key:
             missing.append("LLM_API_KEY")
         if missing:
-            raise ConfigurationError("production configuration is missing: " + ", ".join(sorted(set(missing))))
+            raise ConfigurationError(
+                "production configuration is missing: "
+                + ", ".join(sorted(set(missing)))
+            )
         recognized_stt = {"faster-whisper", "in-memory"}
         recognized_tts = {"piper", "kokoro", "in-memory"}
         recognized_llm = {"openrouter", "in-memory"}
         if self.stt_provider not in recognized_stt:
-            raise ConfigurationError(f"STT_PROVIDER must be one of {sorted(recognized_stt)}")
+            raise ConfigurationError(
+                f"STT_PROVIDER must be one of {sorted(recognized_stt)}"
+            )
         if self.tts_provider not in recognized_tts:
-            raise ConfigurationError(f"TTS_PROVIDER must be one of {sorted(recognized_tts)}")
+            raise ConfigurationError(
+                f"TTS_PROVIDER must be one of {sorted(recognized_tts)}"
+            )
         if self.llm_provider not in recognized_llm:
-            raise ConfigurationError(f"LLM_PROVIDER must be one of {sorted(recognized_llm)}")
+            raise ConfigurationError(
+                f"LLM_PROVIDER must be one of {sorted(recognized_llm)}"
+            )
         if self.stt_fallback_provider not in recognized_stt:
-            raise ConfigurationError(f"STT_FALLBACK_PROVIDER must be one of {sorted(recognized_stt)}")
+            raise ConfigurationError(
+                f"STT_FALLBACK_PROVIDER must be one of {sorted(recognized_stt)}"
+            )
         if self.tts_fallback_provider not in recognized_tts:
-            raise ConfigurationError(f"TTS_FALLBACK_PROVIDER must be one of {sorted(recognized_tts)}")
+            raise ConfigurationError(
+                f"TTS_FALLBACK_PROVIDER must be one of {sorted(recognized_tts)}"
+            )
         if self.llm_fallback_provider not in recognized_llm:
-            raise ConfigurationError(f"LLM_FALLBACK_PROVIDER must be one of {sorted(recognized_llm)}")
+            raise ConfigurationError(
+                f"LLM_FALLBACK_PROVIDER must be one of {sorted(recognized_llm)}"
+            )
 
     def diagnostics(self) -> dict[str, object]:
         """Return safe startup details with secret values represented only by presence."""
         return {
             "profile": self.profile.value,
-            "providers": {"stt": self.stt_provider, "tts": self.tts_provider, "llm": self.llm_provider},
-            "fallbacks": {"stt": self.stt_fallback_provider, "tts": self.tts_fallback_provider, "llm": self.llm_fallback_provider},
+            "providers": {
+                "stt": self.stt_provider,
+                "tts": self.tts_provider,
+                "llm": self.llm_provider,
+            },
+            "fallbacks": {
+                "stt": self.stt_fallback_provider,
+                "tts": self.tts_fallback_provider,
+                "llm": self.llm_fallback_provider,
+            },
             "storage_backend": self.storage_backend,
             "firebase_configured": bool(self.firebase_project_id),
             "secrets_configured": {
@@ -187,35 +228,75 @@ class RuntimeProviders:
     tts: tuple[TTSProvider, ...]
     llm: tuple[LLMProvider, ...]
 
-    def routers(self) -> tuple[FallbackRouter[STTProvider], FallbackRouter[TTSProvider], FallbackRouter[LLMProvider]]:
+    def routers(
+        self,
+    ) -> tuple[
+        FallbackRouter[STTProvider],
+        FallbackRouter[TTSProvider],
+        FallbackRouter[LLMProvider],
+    ]:
         """Create independent ordered fallback routers for the three voice capabilities."""
-        return FallbackRouter(self.stt, "stt"), FallbackRouter(self.tts, "tts"), FallbackRouter(self.llm, "llm")
+        return (
+            FallbackRouter(self.stt, "stt"),
+            FallbackRouter(self.tts, "tts"),
+            FallbackRouter(self.llm, "llm"),
+        )
 
 
-def compose_providers(settings: RuntimeSettings, backends: ProviderBackends | None = None) -> RuntimeProviders:
+def compose_providers(
+    settings: RuntimeSettings, backends: ProviderBackends | None = None
+) -> RuntimeProviders:
     """Compose deterministic local or injected provider-shaped implementations."""
     injected = backends or ProviderBackends()
     if settings.profile is RuntimeProfile.LOCAL:
         return RuntimeProviders((InMemorySTT(),), (InMemoryTTS(),), (InMemoryLLM(),))
-    stt: STTProvider = FasterWhisperSTT(injected.stt, settings.stt_model) if settings.stt_provider == "faster-whisper" else InMemorySTT()
-    tts: TTSProvider = PiperKokoroTTS(injected.tts, settings.tts_model) if settings.tts_provider in {"piper", "kokoro"} else InMemoryTTS()
-    llm: LLMProvider = OpenRouterLLM(injected.llm, settings.llm_api_key, settings.llm_model) if settings.llm_provider == "openrouter" else InMemoryLLM()
-    return RuntimeProviders((stt, _fallback_stt(settings, injected)), (tts, _fallback_tts(settings, injected)), (llm, _fallback_llm(settings, injected)))
+    stt: STTProvider = (
+        FasterWhisperSTT(injected.stt, settings.stt_model)
+        if settings.stt_provider == "faster-whisper"
+        else InMemorySTT()
+    )
+    tts: TTSProvider = (
+        PiperKokoroTTS(injected.tts, settings.tts_model)
+        if settings.tts_provider in {"piper", "kokoro"}
+        else InMemoryTTS()
+    )
+    llm: LLMProvider = (
+        OpenRouterLLM(injected.llm, settings.llm_api_key, settings.llm_model)
+        if settings.llm_provider == "openrouter"
+        else InMemoryLLM()
+    )
+    return RuntimeProviders(
+        (stt, _fallback_stt(settings, injected)),
+        (tts, _fallback_tts(settings, injected)),
+        (llm, _fallback_llm(settings, injected)),
+    )
 
 
 def _fallback_stt(settings: RuntimeSettings, backends: ProviderBackends) -> STTProvider:
     """Build the configured STT fallback without importing optional dependencies."""
-    return FasterWhisperSTT(backends.stt, settings.stt_model) if settings.stt_fallback_provider == "faster-whisper" else InMemorySTT()
+    return (
+        FasterWhisperSTT(backends.stt, settings.stt_model)
+        if settings.stt_fallback_provider == "faster-whisper"
+        else InMemorySTT()
+    )
 
 
 def _fallback_tts(settings: RuntimeSettings, backends: ProviderBackends) -> TTSProvider:
     """Build the configured TTS fallback without importing optional dependencies."""
-    return PiperKokoroTTS(backends.tts, settings.tts_model) if settings.tts_fallback_provider in {"piper", "kokoro"} else InMemoryTTS()
+    return (
+        PiperKokoroTTS(backends.tts, settings.tts_model)
+        if settings.tts_fallback_provider in {"piper", "kokoro"}
+        else InMemoryTTS()
+    )
 
 
 def _fallback_llm(settings: RuntimeSettings, backends: ProviderBackends) -> LLMProvider:
     """Build the configured LLM fallback without importing optional dependencies."""
-    return OpenRouterLLM(backends.llm, settings.llm_api_key, settings.llm_model) if settings.llm_fallback_provider == "openrouter" else InMemoryLLM()
+    return (
+        OpenRouterLLM(backends.llm, settings.llm_api_key, settings.llm_model)
+        if settings.llm_fallback_provider == "openrouter"
+        else InMemoryLLM()
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,7 +324,11 @@ class ProviderReadinessChecker:
     async def check(self) -> tuple[CapabilityReadiness, ...]:
         """Collect health and capability data for STT, TTS, and LLM chains."""
         reports: list[CapabilityReadiness] = []
-        for name, chain in (("stt", self.providers.stt), ("tts", self.providers.tts), ("llm", self.providers.llm)):
+        for name, chain in (
+            ("stt", self.providers.stt),
+            ("tts", self.providers.tts),
+            ("llm", self.providers.llm),
+        ):
             statuses = tuple([await provider.health() for provider in chain])
             descriptors = tuple(provider.capabilities() for provider in chain)
             report = CapabilityReadiness(name, statuses, descriptors, self.required)
@@ -270,7 +355,9 @@ def _integer(values: Mapping[str, str], name: str, default: int, minimum: int) -
     return result
 
 
-def _number(values: Mapping[str, str], name: str, default: float, minimum: float) -> float:
+def _number(
+    values: Mapping[str, str], name: str, default: float, minimum: float
+) -> float:
     """Parse a bounded floating-point setting."""
     try:
         result = float(values.get(name, str(default)))

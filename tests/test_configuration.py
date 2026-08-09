@@ -37,7 +37,9 @@ class SpeechFixture:
 class LLMFixture:
     """Return a provider-shaped completion without network access."""
 
-    async def complete(self, payload: dict[str, object], api_key: str) -> dict[str, object]:
+    async def complete(
+        self, payload: dict[str, object], api_key: str
+    ) -> dict[str, object]:
         """Complete the injected request."""
         return {"choices": [{"message": {"content": "Tell me about the result."}}]}
 
@@ -51,14 +53,27 @@ class RuntimeConfigurationTests(unittest.TestCase):
         providers = compose_providers(settings)
         self.assertEqual(settings.profile, RuntimeProfile.LOCAL)
         self.assertEqual(settings.retention_days, 14)
-        self.assertEqual(settings.diagnostics()["secrets_configured"], {"firebase_api_key": False, "stt_api_key": False, "tts_api_key": False, "llm_api_key": False})
-        self.assertEqual([provider.capabilities().name for provider in providers.stt], ["in-memory-stt"])
+        self.assertEqual(
+            settings.diagnostics()["secrets_configured"],
+            {
+                "firebase_api_key": False,
+                "stt_api_key": False,
+                "tts_api_key": False,
+                "llm_api_key": False,
+            },
+        )
+        self.assertEqual(
+            [provider.capabilities().name for provider in providers.stt],
+            ["in-memory-stt"],
+        )
         print("[PHASE11] config-local-ok")
         print("[PHASE11] diagnostics-redacted")
 
     def test_production_missing_required_configuration_fails_safely(self) -> None:
         """Production never silently falls back to the local profile."""
-        with self.assertRaisesRegex(ConfigurationError, "production configuration is missing"):
+        with self.assertRaisesRegex(
+            ConfigurationError, "production configuration is missing"
+        ):
             RuntimeSettings.from_env({"APP_PROFILE": "production"})
         diagnostics = str(RuntimeSettings.from_env({}).diagnostics())
         self.assertNotIn("runtime-only-test-key", diagnostics)
@@ -81,13 +96,31 @@ class RuntimeConfigurationTests(unittest.TestCase):
                 "LLM_API_KEY": "runtime-only-test-key",
             }
         )
-        providers = compose_providers(settings, ProviderBackends(WhisperFixture(), SpeechFixture(), LLMFixture()))
-        reports = asyncio.run(ProviderReadinessChecker(providers, required=True).check())
+        providers = compose_providers(
+            settings, ProviderBackends(WhisperFixture(), SpeechFixture(), LLMFixture())
+        )
+        reports = asyncio.run(
+            ProviderReadinessChecker(providers, required=True).check()
+        )
         self.assertTrue(all(report.healthy for report in reports))
-        self.assertEqual([report.descriptors[0].name for report in reports], ["faster-whisper", "piper-kokoro", "openrouter"])
-        self.assertEqual(asyncio.run(providers.stt[0].transcribe(b"audio", uuid4(), CancellationToken())).text, "I delivered the project.")
-        self.assertEqual(asyncio.run(providers.tts[0].synthesize("hello", CancellationToken())), b"AUDIO:hello")
-        self.assertIn("result", asyncio.run(providers.llm[0].generate("prompt", CancellationToken())))
+        self.assertEqual(
+            [report.descriptors[0].name for report in reports],
+            ["faster-whisper", "piper-kokoro", "openrouter"],
+        )
+        self.assertEqual(
+            asyncio.run(
+                providers.stt[0].transcribe(b"audio", uuid4(), CancellationToken())
+            ).text,
+            "I delivered the project.",
+        )
+        self.assertEqual(
+            asyncio.run(providers.tts[0].synthesize("hello", CancellationToken())),
+            b"AUDIO:hello",
+        )
+        self.assertIn(
+            "result",
+            asyncio.run(providers.llm[0].generate("prompt", CancellationToken())),
+        )
         print("[PHASE11] provider-health-capabilities-ok")
 
     def test_provider_fallback_runs_after_unavailable_primary(self) -> None:
@@ -122,10 +155,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
         session = InterviewSession("local-user", InterviewMode.RECRUITER)
         store = InMemoryDataStore()
         events = InMemoryEventBus()
-        runner = MockTurnRunner(providers.stt[0], providers.llm[0], providers.tts[0], store, events)
+        runner = MockTurnRunner(
+            providers.stt[0], providers.llm[0], providers.tts[0], store, events
+        )
         turn = Turn(session.id, 1, "candidate", b"candidate audio")
         response, audio = asyncio.run(runner.run(turn))
-        self.assertEqual(store.transcripts[turn.id][0].text, "I built a reliable service.")
+        self.assertEqual(
+            store.transcripts[turn.id][0].text, "I built a reliable service."
+        )
         self.assertTrue(response)
         self.assertTrue(audio.startswith(b"WAV-MOCK:"))
         print("[PHASE11] mock-runtime-e2e-ok")

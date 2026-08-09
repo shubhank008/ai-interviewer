@@ -1,4 +1,5 @@
 """Domain and capability foundation for the voice-first interview platform."""
+
 from .configuration import (
     CapabilityReadiness,
     ConfigurationError,

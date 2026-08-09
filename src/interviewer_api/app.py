@@ -10,7 +10,11 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
-from interviewer_domain.configuration import ProviderReadinessChecker, RuntimeSettings, compose_providers
+from interviewer_domain.configuration import (
+    ProviderReadinessChecker,
+    RuntimeSettings,
+    compose_providers,
+)
 from interviewer_domain.contracts import ErrorCode, ProviderError
 from interviewer_domain.models import InterviewMode
 from interviewer_domain.persistence import (
@@ -42,7 +46,9 @@ class InterviewApplication:
         self.data = InMemoryPersistentDataStore()
         self.persistence = PersistenceService(self.data, InMemoryStorage())
         self.auth = InMemoryAuthProvider({"dev-token": UserIdentity("local-user")})
-        self.rate_limiter = FixedWindowRateLimiter(limit=settings.rate_limit, window_seconds=settings.rate_window_seconds)
+        self.rate_limiter = FixedWindowRateLimiter(
+            limit=settings.rate_limit, window_seconds=settings.rate_window_seconds
+        )
 
     async def user_id(self, token: str) -> str:
         """Resolve a bearer token without exposing token details."""
@@ -93,7 +99,9 @@ async def api_health() -> dict[str, str]:
 @app.get("/api/v1/readiness")
 async def readiness() -> dict[str, object]:
     """Return redacted runtime profile and normalized capability readiness."""
-    reports = await ProviderReadinessChecker(runtime_providers, settings.profile.value == "production").check()
+    reports = await ProviderReadinessChecker(
+        runtime_providers, settings.profile.value == "production"
+    ).check()
     return {
         "profile": settings.profile.value,
         "diagnostics": settings.diagnostics(),
@@ -106,7 +114,6 @@ async def readiness() -> dict[str, object]:
             for report in reports
         },
     }
-
 
 
 @app.get("/api/v1/version")
@@ -126,7 +133,9 @@ async def create_session(
     response = RestResourceCatalog.create_session(
         CreateSessionRequest(user_id, payload.mode), record.id
     )
-    result: dict[str, object] = {key: value for key, value in response.to_dict().items()}
+    result: dict[str, object] = {
+        key: value for key, value in response.to_dict().items()
+    }
     result.update({"status": record.status})
     return result
 

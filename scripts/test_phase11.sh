@@ -13,7 +13,7 @@ for marker in \
   '[PHASE11] mock-runtime-e2e-ok' \
   '[PHASE11] diagnostics-redacted'; do
   grep -F "$marker" "$output" >/dev/null
- done
+done
 if grep -E 'Traceback|Script Error|secret leaked|raw provider key|Firebase private key|Bearer dev-token|NotImplementedError|TODO: production|placeholder|skipped required check' "$output" >/dev/null; then
   printf '%s\n' 'forbidden Phase 11 failure pattern found' >&2
   exit 1
