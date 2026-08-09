@@ -1,6 +1,13 @@
 """Domain and capability foundation for the voice-first interview platform."""
 
 from .benchmark import BenchmarkReport, ProviderBenchmark
+from .evaluation import (
+    EVALUATION_VERSION,
+    DeterministicEvaluator,
+    InterviewContext,
+    PostInterviewEvaluationService,
+    normalized_rubric,
+)
 from .documents import LocalDocumentParser
 from .models import (
     DocumentChunk,
@@ -57,6 +64,11 @@ from .transport import (
 
 __all__ = [
     "AudioScheduler",
+    "DeterministicEvaluator",
+    "EVALUATION_VERSION",
+    "InterviewContext",
+    "PostInterviewEvaluationService",
+    "normalized_rubric",
     "BenchmarkReport",
     "DEFAULT_RETENTION_DAYS",
     "MAX_RESUME_BYTES",

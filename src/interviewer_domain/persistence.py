@@ -404,14 +404,20 @@ class PersistenceService:
         self.data.delete_interview(user_id, interview_id)
 
     def resource(self, user_id: str, view: str, interview_id: UUID | None = None, now: datetime | None = None) -> UXResource:
-        """Build provider-neutral setup, active, history, replay, transcript, or results data."""
+        """Build provider-neutral setup, active, replay, transcript, or results data."""
         current = now or datetime.now(timezone.utc)
         if view == "history":
             return UXResource(view, None, {"interviews": [_json_record(r) for r in self.data.list_interviews(user_id, current)]})
         if interview_id is None:
             return UXResource(view, None, {"user_id": user_id})
         record = self.data.get_interview(user_id, interview_id)
-        return UXResource(view, interview_id, {"interview": _json_record(record), "available": view in {"active", "replay", "transcript", "results"}})
+        payload: dict[str, Any] = {"interview": _json_record(record), "available": view in {"active", "replay", "transcript", "results"}}
+        if view == "results":
+            evaluation = getattr(self.data, "evaluations", {}).get(interview_id)
+            if evaluation is not None:
+                from .evaluation import evaluation_dict
+                payload["evaluation"] = evaluation_dict(evaluation)
+        return UXResource(view, interview_id, payload)
 
 
 def _json_record(record: InterviewRecord) -> dict[str, Any]:

@@ -132,17 +132,28 @@ class Recording:
 
 @dataclass(frozen=True, slots=True)
 class Evaluation:
-    """Versioned structured evaluation placeholder for post-interview use."""
+    """Versioned structured post-interview evaluation output."""
 
     session_id: UUID
     rubric_version: str
     score: int | None = None
     dimensions: tuple[dict[str, Any], ...] = ()
+    mode: str = ""
+    context: dict[str, str] = field(default_factory=dict)
+    summary: str = ""
+    strengths: tuple[str, ...] = ()
+    weaknesses: tuple[str, ...] = ()
+    recommendations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Validate the optional score range."""
+        """Validate score and structured dimension bounds."""
         if self.score is not None and not 0 <= self.score <= 100:
             raise ValueError("evaluation score must be between 0 and 100")
+        weights = [float(dimension["weight"]) for dimension in self.dimensions if "weight" in dimension]
+        if weights and abs(sum(weights) - 1.0) > 0.00001:
+            raise ValueError("evaluation dimension weights must sum to one")
+        if any("score" in dimension and not 0 <= int(dimension["score"]) <= 100 for dimension in self.dimensions):
+            raise ValueError("evaluation dimension scores must be between 0 and 100")
 
 
 @dataclass(frozen=True, slots=True)

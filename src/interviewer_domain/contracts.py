@@ -147,6 +147,8 @@ class DataStore(Protocol):
 
     def save_recording(self, recording: Recording) -> None: ...
 
+    def save_evaluation(self, evaluation: object) -> None: ...
+
 
 class AuthProvider(Protocol):
     """Validate an authenticated user session."""
