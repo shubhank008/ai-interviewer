@@ -90,6 +90,7 @@ class SessionEngineTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, ErrorCode.CANCELLED)
         self.assertEqual(engine.session.status, SessionStatus.CANCELLED.value)
         self.assertNotIn("session.completed", [event.name for event in events.events])
+        print("[ENGINE] cancellation-failure-ok")
 
     def test_provider_failure_is_terminal(self) -> None:
         """Invalid deterministic input transitions the session to failed."""
