@@ -147,13 +147,20 @@ class Evaluation:
 
 @dataclass(frozen=True, slots=True)
 class ProviderMeasurement:
-    """Normalized timing and outcome data for a provider operation."""
+    """Normalized timing, quality, cost, failure, and resource data."""
 
     capability: str
     provider: str
     operation: str
     latency_ms: int
     success: bool
+    first_byte_latency_ms: int | None = None
+    end_to_end_latency_ms: int | None = None
+    quality: float | None = None
+    estimated_cost: float = 0.0
+    failure_code: str | None = None
+    cpu_seconds: float | None = None
+    memory_bytes: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
