@@ -87,8 +87,7 @@ class InterviewSessionEngine:
         if turn.session_id != self.session.id or turn.sequence != self._expected_turn or turn.speaker != "candidate":
             raise SessionStateError("turn does not match the expected session sequence")
         operation_token = token or CancellationToken()
-        if hasattr(self.store, "link_turn_session"):
-            self.store.link_turn_session(turn.id, turn.session_id)
+        self.store.link_turn_session(turn.id, turn.session_id)
         await self._emit("turn.started", correlation=turn.id)
         try:
             await self._emit("turn.processing", correlation=turn.id)
