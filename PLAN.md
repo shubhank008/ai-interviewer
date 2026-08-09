@@ -48,13 +48,15 @@ The Phase 2 vertical slice is implemented in `src/interviewer_domain/session.py`
 
 ### Phase 3: Job-description and resume intelligence
 
-- [ ] Parse pasted text-only job descriptions.
-- [ ] Parse PDF resumes up to 5 MB into structured sections and source-referenced chunks.
-- [ ] Add embeddings and vector retrieval behind interfaces.
-- [ ] Implement topic-aware context retrieval for live turns.
-- [ ] Add prompt-injection defenses for resume, job-description, and research content.
+- [x] Parse pasted text-only job descriptions.
+- [x] Parse text-based PDF resumes up to 5 MB into structured sections and source-referenced chunks.
+- [x] Add deterministic embeddings and vector retrieval behind interfaces.
+- [x] Implement topic-aware context retrieval for live turns.
+- [x] Add prompt-injection defenses for resume and job-description content.
 - [ ] Add optional external company and culture research with source attribution.
-- [ ] Add sensitive-data handling, 14-day retention, deletion, and source attribution rules.
+- [ ] Add persistent sensitive-data handling, 14-day retention, and deletion enforcement.
+
+The completed local Phase 3 slice is specified in `docs/specs/003-job-description-resume-rag/`. OCR, external research, and persistence remain later integration work.
 
 ### Phase 4: Provider implementations and benchmark harness
 
@@ -118,7 +120,7 @@ The first feature specifications should be created in this order:
 
 1. `001-domain-capability-foundation`
 2. `002-voice-first-interview-engine`
-3. `003-job-description-and-resume-rag`
+3. `003-job-description-resume-rag`
 4. `004-provider-benchmark-harness`
 5. `005-browser-transport-and-session-events`
 6. `006-live-voice-loop`

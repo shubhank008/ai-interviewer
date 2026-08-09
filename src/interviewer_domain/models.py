@@ -19,6 +19,34 @@ class InterviewMode(StrEnum):
     TECHNICAL = "technical"
 
 
+class DocumentSource(StrEnum):
+    """Trusted origin labels for candidate and role context."""
+
+    JOB_DESCRIPTION = "job_description"
+    RESUME = "resume"
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentChunk:
+    """A bounded, source-attributed piece of untrusted document text."""
+
+    source: DocumentSource
+    section: str
+    text: str
+    location: str
+    trust_boundary: str = "untrusted_document"
+    id: UUID = field(default_factory=uuid4)
+    retention_days: int = 14
+
+
+@dataclass(frozen=True, slots=True)
+class RetrievedEvidence:
+    """Ranked document evidence returned to a topic-aware caller."""
+
+    chunk: DocumentChunk
+    score: float
+
+
 class TurnState(StrEnum):
     """Lifecycle state for a voice turn."""
 

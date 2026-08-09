@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Protocol
 from uuid import UUID
 
-from .models import LifecycleEvent, Recording, TranscriptSegment
+from .models import DocumentChunk, LifecycleEvent, Recording, RetrievedEvidence, TranscriptSegment
 
 
 class ErrorCode(StrEnum):
@@ -110,9 +110,9 @@ class AuthProvider(Protocol):
 
 
 class DocumentParser(Protocol):
-    """Normalize untrusted document text."""
+    """Normalize untrusted document input into attributed chunks."""
 
-    def parse(self, content: bytes, content_type: str) -> str: ...
+    def parse(self, content: bytes, content_type: str, source: str) -> list[DocumentChunk]: ...
 
 
 class EmbeddingProvider(Protocol):
@@ -122,11 +122,11 @@ class EmbeddingProvider(Protocol):
 
 
 class VectorStore(Protocol):
-    """Store and retrieve document chunks."""
+    """Store and retrieve source-attributed document chunks."""
 
-    def add(self, key: str, text: str, vector: list[float]) -> None: ...
+    def add(self, chunk: DocumentChunk, vector: list[float]) -> None: ...
 
-    def search(self, vector: list[float], limit: int = 5) -> list[str]: ...
+    def search(self, vector: list[float], limit: int = 5) -> list[RetrievedEvidence]: ...
 
 
 class AudioTransport(Protocol):
