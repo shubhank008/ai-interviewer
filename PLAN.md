@@ -82,13 +82,15 @@ The Phase 5 local transport slice is specified in `docs/specs/005-browser-transp
 
 ### Phase 6: Live voice loop
 
-- [ ] Connect streaming or incremental STT to the interview state machine.
-- [ ] Stream live LLM responses and support cancellation.
-- [ ] Add the secondary response layer for acknowledgements, fillers, and permitted company or culture context.
-- [ ] Implement guarded prefetching of topic plans and secondary responses.
-- [ ] Stream TTS audio, schedule chunks, and handle interruptions.
-- [ ] Record the mixed or separately persisted audio and timestamped transcript.
-- [ ] Measure and expose turn latency and provider fallback events.
+- [x] Connect streaming or incremental STT to the interview state machine.
+- [x] Stream live LLM responses and support cancellation.
+- [x] Add the bounded secondary response layer for acknowledgements and fillers.
+- [x] Implement guarded prefetching of topic plans and secondary responses.
+- [x] Stream TTS audio, schedule chunks, and handle interruptions.
+- [x] Record separately persisted audio and timestamped transcript artifacts.
+- [x] Measure and expose turn latency and provider fallback events.
+
+The Phase 6 local live voice slice is specified in `docs/specs/006-live-voice-loop/`. `LiveVoiceOrchestrator` composes streaming provider protocols, digest-guards speculative responses, cancels stale generation and playback, and emits deterministic latency and fallback events. The in-memory providers and tests remain CPU-only, offline, credential-free, and vendor-neutral.
 
 ### Phase 7: Identity, persistence, and user experience
 
