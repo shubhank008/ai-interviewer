@@ -80,7 +80,6 @@ place.
 * The Phase 3 local PDF parser intentionally supports text operators only; scanned or encrypted resumes require a future OCR/parser adapter and must fail safely rather than be guessed.
 * Phase 5 transport tests use local in-memory seams: REST schemas and WebSocket replay are protocol contracts, while WebRTC media is represented only by a separate media-frame buffer. Do not introduce browser automation, network dependencies, or media bytes into WebSocket event payloads for deterministic tests.
 
-
 ## Testing strategy
 
 ## Conventions
