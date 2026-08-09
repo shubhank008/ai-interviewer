@@ -85,7 +85,7 @@ place.
 
 ## Conventions
 
-* Donot use em-dashes or emojis. Comment every method and important code. Maintain upto-date documentation so a new developer can easily takeover. English everywhere.
+* Do not use em-dashes or emojis. Comment every method and important code. Maintain up-to-date documentation so a new developer can easily takeover. English everywhere.
 * Plan ahead using a PLAN.md and keep it updated after every feature or update.
 * **When something surprises you, write it down here.** A landmine that costs
   an hour and is not recorded costs that hour again.
