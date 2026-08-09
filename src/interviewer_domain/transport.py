@@ -112,9 +112,13 @@ class SessionEvent:
 class SessionEventChannel(Protocol):
     """Publish and resume ordered control events for a session."""
 
-    def publish(self, event_type: SessionEventType, payload: dict[str, Any], correlation_id: str) -> SessionEvent: ...
+    def publish(
+        self, event_type: SessionEventType, payload: dict[str, Any], correlation_id: str
+    ) -> SessionEvent: ...
 
-    def replay(self, session_id: UUID, after_sequence: int = 0) -> list[SessionEvent]: ...
+    def replay(
+        self, session_id: UUID, after_sequence: int = 0
+    ) -> list[SessionEvent]: ...
 
 
 class LocalSessionEventChannel:
@@ -128,7 +132,13 @@ class LocalSessionEventChannel:
         self._events: deque[SessionEvent] = deque(maxlen=retention)
         self._next_sequence = 0
 
-    def publish(self, event_type: SessionEventType, payload: dict[str, Any], correlation_id: str, idempotency_key: str | None = None) -> SessionEvent:
+    def publish(
+        self,
+        event_type: SessionEventType,
+        payload: dict[str, Any],
+        correlation_id: str,
+        idempotency_key: str | None = None,
+    ) -> SessionEvent:
         """Append one event or return the previously accepted idempotent event."""
         if not correlation_id.strip():
             raise TransportValidationError("correlation_id is required")
@@ -137,7 +147,14 @@ class LocalSessionEventChannel:
             if existing.idempotency_key == key:
                 return existing
         self._next_sequence += 1
-        event = SessionEvent(self.session_id, self._next_sequence, event_type, dict(payload), correlation_id, key)
+        event = SessionEvent(
+            self.session_id,
+            self._next_sequence,
+            event_type,
+            dict(payload),
+            correlation_id,
+            key,
+        )
         self._events.append(event)
         return event
 
@@ -181,8 +198,15 @@ class SignalingMessage:
             raise TransportValidationError("signaling correlation_id is required")
         if any(key in self.payload for key in ("audio", "media", "audio_bytes")):
             raise TransportValidationError("signaling payload cannot contain media")
-        required = {SignalingType.OFFER: "sdp", SignalingType.ANSWER: "sdp", SignalingType.ICE_CANDIDATE: "candidate"}
-        if not isinstance(self.payload.get(required[self.message_type]), str) or not self.payload[required[self.message_type]].strip():
+        required = {
+            SignalingType.OFFER: "sdp",
+            SignalingType.ANSWER: "sdp",
+            SignalingType.ICE_CANDIDATE: "candidate",
+        }
+        if (
+            not isinstance(self.payload.get(required[self.message_type]), str)
+            or not self.payload[required[self.message_type]].strip()
+        ):
             raise TransportValidationError(f"{required[self.message_type]} is required")
         if len(json.dumps(self.payload).encode("utf-8")) > MAX_SIGNALING_PAYLOAD_BYTES:
             raise TransportValidationError("signaling payload exceeds 64 KiB limit")
@@ -253,4 +277,11 @@ class RestResourceCatalog:
     def create_session(cls, request: CreateSessionRequest) -> SessionResponse:
         """Create a normalized local session response without external services."""
         session_id = uuid4()
-        return SessionResponse(session_id, request.user_id, request.mode, "created", f"/ws/v1/sessions/{session_id}", f"{cls.session(session_id)}/signaling")
+        return SessionResponse(
+            session_id,
+            request.user_id,
+            request.mode,
+            "created",
+            f"/ws/v1/sessions/{session_id}",
+            f"{cls.session(session_id)}/signaling",
+        )
