@@ -94,6 +94,7 @@ class FirestoreBackend(Protocol):
     def get(self, collection: str, document_id: str) -> dict[str, Any] | None: ...
     def list(self, collection: str, field: str, value: str) -> list[dict[str, Any]]: ...
     def delete_collection_value(self, collection: str, field: str, value: str) -> None: ...
+    def delete_collection(self, collection: str) -> None: ...
 
 
 class ObjectBackend(Protocol):
@@ -273,11 +274,13 @@ class FirestoreDataStore:
         self.backend.set(f"{self.collection}/{interview_id}", "document", {"key": key})
 
     def delete_interview(self, user_id: str, interview_id: UUID) -> None:
-        """Delete all Firestore documents for an owned interview, including expired data."""
+        """Delete all Firestore documents and subcollections for an owned interview, including expired data."""
         value = self.backend.get(self.collection, str(interview_id))
         if value is None or value.get("user_id") != user_id:
             raise ProviderError(ErrorCode.UNAVAILABLE, "interview not found")
         self.backend.delete_collection_value(self.collection, "id", str(interview_id))
+        self.backend.delete_collection(f"{self.collection}/{interview_id}")
+        self.backend.delete_collection(f"{self.collection}/{interview_id}/transcripts")
 
 
 class LocalFilesystemStorage:

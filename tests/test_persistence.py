@@ -56,6 +56,12 @@ class FakeFirestoreBackend:
             if key[0] == collection and item.get(field) == value:
                 del self.values[key]
 
+    def delete_collection(self, collection: str) -> None:
+        """Delete every document stored under one collection name."""
+        for key in list(self.values):
+            if key[0] == collection:
+                del self.values[key]
+
 
 class FakeObjectBackend:
     """Backend fixture for the S3-compatible storage seam."""
@@ -102,6 +108,21 @@ class PersistenceTests(unittest.TestCase):
         cloud.put("users/alice/file", b"data", "text/plain")
         self.assertEqual(cloud.get("users/alice/file"), b"data")
         print("[PERSISTENCE] adapters-ok")
+
+    def test_firestore_complete_deletion(self) -> None:
+        """Remove every Firestore document category, not only the top-level record."""
+        firestore_backend = FakeFirestoreBackend()
+        firestore = FirestoreDataStore(firestore_backend)
+        record = InterviewRecord("alice", InterviewMode.RECRUITER, created_at=datetime(2027, 1, 1, tzinfo=timezone.utc)).with_retention()
+        firestore.save_interview(record)
+        firestore.save_transcript("alice", record.id, TranscriptSegment(uuid4(), "candidate", "hello"))
+        firestore.save_recording("alice", record.id, Recording(record.id, "users/alice/interviews/audio", "audio/wav"))
+        firestore.save_evaluation("alice", record.id, Evaluation(record.id, "v1", 80))
+        firestore.save_document_reference("alice", record.id, "users/alice/interviews/document")
+        self.assertEqual(len(firestore_backend.values), 5)
+        firestore.delete_interview("alice", record.id)
+        self.assertEqual(firestore_backend.values, {})
+        print("[PERSISTENCE] firestore-complete-deletion-ok")
 
     def test_authorization_retention_and_complete_deletion(self) -> None:
         """Keep owners isolated and remove all categories on deletion."""
