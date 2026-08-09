@@ -133,15 +133,21 @@ class RuntimeSettings:
             missing.append("LLM_API_KEY")
         if missing:
             raise ConfigurationError("production configuration is missing: " + ", ".join(sorted(set(missing))))
-        recognized_stt = {"faster-whisper"}
-        recognized_tts = {"piper", "kokoro"}
-        recognized_llm = {"openrouter"}
+        recognized_stt = {"faster-whisper", "in-memory"}
+        recognized_tts = {"piper", "kokoro", "in-memory"}
+        recognized_llm = {"openrouter", "in-memory"}
         if self.stt_provider not in recognized_stt:
             raise ConfigurationError(f"STT_PROVIDER must be one of {sorted(recognized_stt)}")
         if self.tts_provider not in recognized_tts:
             raise ConfigurationError(f"TTS_PROVIDER must be one of {sorted(recognized_tts)}")
         if self.llm_provider not in recognized_llm:
             raise ConfigurationError(f"LLM_PROVIDER must be one of {sorted(recognized_llm)}")
+        if self.stt_fallback_provider not in recognized_stt:
+            raise ConfigurationError(f"STT_FALLBACK_PROVIDER must be one of {sorted(recognized_stt)}")
+        if self.tts_fallback_provider not in recognized_tts:
+            raise ConfigurationError(f"TTS_FALLBACK_PROVIDER must be one of {sorted(recognized_tts)}")
+        if self.llm_fallback_provider not in recognized_llm:
+            raise ConfigurationError(f"LLM_FALLBACK_PROVIDER must be one of {sorted(recognized_llm)}")
 
     def diagnostics(self) -> dict[str, object]:
         """Return safe startup details with secret values represented only by presence."""

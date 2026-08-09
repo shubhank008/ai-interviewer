@@ -101,7 +101,7 @@ async def readiness() -> dict[str, object]:
             report.capability: {
                 "healthy": report.healthy,
                 "providers": [descriptor.name for descriptor in report.descriptors],
-                "statuses": [status.healthy for status in report.statuses],
+                "statuses": [hs.healthy for hs in report.statuses],
             }
             for report in reports
         },
