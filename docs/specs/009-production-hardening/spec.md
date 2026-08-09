@@ -25,12 +25,12 @@ The production boundary is explicit: FastAPI exposes versioned health, version, 
 
 ## Acceptance
 
-- [ ] Marker contract written before implementation.
-- [ ] Real FastAPI application exposes health and version behavior.
-- [ ] Browser frontend is runnable from its package manifest and exercises documented API boundaries.
-- [ ] Existing tests execute public behavior; no source-text or hardcoded-only assertions remain.
-- [ ] Complete offline mock interview test covers ingestion, retrieval, routing, live voice, transport, persistence, and evaluation.
-- [ ] Failure, reconnect, cancellation, partial-audio, authorization, retention, and rate-limit cases are executable.
-- [ ] Benchmark and privacy/security seams run without credentials or network.
-- [ ] README, PLAN, and AGENTS contain production decisions and exact commands.
-- [ ] Marker evidence and landmines are recorded.
+- [x] Marker contract written before implementation.
+- [x] Real FastAPI application exposes health and version behavior.
+- [x] Browser frontend is runnable from its package manifest and exercises documented API boundaries.
+- [x] Existing tests execute public behavior; no source-text or hardcoded-only assertions remain.
+- [x] Complete offline mock interview test covers ingestion, retrieval, routing, live voice, transport, persistence, and evaluation.
+- [x] Failure, reconnect, cancellation, partial-audio, authorization, retention, and rate-limit cases are executable.
+- [x] Benchmark and privacy/security seams run without credentials or network.
+- [x] README, PLAN, and AGENTS contain production decisions and exact commands.
+- [x] Marker evidence and landmines are recorded.
