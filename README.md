@@ -60,3 +60,45 @@ Each feature will be developed through the repository's SDD workflow:
 5. Unit and mock end-to-end tests
 6. Evidence and documentation
 7. Landmine review and roadmap update
+
+## Phase 9 production runtime
+
+The repository includes a runnable FastAPI composition root at `src/interviewer_api/app.py` and a Vite React frontend under `frontend/`. The API exposes `GET /healthz`, versioned health/version routes, authenticated session creation, history, setup, active, replay, transcript, results, and completion resources. The frontend provides setup, active interview, history/replay/transcript, and results views and is API-backed rather than a static placeholder.
+
+### Prerequisites and installation
+
+Use Python 3.12+, Node.js 20+, npm, and optionally Docker Compose. No credentials are needed for the deterministic local path.
+
+```bash
+python -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+npm install --prefix frontend
+export PYTHONPATH=src
+```
+
+The local `Bearer dev-token` is a development-only fixture. Never use it in deployment. Inject real owner-checked identity, durable data/storage providers, HTTPS, and secrets through deployment configuration. Provider adapters use injected transports and must not place credentials in source or frontend bundles.
+
+### Development, tests, and checks
+
+```bash
+PYTHONPATH=src uvicorn interviewer_api.app:app --reload --port 8000
+npm run dev --prefix frontend
+PYTHONPATH=src python -m unittest discover -s tests -v
+PYTHONPATH=src python -m compileall -q src tests
+npm run build --prefix frontend
+```
+
+`tests/test_phase9_production.py` calls real ASGI routes and public domain interfaces across ingestion, retrieval, provider routing, live voice, transport, persistence, evaluation, failure, reconnect, cancellation, partial audio, authorization, retention, rate limits, benchmarks, and privacy boundaries. It does not grep source strings or depend on credentials, network, browser automation, or heavyweight models.
+
+### Docker, deployment, and architecture
+
+```bash
+docker compose up --build
+# API health: http://localhost:8000/healthz
+```
+
+The Dockerfile runs the API. Build the frontend with `npm run build --prefix frontend`, then serve `frontend/dist` through a static host or HTTPS reverse proxy. Before production traffic, add a durable database and object store, real identity, retention scheduling, structured logs, metrics/traces, rate-limit policy, provider health checks, and deployment-specific benchmark evidence. No cloud provider is selected by this phase.
+
+### Provider configuration and troubleshooting
+
+The domain remains provider-neutral: configure optional STT, TTS, and LLM adapters only through injected capability implementations and environment-backed secrets. If imports fail, set `PYTHONPATH=src`. API resource calls need `Authorization: Bearer dev-token` locally. Empty, expired, and cross-owner resources fail safely. The local parser supports text PDFs only; scanned or encrypted PDFs must fail safely until an OCR adapter is intentionally added. Frontend `/api` calls require a reverse-proxy or Vite dev proxy to the API.
