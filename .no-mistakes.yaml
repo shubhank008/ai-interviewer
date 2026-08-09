@@ -69,7 +69,7 @@ auto_fix:
   rebase: 3
   lint: 3
   test: 3
-  review: 0
+  review: 3
   document: 3
   ci: 3
 
