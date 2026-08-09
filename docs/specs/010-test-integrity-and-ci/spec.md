@@ -13,7 +13,9 @@ This phase establishes the verification foundation for later Firebase, provider,
 | Minimum Python version | 3.12 | Existing README prerequisite |
 | Maximum resume upload | 5 MB | Existing SPEC.md product requirement |
 | Default interview retention | 14 days | Existing SPEC.md product requirement |
-| Coverage thresholds | TBD per code surface | DESIGN-FRESH; set after baseline measurement in this phase |
+| Backend aggregate coverage floor | 80% | `scripts/test_backend.sh --fail-under=80` |
+| Frontend line/function/statement floor | 80% | `frontend/package.json` c8 `--lines 80 --functions 80 --statements 80` |
+| Frontend branch coverage floor | 70% | `frontend/package.json` c8 `--branches 70` |
 
 ## Out of scope
 
