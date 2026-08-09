@@ -29,6 +29,28 @@ class TurnState(StrEnum):
     FAILED = "failed"
 
 
+class SessionStatus(StrEnum):
+    """Lifecycle state for an interview session."""
+
+    CREATED = "created"
+    ACTIVE = "active"
+    CANCELLED = "cancelled"
+    FAILED = "failed"
+    COMPLETED = "completed"
+
+
+@dataclass(frozen=True, slots=True)
+class QuestionPlan:
+    """A guarded, mode-specific candidate question plan."""
+
+    session_id: UUID
+    mode: InterviewMode
+    topic: str
+    prompt: str
+    source_turn_sequence: int
+    context_digest: str
+
+
 @dataclass(frozen=True, slots=True)
 class InterviewSession:
     """Identity and lifecycle metadata for one interview."""
@@ -115,3 +137,4 @@ class LifecycleEvent:
     sequence: int
     payload: dict[str, Any] = field(default_factory=dict)
     occurred_at: datetime = field(default_factory=utc_now)
+    correlation_id: str = ""

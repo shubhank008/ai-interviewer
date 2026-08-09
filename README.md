@@ -39,7 +39,7 @@ Resume input is PDF-only with a 5 MB limit, while job descriptions are supplied 
 
 ## Project status
 
-The repository has completed the domain and capability foundation slice. The provider-independent Python package is under `src/interviewer_domain/`, with deterministic providers and a mock voice-shaped turn covered by `tests/test_foundation.py`. Run `python -m unittest discover -s tests -v` for the local test gate. Read [`SPEC.md`](SPEC.md) for the product specification and [`PLAN.md`](PLAN.md) for the SDD implementation roadmap. The first implementation will build the voice loop directly rather than creating a separate text-only interview mode.
+The repository has completed the domain and capability foundation and the Phase 2 voice-first session engine slices. The provider-independent Python package is under `src/interviewer_domain/`, with deterministic providers, a mock voice-shaped turn, and recruiter or technical session state-machine coverage in `tests/`. Run `python -m unittest discover -s tests -v` for the local test gate. Read [`SPEC.md`](SPEC.md) for the product specification and [`PLAN.md`](PLAN.md) for the SDD implementation roadmap. The first implementation will build the voice loop directly rather than creating a separate text-only interview mode.
 
 Each feature will be developed through the repository's SDD workflow:
 
