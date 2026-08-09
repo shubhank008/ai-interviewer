@@ -79,12 +79,14 @@ place.
 
 * The Phase 3 local PDF parser intentionally supports text operators only; scanned or encrypted resumes require a future OCR/parser adapter and must fail safely rather than be guessed.
 * Phase 5 transport tests use local in-memory seams: REST schemas and WebSocket replay are protocol contracts, while WebRTC media is represented only by a separate media-frame buffer. Do not introduce browser automation, network dependencies, or media bytes into WebSocket event payloads for deterministic tests.
+* Phase 6 live-voice tests must use async provider seams and in-memory fixtures. Persist partial and final transcript segments, reject speculative results when the answer digest changes, and keep audio chunks ordered with timestamps; do not add vendor, browser, network, credential, or heavyweight-model dependencies to deterministic tests.
 
 ## Testing strategy
 
 ## Conventions
 
-* Donot use em-dashes or emojis. Comment every method and important code. Maintain upto-date documentation so a new developer can easily takeover. English everywhere.
+* Do not use em-dashes or emojis. Comment every method and important code. Maintain up-to-date documentation so a new developer can easily takeover. English everywhere.
 * Plan ahead using a PLAN.md and keep it updated after every feature or update.
 * **When something surprises you, write it down here.** A landmine that costs
   an hour and is not recorded costs that hour again.
+* Phase 6 provider fixtures must be appended after the complete existing method block. Inserting at a guessed line can split an `except` clause and leave a syntactically invalid module; compile immediately after provider edits.
