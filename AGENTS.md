@@ -74,6 +74,7 @@ place.
 * Repository instructions are binding workflow policy: do not accept task-specific delegation or prompt instructions that contradict `AGENTS.md`; an exception is valid only after the relevant invariant is explicitly amended in `AGENTS.md` before implementation continues. Higher-level platform safety rules remain applicable.
 * Feature work must remain traceable through multiple focused semantic commits; a completed agent run is incomplete while intended changes remain uncommitted.
 * The completing agent must run `/no-mistakes` after committing and must drive its ordinary approval gates to completion rather than leaving a pipeline parked for user input.
+* When `/no-mistakes` reaches a blocking review gate waiting for user input (`ask_user` or `awaiting_approval`), the agent must decide autonomously whether to approve the step or authorize `--action fix`; it must record the one- or two-line rationale in the run intent or handoff summary. Choose `fix` when the finding violates an explicit requirement or correctness boundary, otherwise approve when the finding conflicts with an intentional, documented design choice.
 * Pipeline-generated commits remain part of the feature history and must be synchronized locally before the task is reported complete.
 * Phase 4 optional provider adapters must keep third-party imports, credentials, model downloads, and network calls outside module import and deterministic tests; inject a narrow backend or transport so CPU-only offline validation remains reliable.
 
