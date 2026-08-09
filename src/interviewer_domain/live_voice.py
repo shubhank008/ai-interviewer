@@ -67,6 +67,10 @@ class AudioScheduler:
         """Prevent any not-yet-scheduled chunk from being played."""
         self._interrupted = True
 
+    def reset(self) -> None:
+        """Clear interrupted state so the scheduler can be reused for a new turn."""
+        self._interrupted = False
+
     async def schedule(self, session_id: UUID, turn_id: UUID, chunks: AsyncIterator[StreamAudioChunk]) -> tuple[TimestampedAudio, ...]:
         """Consume chunks in sequence order until interruption or exhaustion."""
         pending: list[StreamAudioChunk] = []
@@ -166,6 +170,7 @@ class LiveVoiceOrchestrator:
     async def process_turn(self, turn: Turn, token: CancellationToken | None = None) -> LiveVoiceTurnResult:
         """Run incremental STT, cancellable response generation, and TTS scheduling."""
         started = monotonic()
+        self.scheduler.reset()
         operation_token = token or CancellationToken()
         self._active_token = operation_token
         self.store.link_turn_session(turn.id, turn.session_id)
@@ -200,7 +205,7 @@ class LiveVoiceOrchestrator:
             if error.code == ErrorCode.CANCELLED:
                 latency = int((monotonic() - started) * 1000)
                 await self._emit("playback.interrupted", {"turn_id": str(turn.id)})
-                return LiveVoiceTurnResult("", tuple(transcript), tuple(self.scheduler.played), latency, True, self._fallback_count)
+                return LiveVoiceTurnResult("", tuple(transcript), (), latency, True, self._fallback_count)
             await self._emit("live.turn.failed", {"turn_id": str(turn.id), "code": error.code.value})
             raise
         finally:
