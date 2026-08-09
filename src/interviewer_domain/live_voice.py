@@ -171,6 +171,7 @@ class LiveVoiceOrchestrator:
         """Run incremental STT, cancellable response generation, and TTS scheduling."""
         started = monotonic()
         self.scheduler.reset()
+        turn_fallback_start = self._fallback_count
         operation_token = token or CancellationToken()
         self._active_token = operation_token
         self.store.link_turn_session(turn.id, turn.session_id)
@@ -200,12 +201,12 @@ class LiveVoiceOrchestrator:
             latency = int((monotonic() - started) * 1000)
             await self._emit("live.latency", {"turn_id": str(turn.id), "latency_ms": str(latency)})
             await self._emit("live.turn.completed", {"turn_id": str(turn.id)})
-            return LiveVoiceTurnResult(response, tuple(transcript), audio, latency, False, self._fallback_count)
+            return LiveVoiceTurnResult(response, tuple(transcript), audio, latency, False, self._fallback_count - turn_fallback_start)
         except ProviderError as error:
             if error.code == ErrorCode.CANCELLED:
                 latency = int((monotonic() - started) * 1000)
                 await self._emit("playback.interrupted", {"turn_id": str(turn.id)})
-                return LiveVoiceTurnResult("", tuple(transcript), (), latency, True, self._fallback_count)
+                return LiveVoiceTurnResult("", tuple(transcript), (), latency, True, self._fallback_count - turn_fallback_start)
             await self._emit("live.turn.failed", {"turn_id": str(turn.id), "code": error.code.value})
             raise
         finally:

@@ -31,6 +31,23 @@ class FailingSTT:
         return stream()
 
 
+class OnceFailingSTT:
+    """Fail on the first call only, then succeed on subsequent calls."""
+
+    def __init__(self) -> None:
+        self._call_count = 0
+
+    def transcribe_stream(self, audio: bytes, turn_id: UUID, token: CancellationToken):
+        """Fail on first invocation, delegate to InMemoryStreamingSTT afterward."""
+        if self._call_count == 0:
+            self._call_count += 1
+            async def stream():
+                raise ProviderError(ErrorCode.UNAVAILABLE, "primary unavailable", True)
+                yield None
+            return stream()
+        return InMemoryStreamingSTT().transcribe_stream(audio, turn_id, token)
+
+
 class SlowLLM(InMemoryStreamingLLM):
     """Pause between chunks so an external interruption can be observed."""
 
@@ -173,6 +190,29 @@ class LiveVoiceTests(unittest.TestCase):
         scheduler.interrupt()
         output = asyncio.run(scheduler.schedule(InterviewSession("candidate", InterviewMode.RECRUITER).id, Turn(InterviewSession("candidate", InterviewMode.RECRUITER).id, 1, "candidate").id, chunks()))
         self.assertEqual(output, ())
+
+    def test_fallback_count_isolated_per_turn(self) -> None:
+        """Fallback count from turn 1 does not leak into turn 2."""
+        async def run():
+            session = InterviewSession("candidate", InterviewMode.RECRUITER)
+            store = InMemoryDataStore()
+            events = InMemoryEventBus()
+            once_fail = OnceFailingSTT()
+            engine = LiveVoiceOrchestrator(
+                session,
+                [once_fail, InMemoryStreamingSTT()],
+                [InMemoryStreamingLLM()],
+                [InMemoryStreamingTTS()],
+                store,
+                events,
+            )
+            result1 = await engine.process_turn(Turn(session.id, 1, "candidate", b"audio"))
+            result2 = await engine.process_turn(Turn(session.id, 2, "candidate", b"audio"))
+            return result1, result2
+
+        result1, result2 = asyncio.run(run())
+        self.assertEqual(result1.fallback_count, 1)
+        self.assertEqual(result2.fallback_count, 0)
 
 
 if __name__ == "__main__":
