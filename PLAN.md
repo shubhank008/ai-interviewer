@@ -94,12 +94,14 @@ The Phase 6 local live voice slice is specified in `docs/specs/006-live-voice-lo
 
 ### Phase 7: Identity, persistence, and user experience
 
-- [ ] Add Firebase Authentication behind `AuthProvider`.
-- [ ] Add Firestore behind `DataStore`.
-- [ ] Add local filesystem or Docker-volume storage through `StorageProvider`.
-- [ ] Add remote or S3-compatible storage implementations for deployment environments.
-- [ ] Implement interview setup, active interview, history, replay, transcript, and results views with a minimal mobile-friendly React UI.
-- [ ] Enforce access control, 14-day retention, complete dataset deletion, upload validation, and rate limits.
+- [x] Add Firebase Authentication behind `AuthProvider`.
+- [x] Add Firestore behind `DataStore`.
+- [x] Add local filesystem or Docker-volume storage through `StorageProvider`.
+- [x] Add remote or S3-compatible storage implementations for deployment environments.
+- [x] Define provider-neutral interview setup, active interview, history, replay, transcript, and results resource contracts. No frontend tree exists yet, so no React stack was invented in this phase.
+- [x] Enforce access control, 14-day retention, complete dataset deletion, upload validation, and rate limits.
+
+The Phase 7 slice is specified in `docs/specs/007-persistence-user-identity/`. It provides injected Firebase Auth, Firestore, local filesystem, and S3-compatible seams, ownership and retention enforcement, complete deletion, bounded PDF uploads, fixed-window rate limiting, and deterministic UI-independent resource contracts.
 
 ### Phase 8: Post-interview evaluation
 

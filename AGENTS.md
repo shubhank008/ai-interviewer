@@ -90,3 +90,4 @@ place.
 * **When something surprises you, write it down here.** A landmine that costs
   an hour and is not recorded costs that hour again.
 * Phase 6 provider fixtures must be appended after the complete existing method block. Inserting at a guessed line can split an `except` clause and leave a syntactically invalid module; compile immediately after provider edits.
+* Phase 7 has no frontend source tree. Keep setup, active interview, history, replay, transcript, and results as provider-neutral resource contracts until a frontend is intentionally introduced. Hosted identity, Firestore, and S3 adapters must accept injected backends so imports and deterministic tests remain credential-free and offline.
