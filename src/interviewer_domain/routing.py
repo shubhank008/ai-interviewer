@@ -1,11 +1,18 @@
 """Configuration seams and provider-independent fallback routing."""
 
 from dataclasses import dataclass
-from typing import Generic, Sequence, TypeVar
+from typing import Generic, Protocol, Sequence, TypeVar
 
 from .contracts import CancellationToken, ErrorCode, HealthStatus, ProviderError
 
-T = TypeVar("T")
+
+class HealthCapable(Protocol):
+    """Bound for FallbackRouter generic: providers must expose health()."""
+
+    async def health(self) -> HealthStatus: ...
+
+
+T = TypeVar("T", bound="HealthCapable")
 
 
 @dataclass(frozen=True, slots=True)

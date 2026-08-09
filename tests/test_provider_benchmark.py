@@ -29,17 +29,6 @@ class SpeechFixture:
         return b"WAV-FIXTURE:" + text.encode()
 
 
-class RouterFailure:
-    """Provider-shaped failure used to exercise real fallback logic."""
-
-    async def health(self):
-        from interviewer_domain.contracts import HealthStatus
-        return HealthStatus(False, "offline")
-
-    async def call(self, provider, token):
-        raise ProviderError(ErrorCode.UNAVAILABLE, "offline", True)
-
-
 class TransportFixture:
     """Deterministic OpenAI-compatible response transport."""
 

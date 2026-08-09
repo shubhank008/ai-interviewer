@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import json
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from .contracts import CancellationToken, CapabilityDescriptor, ErrorCode, HealthStatus, ProviderError
