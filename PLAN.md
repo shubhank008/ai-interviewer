@@ -179,6 +179,8 @@ Phase 11 is specified in `docs/specs/011-runtime-configuration-and-provider-read
 - [ ] Persist final audio, transcript, event, and evaluation artifacts through the configured providers.
 - [ ] Add a local deterministic browser mode and a real configured-provider mode without mixing their credentials or behavior.
 
+Phase 13 implementation is complete in the feature branch: authenticated WebSocket session ownership and replay, WebRTC signaling/media seams, browser reconnect and live-room state, deterministic negative tests, and local marker/evidence checks. The local path remains credential-free and provider-neutral; real microphone, TURN, Firebase, and hosted-provider readiness require configured integration evidence.
+
 ### Phase 14: Full programmatic user E2E acceptance
 
 - [ ] Build a repeatable user-journey test: signup/login, provide job description, upload a valid local PDF resume, select mode, start, conduct turns, interrupt/reconnect, complete, and view results.
