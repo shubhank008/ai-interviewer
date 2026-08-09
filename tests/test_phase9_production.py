@@ -41,17 +41,6 @@ from interviewer_domain.routing import FallbackRouter
 from interviewer_domain.transport import LocalSessionEventChannel, SessionEventType
 
 
-class FailingStreamingSTT:
-    """Provider seam that fails without network or credentials."""
-
-    def transcribe_stream(self, audio, turn_id, token):
-        async def stream():
-            raise ProviderError(ErrorCode.UNAVAILABLE, "fixture failure", True)
-            yield  # pragma: no cover
-
-        return stream()
-
-
 class Phase9Tests(unittest.TestCase):
     """Exercise public application and domain behavior end to end."""
 
