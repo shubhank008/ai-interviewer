@@ -274,9 +274,11 @@ class RestResourceCatalog:
         return f"{cls.session_collection()}/{session_id}"
 
     @classmethod
-    def create_session(cls, request: CreateSessionRequest) -> SessionResponse:
+    def create_session(
+        cls, request: CreateSessionRequest, session_id: UUID | None = None
+    ) -> SessionResponse:
         """Create a normalized local session response without external services."""
-        session_id = uuid4()
+        session_id = session_id or uuid4()
         return SessionResponse(
             session_id,
             request.user_id,

@@ -102,10 +102,10 @@ async def create_session(
         user_id, InterviewMode(payload.mode), datetime.now(timezone.utc)
     )
     response = RestResourceCatalog.create_session(
-        CreateSessionRequest(user_id, payload.mode)
+        CreateSessionRequest(user_id, payload.mode), record.id
     )
     result: dict[str, object] = {key: value for key, value in response.to_dict().items()}
-    result.update({"id": str(record.id), "status": record.status})
+    result.update({"status": record.status})
     return result
 
 
