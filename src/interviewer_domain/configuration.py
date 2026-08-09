@@ -133,6 +133,15 @@ class RuntimeSettings:
             missing.append("LLM_API_KEY")
         if missing:
             raise ConfigurationError("production configuration is missing: " + ", ".join(sorted(set(missing))))
+        recognized_stt = {"faster-whisper"}
+        recognized_tts = {"piper", "kokoro"}
+        recognized_llm = {"openrouter"}
+        if self.stt_provider not in recognized_stt:
+            raise ConfigurationError(f"STT_PROVIDER must be one of {sorted(recognized_stt)}")
+        if self.tts_provider not in recognized_tts:
+            raise ConfigurationError(f"TTS_PROVIDER must be one of {sorted(recognized_tts)}")
+        if self.llm_provider not in recognized_llm:
+            raise ConfigurationError(f"LLM_PROVIDER must be one of {sorted(recognized_llm)}")
 
     def diagnostics(self) -> dict[str, object]:
         """Return safe startup details with secret values represented only by presence."""
@@ -242,14 +251,6 @@ def _optional(values: Mapping[str, str], name: str) -> str | None:
     """Return a trimmed optional environment value."""
     value = values.get(name, "").strip()
     return value or None
-
-
-def _enum(value: str, enum: type[StrEnum], name: str) -> StrEnum:
-    """Parse a string enum with a safe configuration error."""
-    try:
-        return enum(value.lower())
-    except ValueError as exc:
-        raise ConfigurationError(f"{name} has an unsupported value") from exc
 
 
 def _integer(values: Mapping[str, str], name: str, default: int, minimum: int) -> int:
