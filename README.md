@@ -35,7 +35,7 @@ The planned browser communication model is:
 
 Candidate provider implementations include local Faster-Whisper, hosted Groq Whisper, local Kokoro or Piper, and OpenRouter or self-hosted LLMs. These are comparison candidates, not final production decisions. Local development is Docker-first and CPU-only, with an approximate 4 GB RAM and 250 GB storage target.
 
-Resume input is PDF-only with a 5 MB limit, while job descriptions are supplied as text. Uploaded and generated content is treated as untrusted input and must pass prompt-injection and output-safety guardrails. Interview data is retained for 14 days by default and can be completely deleted per interview.
+Resume input is PDF-only with a 5 MB limit, while job descriptions are supplied as text. The Phase 3 local ingestion slice extracts text-based PDFs, preserves source-linked chunks, provides deterministic topic retrieval, and marks instruction-like document text as untrusted data. OCR, external research, and persistent retention enforcement remain integration work. Uploaded and generated content is treated as untrusted input and must pass prompt-injection and output-safety guardrails. Interview data is retained for 14 days by default and can be completely deleted per interview.
 
 ## Project status
 
