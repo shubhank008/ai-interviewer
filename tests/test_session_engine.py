@@ -90,6 +90,7 @@ class SessionEngineTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, ErrorCode.CANCELLED)
         self.assertEqual(engine.session.status, SessionStatus.CANCELLED.value)
         self.assertNotIn("session.completed", [event.name for event in events.events])
+        print("[ENGINE] cancellation-failure-ok")
 
     def test_provider_failure_is_terminal(self) -> None:
         """Invalid deterministic input transitions the session to failed."""
@@ -99,7 +100,7 @@ class SessionEngineTests(unittest.TestCase):
             asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"")))
         self.assertEqual(engine.session.status, SessionStatus.FAILED.value)
         self.assertEqual(events.events[-1].name, "session.failed")
-        print("[ENGINE] cancellation-failure-ok")
+        print("[ENGINE] provider-failure-ok")
 
     def test_planner_rejects_empty_follow_up_context(self) -> None:
         """Follow-up preparation requires substantive current context."""

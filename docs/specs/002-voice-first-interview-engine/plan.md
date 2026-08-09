@@ -22,6 +22,7 @@ Written in `contracts/log-markers.md` before implementation. The deterministic s
 - Requires: `[ENGINE] lifecycle-ok`
 - Requires: `[ENGINE] guarded-planning-ok`
 - Requires: `[ENGINE] cancellation-failure-ok`
+- Requires: `[ENGINE] provider-failure-ok`
 - Requires: `[ENGINE] mock-session-ok`
 - Forbids: `Traceback`, `AssertionError`, `Script Error`, `TypeError`, `TimeoutError`
 

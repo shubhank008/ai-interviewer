@@ -4,7 +4,7 @@ from dataclasses import replace
 from hashlib import sha256
 from uuid import UUID, uuid4
 
-from .contracts import CancellationToken, DataStore, EventBus, LLMProvider, ProviderError, STTProvider, TTSProvider
+from .contracts import CancellationToken, DataStore, ErrorCode, EventBus, LLMProvider, ProviderError, STTProvider, TTSProvider
 from .models import InterviewSession, LifecycleEvent, QuestionPlan, SessionStatus, Turn
 
 
@@ -102,7 +102,7 @@ class InterviewSessionEngine:
             await self._emit("question.prepared", {"topic": self._plan.topic}, turn.id)
             return response, audio
         except ProviderError as error:
-            terminal = SessionStatus.CANCELLED if error.code.value == "cancelled" else SessionStatus.FAILED
+            terminal = SessionStatus.CANCELLED if error.code == ErrorCode.CANCELLED else SessionStatus.FAILED
             self.session = replace(self.session, status=terminal.value)
             await self._emit("session.cancelled" if terminal is SessionStatus.CANCELLED else "session.failed", correlation=turn.id)
             raise
