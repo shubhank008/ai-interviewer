@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from collections import deque
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol
 from uuid import UUID, uuid4
+
+MAX_SIGNALING_PAYLOAD_BYTES = 64 * 1024
 
 
 class TransportValidationError(ValueError):
@@ -181,6 +184,8 @@ class SignalingMessage:
         required = {SignalingType.OFFER: "sdp", SignalingType.ANSWER: "sdp", SignalingType.ICE_CANDIDATE: "candidate"}
         if not isinstance(self.payload.get(required[self.message_type]), str) or not self.payload[required[self.message_type]].strip():
             raise TransportValidationError(f"{required[self.message_type]} is required")
+        if len(json.dumps(self.payload).encode("utf-8")) > MAX_SIGNALING_PAYLOAD_BYTES:
+            raise TransportValidationError("signaling payload exceeds 64 KiB limit")
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible signaling envelope."""

@@ -90,6 +90,19 @@ class BrowserTransportTests(unittest.TestCase):
             SignalingMessage(session_id, SignalingType.ICE_CANDIDATE, {}, "negotiation-2")
         print("[WEBRTC] answer and ICE candidate validated")
 
+    def test_signaling_payload_size_limit(self) -> None:
+        """Reject signaling payloads that exceed the 64 KiB design constant."""
+        from interviewer_domain.transport import MAX_SIGNALING_PAYLOAD_BYTES
+        session_id = uuid4()
+        valid_payload = {"sdp": "v=0"}
+        msg = SignalingMessage(session_id, SignalingType.OFFER, valid_payload, "negotiation-1")
+        self.assertIsNotNone(msg)
+        oversized_sdp = "x" * (MAX_SIGNALING_PAYLOAD_BYTES + 1)
+        with self.assertRaises(TransportValidationError) as ctx:
+            SignalingMessage(session_id, SignalingType.OFFER, {"sdp": oversized_sdp}, "negotiation-1")
+        self.assertIn("64 KiB", str(ctx.exception))
+        print("[WEBRTC] signaling payload size limit enforced")
+
 
 if __name__ == "__main__":
     unittest.main()
