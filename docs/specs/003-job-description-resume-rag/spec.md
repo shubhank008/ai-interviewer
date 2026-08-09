@@ -29,11 +29,11 @@ This slice uses deterministic local implementations for parsing, chunking, embed
 ## Acceptance
 
 - [x] Marker contract written before implementation
-- [ ] Text job descriptions normalize into source-linked chunks
-- [ ] PDF resumes enforce the 5 MB limit and extract supported text with source references
-- [ ] Empty, malformed, and unsupported documents fail with normalized errors
-- [ ] Chunk embeddings and retrieval are available through capability interfaces
-- [ ] Retrieved evidence preserves source kind, section, and trust boundary
-- [ ] Instruction-like content is isolated as untrusted data and never returned as executable instructions
-- [ ] Unit tests exercise parsers, chunking, retrieval, safety filtering, and a real mock ingestion path
-- [ ] All required markers print with no forbidden failure patterns
+- [x] Text job descriptions normalize into source-linked chunks
+- [x] PDF resumes enforce the 5 MB limit and extract supported text with source references
+- [x] Empty, malformed, and unsupported documents fail with normalized errors
+- [x] Chunk embeddings and retrieval are available through capability interfaces
+- [x] Retrieved evidence preserves source kind, section, and trust boundary
+- [x] Instruction-like content is isolated as untrusted data and never returned as executable instructions
+- [x] Unit tests exercise parsers, chunking, retrieval, safety filtering, and a real mock ingestion path
+- [x] All required markers print with no forbidden failure patterns
