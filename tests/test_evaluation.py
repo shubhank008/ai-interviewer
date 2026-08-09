@@ -3,7 +3,7 @@
 import tempfile
 import unittest
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from interviewer_domain.contracts import ErrorCode, ProviderError
@@ -73,6 +73,7 @@ class EvaluationTests(unittest.TestCase):
     def test_post_interview_access_and_retention(self) -> None:
         """Active, failed, wrong-owner, and expired interviews cannot be evaluated."""
         now = datetime(2027, 1, 1, tzinfo=timezone.utc)
+        expired = now - timedelta(days=365)
         data = InMemoryPersistentDataStore()
         active = InterviewRecord("alice", InterviewMode.TECHNICAL, created_at=now)
         data.save_interview(active)
@@ -82,12 +83,13 @@ class EvaluationTests(unittest.TestCase):
         with self.assertRaises(ProviderError) as active_error:
             service.evaluate("alice", active.id, context, transcript)
         self.assertEqual(active_error.exception.code, ErrorCode.CONFLICT)
-        completed = replace(active, status="completed", expires_at=datetime(2000, 1, 1, tzinfo=timezone.utc))
+        completed = replace(active, status="completed", expires_at=expired)
         data.save_interview(completed)
         with self.assertRaises(ProviderError):
             service.evaluate("alice", completed.id, context, transcript)
         with self.assertRaises(ProviderError):
             service.evaluate("bob", active.id, context, transcript)
+        self.assertIsNone(data.get_evaluation("alice", completed.id, now))
         print("[EVALUATION] access-retention-ok")
 
 

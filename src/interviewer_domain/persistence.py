@@ -201,10 +201,11 @@ class InMemoryPersistentDataStore:
         self.get_interview(user_id, interview_id)
         self.evaluations[interview_id] = evaluation
 
-    def get_evaluation(self, user_id: str, interview_id: UUID) -> Evaluation | None:
-        """Return an owned interview evaluation or None when absent."""
+    def get_evaluation(self, user_id: str, interview_id: UUID, now: datetime | None = None) -> Evaluation | None:
+        """Return an owned, non-expired interview evaluation or None when absent."""
         record = self.interviews.get(interview_id)
-        if record is None or record.user_id != user_id:
+        current = now or datetime.now(timezone.utc)
+        if record is None or record.user_id != user_id or (record.expires_at is not None and record.expires_at <= current):
             return None
         return self.evaluations.get(interview_id)
 
