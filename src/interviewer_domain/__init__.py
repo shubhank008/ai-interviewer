@@ -19,6 +19,7 @@ from .retrieval import (
     TopicRetriever,
 )
 from .routing import FallbackRouter, ProviderFlags
+from .live_voice import AudioScheduler, LiveVoiceOrchestrator, LiveVoiceTurnResult, PrefetchGuard, PrefetchedResponse, TimestampedAudio
 from .session import InterviewSessionEngine, QuestionPlanner, SessionStateError
 from .transport import (
     BrowserControlTransport,
@@ -37,7 +38,13 @@ from .transport import (
 )
 
 __all__ = [
+    "AudioScheduler",
     "BenchmarkReport",
+    "LiveVoiceOrchestrator",
+    "LiveVoiceTurnResult",
+    "PrefetchGuard",
+    "PrefetchedResponse",
+    "TimestampedAudio",
     "BrowserControlTransport",
     "BrowserMediaTransport",
     "CreateSessionRequest",

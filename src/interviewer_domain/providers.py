@@ -9,6 +9,8 @@ from .contracts import (
     ErrorCode,
     HealthStatus,
     ProviderError,
+    StreamAudioChunk,
+    StreamTextChunk,
 )
 from .models import LifecycleEvent, Recording, TranscriptSegment
 
@@ -133,3 +135,76 @@ class InMemoryStorage:
             return self.files[key][0]
         except KeyError as exc:
             raise ProviderError(ErrorCode.UNAVAILABLE, "storage key not found") from exc
+
+
+class InMemoryStreamingSTT:
+    """Emit deterministic partial and final transcript segments."""
+
+    def __init__(self, transcript: str = "I built a reliable service.") -> None:
+        self.transcript = transcript
+
+    async def _stream(self, audio: bytes, turn_id: UUID, token: CancellationToken):
+        """Yield a partial and final segment with stable timestamps."""
+        token.raise_if_cancelled()
+        if not audio:
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "audio payload is empty")
+        midpoint = max(1, len(self.transcript) // 2)
+        yield TranscriptSegment(turn_id, "candidate", self.transcript[:midpoint], False, 0, 100)
+        token.raise_if_cancelled()
+        yield TranscriptSegment(turn_id, "candidate", self.transcript, True, 0, 200)
+
+    def transcribe_stream(self, audio: bytes, turn_id: UUID, token: CancellationToken):
+        """Return the incremental transcript stream."""
+        return self._stream(audio, turn_id, token)
+
+
+class InMemoryStreamingLLM:
+    """Stream a deterministic response in ordered text chunks."""
+
+    def __init__(self, response: str = "Thank you. Can you explain the impact?") -> None:
+        self.response = response
+
+    async def _stream(self, prompt: str, token: CancellationToken):
+        """Yield response words while honoring cooperative cancellation."""
+        token.raise_if_cancelled()
+        if not prompt.strip():
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "prompt is empty")
+        words = self.response.split(" ")
+        for sequence, word in enumerate(words):
+            token.raise_if_cancelled()
+            yield StreamTextChunk(sequence, word + (" " if sequence < len(words) - 1 else ""), sequence == len(words) - 1)
+
+    def generate_stream(self, prompt: str, token: CancellationToken):
+        """Return the cancellable response stream."""
+        return self._stream(prompt, token)
+
+
+class InMemorySecondaryResponse:
+    """Return a short deterministic acknowledgement."""
+
+    def __init__(self, response: str = "I see.") -> None:
+        self.response = response
+
+    async def generate_secondary(self, answer: str, token: CancellationToken) -> str:
+        """Generate an acknowledgement only for a non-empty answer."""
+        token.raise_if_cancelled()
+        if not answer.strip():
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "answer is empty")
+        return self.response
+
+
+class InMemoryStreamingTTS:
+    """Encode each response word as an ordered, timestamped mock audio chunk."""
+
+    async def _stream(self, text: str, token: CancellationToken):
+        """Yield deterministic audio chunks with contiguous timestamps."""
+        token.raise_if_cancelled()
+        if not text.strip():
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "text is empty")
+        for sequence, word in enumerate(text.split(" ")):
+            token.raise_if_cancelled()
+            yield StreamAudioChunk(sequence, b"AUDIO:" + word.encode("utf-8"), sequence * 20, 20)
+
+    def synthesize_stream(self, text: str, token: CancellationToken):
+        """Return the cancellable audio chunk stream."""
+        return self._stream(text, token)

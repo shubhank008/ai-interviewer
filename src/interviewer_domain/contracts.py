@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from enum import StrEnum
+from collections.abc import AsyncIterator
 from typing import Protocol
 from uuid import UUID
 
@@ -59,6 +60,50 @@ class CapabilityDescriptor:
     name: str
     streaming: bool
     cancellation: bool
+
+
+
+@dataclass(frozen=True, slots=True)
+class StreamTextChunk:
+    """One ordered text fragment from an incremental provider."""
+
+    sequence: int
+    text: str
+    is_final: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class StreamAudioChunk:
+    """One ordered audio fragment with a playback timestamp."""
+
+    sequence: int
+    audio: bytes
+    start_ms: int
+    duration_ms: int
+
+
+class StreamingSTTProvider(Protocol):
+    """Incrementally transcribe one candidate turn."""
+
+    def transcribe_stream(self, audio: bytes, turn_id: UUID, token: CancellationToken) -> AsyncIterator[TranscriptSegment]: ...
+
+
+class StreamingLLMProvider(Protocol):
+    """Stream cancellable substantive interviewer text."""
+
+    def generate_stream(self, prompt: str, token: CancellationToken) -> AsyncIterator[StreamTextChunk]: ...
+
+
+class SecondaryResponseProvider(Protocol):
+    """Produce a bounded optional acknowledgement or filler."""
+
+    async def generate_secondary(self, answer: str, token: CancellationToken) -> str: ...
+
+
+class StreamingTTSProvider(Protocol):
+    """Synthesize ordered, cancellable audio chunks."""
+
+    def synthesize_stream(self, text: str, token: CancellationToken) -> AsyncIterator[StreamAudioChunk]: ...
 
 
 class LLMProvider(Protocol):
