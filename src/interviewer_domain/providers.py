@@ -136,6 +136,12 @@ class InMemoryStorage:
         except KeyError as exc:
             raise ProviderError(ErrorCode.UNAVAILABLE, "storage key not found") from exc
 
+    def delete_prefix(self, prefix: str) -> None:
+        """Delete all stored objects below an interview-owned prefix."""
+        for key in tuple(self.files):
+            if key.startswith(prefix):
+                del self.files[key]
+
 
 class InMemoryStreamingSTT:
     """Emit deterministic partial and final transcript segments."""

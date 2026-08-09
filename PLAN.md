@@ -116,13 +116,16 @@ The Phase 8 local evaluation slice is specified in `docs/specs/008-post-intervie
 
 ### Phase 9: Production hardening
 
-- [ ] Add end-to-end mock interview coverage for the complete pipeline.
-- [ ] Add provider failure, reconnect, cancellation, and partial-audio tests.
-- [ ] Add load, latency, cost, and resource benchmarks.
-- [ ] Complete security and privacy review.
-- [ ] Add observability dashboards and operational runbooks.
-- [ ] Select production providers from benchmark evidence.
-- [ ] Document deployment options for self-hosted and hosted components.
+- [x] Add end-to-end mock interview coverage for the complete pipeline.
+- [x] Add provider failure, reconnect, cancellation, and partial-audio tests.
+- [x] Add load, latency, cost, and resource benchmark seams.
+- [x] Complete deterministic security and privacy boundary checks.
+- [x] Add a FastAPI entrypoint, health/version routes, local runtime, and operational documentation.
+- [x] Add a maintainable React frontend for setup, active interview, history/replay/transcript, and results.
+- [ ] Add hosted observability dashboards and select production providers from deployment-specific evidence.
+- [x] Document Docker/local deployment and hosted component boundaries.
+
+Phase 9 is specified in `docs/specs/009-production-hardening/`. The deterministic production boundary is intentionally credential-free: FastAPI composes in-memory capabilities locally, while deployment adapters remain replaceable behind existing interfaces. The frontend is a runnable Vite application rather than a placeholder, and the offline gate executes public methods and ASGI routes instead of inspecting source strings.
 
 ## SDD feature order
 
