@@ -105,12 +105,14 @@ The Phase 7 slice is specified in `docs/specs/007-persistence-user-identity/`. I
 
 ### Phase 8: Post-interview evaluation
 
-- [ ] Finalize recruiter and technical rubric dimensions and weights.
-- [ ] Implement versioned structured evaluation output.
-- [ ] Add transcript evidence references and evaluator confidence.
-- [ ] Generate summary, strengths, weaknesses, and improvement recommendations.
-- [ ] Persist and render the score out of 100.
-- [ ] Add evaluator regression fixtures and quality checks.
+- [x] Finalize recruiter and technical rubric dimensions and normalized weights.
+- [x] Implement versioned structured evaluation output.
+- [x] Add transcript evidence references, evidence status, and evaluator confidence.
+- [x] Generate summary, strengths, weaknesses, and improvement recommendations.
+- [x] Persist and expose the score out of 100 through the results resource.
+- [x] Add evaluator regression fixtures, quality checks, and a real offline mock path.
+
+The Phase 8 local evaluation slice is specified in `docs/specs/008-post-interview-evaluation/`. `DeterministicEvaluator` scores only final candidate transcript segments with mode-specific versioned rubrics. `PostInterviewEvaluationService` authorizes completed owned interviews before saving results through the Phase 7 datastore seam. No LLM, network, credentials, or frontend is required.
 
 ### Phase 9: Production hardening
 

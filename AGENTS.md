@@ -92,3 +92,5 @@ place.
   an hour and is not recorded costs that hour again.
 * Phase 6 provider fixtures must be appended after the complete existing method block. Inserting at a guessed line can split an `except` clause and leave a syntactically invalid module; compile immediately after provider edits.
 * Phase 7 has no frontend source tree. Keep setup, active interview, history, replay, transcript, and results as provider-neutral resource contracts until a frontend is intentionally introduced. Hosted identity, Firestore, and S3 adapters must accept injected backends so imports and deterministic tests remain credential-free and offline.
+* Phase 8 evaluation must consume only final candidate transcript segments after an interview is completed; preserve context and evidence references, and route persistence through owner-checked Phase 7 interfaces. The deterministic evaluator uses lexical fixtures so future provider adapters cannot leak network, credentials, or LLM dependencies into tests.
+
