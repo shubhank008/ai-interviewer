@@ -141,6 +141,29 @@ class LiveVoiceTests(unittest.TestCase):
         print("[LIVE] interruption stopped playback")
         print("[LIVE] cancellable response streamed")
 
+    def test_cancellation_after_successful_turn_returns_empty_audio(self) -> None:
+        """Turn 1 completes then Turn 2 is interrupted; Turn 2 audio is empty."""
+        async def run():
+            engine, _, events = self.build(llm=SlowLLM())
+            turn1 = Turn(engine.session.id, 1, "candidate", b"audio1")
+            result1 = await engine.process_turn(turn1)
+            turn2 = Turn(engine.session.id, 2, "candidate", b"audio2")
+            task2 = asyncio.create_task(engine.process_turn(turn2))
+            await asyncio.sleep(0)
+            engine.interrupt()
+            result2 = await task2
+            return result1, result2, turn2.id, events
+
+        result1, result2, turn2_id, events = asyncio.run(run())
+        self.assertFalse(result1.interrupted)
+        self.assertGreater(len(result1.audio), 0)
+        self.assertTrue(result2.interrupted)
+        self.assertEqual(result2.audio, ())
+        interrupted_events = [e for e in events.events if e.name == "playback.interrupted"]
+        self.assertEqual(len(interrupted_events), 1)
+        self.assertEqual(interrupted_events[0].payload["turn_id"], str(turn2_id))
+        print("[LIVE] cross-turn cancellation isolation verified")
+
     def test_scheduler_discards_chunks_after_interrupt(self) -> None:
         """The scheduler itself has a deterministic interruption guard."""
         async def chunks():
