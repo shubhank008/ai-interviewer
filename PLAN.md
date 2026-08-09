@@ -126,7 +126,7 @@ The first feature specifications should be created in this order:
 2. `002-voice-first-interview-engine`
 3. `003-job-description-resume-rag`
 4. `004-provider-benchmark-harness`
-5. `005-browser-transport-and-session-events`
+5. `005-browser-transport-session-events`
 6. `006-live-voice-loop`
 7. `007-persistence-and-user-identity`
 8. `008-post-interview-evaluation`
