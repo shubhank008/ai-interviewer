@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { authHeaders, createSessionRequest, historyRequest } from './api.js'
+import { authHeaders, createSessionRequest, historyRequest, sessionResourceRequest } from './api.js'
 
 test('createSessionRequest builds an authenticated JSON request', () => {
   const request = createSessionRequest('technical', 'test-token')
@@ -21,4 +21,10 @@ test('historyRequest builds an authenticated read request', () => {
 
 test('authHeaders does not add JSON metadata to read requests', () => {
   assert.deepEqual(authHeaders('test-token'), { Authorization: 'Bearer test-token' })
+})
+
+test('sessionResourceRequest keeps resource views on the versioned boundary', () => {
+  const request = sessionResourceRequest('abc', 'transcript', 'test-token')
+  assert.equal(request.url, '/api/v1/sessions/abc/transcript')
+  assert.deepEqual(request.init.headers, { Authorization: 'Bearer test-token' })
 })
