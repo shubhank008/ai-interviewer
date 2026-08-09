@@ -151,12 +151,14 @@ Phase 10 is specified in `docs/specs/010-test-integrity-and-ci/`. Its local and 
 
 ### Phase 11: Runtime configuration and provider readiness
 
-- [ ] Add `.env.example` with documented, non-secret configuration for Firebase, Firestore, storage, STT, TTS, LLM, WebRTC, CORS, retention, rate limits, and observability.
-- [ ] Add typed configuration loading, environment validation, safe defaults, and startup diagnostics that never print secrets.
-- [ ] Add a local development profile using deterministic providers and a production profile requiring explicitly configured providers.
-- [ ] Add provider capability and health checks with fail-fast behavior for required production capabilities.
-- [ ] Implement and benchmark at least one usable production STT, TTS, and LLM path, including fallback behavior.
-- [ ] Document data-sharing, retention, cost, latency, and failure characteristics for every selected provider.
+- [x] Add `.env.example` with documented, non-secret configuration for Firebase, Firestore, storage, STT, TTS, LLM, WebRTC, CORS, retention, rate limits, and observability.
+- [x] Add typed configuration loading, environment validation, safe defaults, and startup diagnostics that never print secrets.
+- [x] Add a local development profile using deterministic providers and a production profile requiring explicitly configured providers.
+- [x] Add provider capability and health checks with fail-fast behavior for required production capabilities.
+- [x] Implement and benchmark at least one usable production-shaped STT, TTS, and LLM path, including fallback behavior through injected seams.
+- [x] Document data-sharing, retention, cost, latency, and failure characteristics for every selected provider.
+
+Phase 11 is specified in `docs/specs/011-runtime-configuration-and-provider-readiness/`. The default local profile is offline and deterministic. Production-shaped adapters use injected backend and transport seams, while `/api/v1/readiness` exposes only redacted capability status. Passing local tests does not claim real provider, Firebase, browser, or WebRTC readiness. Run `scripts/test_phase11.sh` for the Phase 11 marker evidence path.
 
 ### Phase 12: Production frontend and Firebase identity
 
@@ -206,15 +208,13 @@ Phase 10 is specified in `docs/specs/010-test-integrity-and-ci/`. Its local and 
 
 ## SDD feature order
 
-Feature specifications have been completed through `009-production-hardening`. New specifications must be created in this order:
+Feature specifications have been completed through `011-runtime-configuration-and-provider-readiness`. New specifications must be created in this order:
 
-1. `010-test-integrity-and-ci`
-2. `011-runtime-configuration-and-provider-readiness`
-3. `012-production-frontend-and-firebase-identity`
-4. `013-browser-webrtc-websocket-voice-loop`
-5. `014-full-user-e2e-acceptance`
-6. `015-provider-integration-suite`
-7. `016-coverage-and-live-demo-readiness`
+1. `012-production-frontend-and-firebase-identity`
+2. `013-browser-webrtc-websocket-voice-loop`
+3. `014-full-user-e2e-acceptance`
+4. `015-provider-integration-suite`
+5. `016-coverage-and-live-demo-readiness`
 
 Each phase may contain smaller implementation slices, but no phase may be marked complete using only static fixtures or an offline mock when its acceptance criteria require configured infrastructure.
 
