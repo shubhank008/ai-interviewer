@@ -103,6 +103,10 @@ Phase 13 adds the authenticated browser session control loop. REST-created sessi
 
 Phase 14 provides a behavior-level full-user acceptance harness in `src/interviewer_domain/e2e_acceptance.py` and `tests/test_phase14_full_user_e2e.py`. The local profile drives the real application/domain seams through setup, PDF parsing, retrieval, provider-separated voice orchestration, WebSocket control, WebRTC media buffering, interruption, reconnect, persistence, evaluation, replay, history, and deletion. It emits timestamped JSON, Markdown, and HTML evidence and reports configured STT, TTS, LLM, Firebase, storage, and WebRTC integrations as exercised or explicitly skipped. Run `./scripts/test_phase14.sh`; this remains offline evidence and does not claim absent production credentials or hosted infrastructure.
 
+### 2.10 Phase 15 provider integration suite
+
+Phase 15 adds explicitly selected provider integration profiles and concrete lazy transports for OpenRouter HTTP, operator-supplied Faster-Whisper models, Piper/Kokoro commands, Firebase Admin Auth, Firestore, S3-compatible storage, and configured browser/WebRTC infrastructure. The existing capability interfaces remain the application boundary, and provider wire formats, credentials, timeout/cancellation handling, redaction, and deletion behavior remain inside adapters. `scripts/test_phase15.sh` runs credential-free adapter contracts and writes redacted evidence; configured provider tests are separate and are never implied by skipped profiles. The current local environment does not claim real provider or browser readiness without configured execution evidence.
+
 
 ## 3. Capability-based architecture
 

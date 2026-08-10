@@ -22,3 +22,21 @@ Cost and latency values are intentionally not estimated in this phase. The exist
 ## Startup and diagnostics
 
 Startup diagnostics may show profile, provider names, fallback names, configuration-presence flags, retention, rate limits, CORS origins, and health states. They must never show API key values, Firebase private material, bearer tokens, user content, or provider payloads. Missing required production configuration fails before serving traffic; missing optional local dependencies is reported as unhealthy and does not trigger a model download.
+
+## Phase 15 opt-in integration suite
+
+Run `./scripts/test_phase15.sh` for the offline adapter contract and redacted evidence. It never selects a provider by default. Set `PHASE15_PROFILES` to a comma-separated selection before running configured checks. Each selected profile must be exercised by a provider-specific test or is reported as failed; absent configuration is reported as skipped and is not production evidence.
+
+| Profile | Required configuration | Setup boundary |
+|---|---|---|
+| `openrouter` | `OPENROUTER_API_KEY`, `LLM_MODEL` | OpenRouter HTTP API; hosted prompt sharing, account charges, model retention, and region are deployment-specific |
+| `faster-whisper` | `STT_MODEL_PATH` | Install `faster-whisper` from PyPI and supply an already-downloaded model directory; no automatic download |
+| `piper` | `TTS_MODEL_PATH`, `TTS_COMMAND` | Install Piper or Kokoro from its official distribution and supply a local voice model |
+| `firebase` | `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH` | Install `firebase-admin` from PyPI; keep service-account files outside the repository and verify ID-token claims |
+| `firestore` | `FIREBASE_PROJECT_ID` and application credentials | Install `google-cloud-firestore` from PyPI; test owner isolation and complete deletion |
+| `storage` | `STORAGE_BUCKET` and cloud credentials | Install `boto3` from PyPI; test upload, download, prefix deletion, and deletion failures |
+| `webrtc` | `PHASE15_BROWSER_URL` and configured ICE/TURN | Use the Phase 13 browser/media boundary; browser permission and TURN evidence require configured infrastructure |
+
+Never put API keys, bearer credentials, service-account files, transcript, resume, or audio in logs or evidence. Local model setup is intentionally manual because model downloads are large and may incur licensing or storage costs. Hosted calls can incur charges and may process sensitive interview context. Delete test users, Firestore documents, and objects after each run and verify provider-side retention terms independently.
+
+Troubleshoot skips by checking variable presence, file permissions, model path validity, cloud project and region, service-account scopes, bucket policy, HTTPS/CORS, browser microphone permission, and ICE/TURN reachability. Redacted JSON, Markdown, and HTML reports are written under `.agent_tmp/phase15-evidence/`, which is not versioned.
