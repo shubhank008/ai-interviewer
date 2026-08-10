@@ -140,3 +140,15 @@ This local evidence does not claim real microphone capture, TURN/WebRTC connecti
 Phase 14 adds a repeatable offline acceptance journey spanning deterministic local auth, job setup, valid PDF parsing, RAG retrieval, separate candidate and interviewer provider instances, browser WebSocket/WebRTC seams, candidate audio, STT/TTS/LLM capability calls, interruption, reconnect, completion, persistence, evaluation, replay/history, and deletion. It also exercises invalid login, unauthorized access, malformed PDF, provider fallback, microphone denial, cancellation, timeout, stale responses, and incomplete interviews.
 
 Run `./scripts/test_phase14.sh` for behavior-level markers and evidence. JSON, Markdown, and HTML reports are written to `.agent_tmp/phase14-evidence/` by default, or to `PHASE14_EVIDENCE_DIR`. The local profile is not Firebase or hosted-provider evidence: configured integrations are reported only when their explicit credentials and opt-in settings are present, and otherwise receive a redacted skip reason.
+
+## Phase 15 opt-in provider integrations
+
+Phase 15 adds real, lazy provider transports without changing the offline profile. `OpenRouterHTTPTransport` calls the OpenRouter OpenAI-compatible API when `LLM_API_KEY` and `LLM_PROVIDER=openrouter` are configured. `FasterWhisperLocalBackend` validates an operator-supplied model directory without downloading weights, and `PiperCommandBackend` invokes an operator-installed local speech command. Firebase Admin, Firestore, and S3-compatible adapters are available behind the existing auth, durable data, and storage protocols.
+
+Run the offline Phase 15 contract and evidence check with:
+
+```bash
+./scripts/test_phase15.sh
+```
+
+Select integrations explicitly with `PHASE15_PROFILES=openrouter,faster-whisper,piper,firebase,firestore,storage,webrtc` and provide the documented variables in `.env.example`. The runner never silently substitutes an in-memory provider: absent configuration is a redacted `skipped` result, and configured failures are `failed`. Evidence is written outside Git under `.agent_tmp/phase15-evidence/`. Real provider, Firebase, storage, model, browser, and TURN readiness requires configured integration execution and is not claimed by the default offline gates.

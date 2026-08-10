@@ -195,11 +195,14 @@ Phase 14 implementation is complete: `scripts/test_phase14.sh` runs real behavio
 
 ### Phase 15: Opt-in provider integration suite
 
-- [ ] Add separately tagged integration tests for Firebase Auth, Firestore, object storage, STT, TTS, LLM, and WebRTC infrastructure.
-- [ ] Run integrations only when the required environment variables and explicit CI secrets are present; never make them part of the default offline suite.
-- [ ] Validate real authentication claims, provider payload translation, streaming, cancellation, rate limits, cost, latency, retries, and data deletion.
-- [ ] Redact credentials and personal data from logs and test artifacts.
-- [ ] Record provider versions, model names, region, timing, cost, quality, and known limitations.
+- [x] Add separately selectable integration profiles and redacted JSON, Markdown, and HTML evidence for Firebase Auth, Firestore, object storage, STT, TTS, LLM, and WebRTC infrastructure.
+- [x] Add concrete lazy OpenRouter HTTP, Faster-Whisper local-model, Piper/Kokoro command, Firebase Admin, Firestore, and S3-compatible transports behind existing capability seams.
+- [x] Run integrations only when required environment variables and explicit secrets are present; default offline tests remain unchanged.
+- [x] Validate configuration gating, model-path validation, credential-safe diagnostics, cancellation and timeout normalization, and deletion boundaries in offline contract tests.
+- [x] Redact credentials and personal data from logs and test artifacts; record provider/model/version/region/device/timing/cost/quality/limitations when configured.
+- [ ] Exercise real providers and configured browser/TURN infrastructure. This remains opt-in and is skipped when safe credentials, model paths, or infrastructure are absent.
+
+Phase 15 implementation provides real execution paths and an honest opt-in gate. The current environment has no Firebase, Faster-Whisper, Piper/Kokoro, or browser automation configuration, so no production-provider readiness is claimed by the offline run.
 
 ### Phase 16: Coverage and live-demo release gate
 

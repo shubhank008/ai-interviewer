@@ -278,3 +278,7 @@ Phase 11 provides typed environment configuration with explicit `local` and `pro
 16. **Coverage and live-demo release:** enforce coverage, run a production-shaped release candidate, validate operations, and rehearse the first live demo.
 
 The project is not production-ready for a live demo until phases 10 through 16 have passed their required gates. All features must follow the repository's SDD workflow: feature specification, implementation plan, marker contract, implementation, unit tests, end-to-end evidence, documentation, and landmine recording where applicable.
+
+### 2.10 Phase 15 provider integration suite
+
+Phase 15 adds explicitly selected provider integration profiles and concrete lazy transports for OpenRouter HTTP, operator-supplied Faster-Whisper models, Piper/Kokoro commands, Firebase Admin Auth, Firestore, S3-compatible storage, and configured browser/WebRTC infrastructure. The existing capability interfaces remain the application boundary, and provider wire formats, credentials, timeout/cancellation handling, redaction, and deletion behavior remain inside adapters. `scripts/test_phase15.sh` runs credential-free adapter contracts and writes redacted evidence; configured provider tests are separate and are never implied by skipped profiles. The current local environment does not claim real provider or browser readiness without configured execution evidence.
