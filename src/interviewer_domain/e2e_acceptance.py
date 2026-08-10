@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from .contracts import CancellationToken
+from .contracts import CancellationToken, ErrorCode, ProviderError
 from .documents import LocalDocumentParser
 from .evaluation import InterviewContext, PostInterviewEvaluationService
 from .live_voice import LiveVoiceOrchestrator
@@ -32,12 +32,14 @@ from .providers import (
     InMemoryStorage,
 )
 from .retrieval import DeterministicEmbeddingProvider, InMemoryVectorStore, TopicRetriever
+from .routing import FallbackRouter
 from .transport import (
     BrowserSessionState,
     LocalWebRTCBoundary,
     SessionEventType,
     SignalingMessage,
     SignalingType,
+    TransportValidationError,
 )
 
 MARKERS = (
@@ -327,17 +329,94 @@ async def run_local_acceptance(output_directory: str | Path = ".agent_tmp/phase1
     except Exception as error:
         report.fail("positive-journey", str(error))
 
-    negative = {
-        "unauthorized-access": "owner check rejected",
-        "invalid-pdf": "PDF validation rejected",
-        "provider-outage-fallback": "fallback path exercised by provider contract",
-        "microphone-denial": "media permission failure is visible",
-        "cancellation-timeout": "cancellation and timeout are safe",
-        "stale-response": "digest guard rejects stale response",
-        "incomplete-interview": "evaluation requires completion",
-    }
-    for name, detail in negative.items():
-        report.record(name, outcome=detail)
+    try:
+        try:
+            data.get_interview("attacker", record.id)
+            raise AssertionError("unauthorized access did not raise")
+        except ProviderError:
+            report.record("unauthorized-access", outcome="owner check rejected")
+        try:
+            UploadValidator().validate_resume("bad.txt", b"not-pdf", "text/plain")
+            raise AssertionError("invalid PDF did not raise")
+        except ProviderError:
+            report.record("invalid-pdf", outcome="PDF validation rejected")
+
+        class _FailingProvider:
+            async def health(self) -> object:
+                from interviewer_domain.contracts import HealthStatus
+                return HealthStatus(False, "simulated outage")
+
+            async def transcribe_stream(self, audio, turn_id, token):
+                raise ProviderError(ErrorCode.UNAVAILABLE, "simulated outage")
+                yield  # pragma: no cover
+
+        class _SucceedingSTT:
+            async def health(self) -> object:
+                from interviewer_domain.contracts import HealthStatus
+                return HealthStatus(True)
+
+            async def transcribe_stream(self, audio, turn_id, token):
+                from interviewer_domain.models import TranscriptSegment
+                yield TranscriptSegment(turn_id, "candidate", "fallback succeeded", True, 0, 100)
+
+        router = FallbackRouter([_FailingProvider(), _SucceedingSTT()], "stt")
+        token = CancellationToken()
+
+        async def _call(provider: object, t: CancellationToken) -> list:
+            result = []
+            async for segment in provider.transcribe_stream(b"audio", record.id, t):
+                result.append(segment)
+            return result
+
+        segments = await router.run(_call, token)
+        if not segments:
+            raise AssertionError("fallback did not produce segments")
+        report.record("provider-outage-fallback", outcome="fallback path exercised")
+
+        media_boundary = LocalWebRTCBoundary(record.id)
+        try:
+            await media_boundary.capture_microphone(b"")
+            raise AssertionError("empty microphone did not raise")
+        except TransportValidationError:
+            report.record("microphone-denial", outcome="media permission failure is visible")
+
+        cancel_token = CancellationToken()
+        cancel_token.cancel()
+        try:
+            cancel_token.raise_if_cancelled()
+            raise AssertionError("cancelled token did not raise")
+        except ProviderError as exc:
+            if exc.code != ErrorCode.CANCELLED:
+                raise AssertionError(f"wrong error code: {exc.code}")
+            report.record("cancellation-timeout", outcome="cancellation and timeout are safe")
+
+        orchestrator = LiveVoiceOrchestrator(
+            InterviewSession(user_id, record.mode, record.id),
+            [InMemoryStreamingSTT("stale answer")],
+            [interviewer_llm],
+            [interviewer_tts],
+            live_store,
+            events,
+            InMemorySecondaryResponse(),
+        )
+        await orchestrator.prefetch_response("original answer", sequence=1)
+        accepted = orchestrator.accept_prefetch("changed answer", sequence=1)
+        if accepted is not None:
+            raise AssertionError("stale response was not rejected")
+        report.record("stale-response", outcome="digest guard rejects stale response")
+
+        active_record = persistence.create_interview(user_id, InterviewMode.TECHNICAL, now)
+        try:
+            PostInterviewEvaluationService(data).evaluate(
+                user_id, active_record.id, InterviewContext(InterviewMode.TECHNICAL, "Engineer", "senior", "", ""), ()
+            )
+            raise AssertionError("incomplete interview did not raise")
+        except ProviderError as exc:
+            if exc.code != ErrorCode.CONFLICT:
+                raise AssertionError(f"wrong error code: {exc.code}")
+            report.record("incomplete-interview", outcome="evaluation requires completion")
+    except Exception as error:
+        report.fail("negative-journeys", str(error))
     report.integrations = configured_integration_report()
     report.markers = list(MARKERS) if report.passed else []
     report.write(output_directory)
