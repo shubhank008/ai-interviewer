@@ -199,7 +199,7 @@ class SignalingMessage:
         """Validate signaling-specific required fields and forbid media bytes."""
         if not self.correlation_id.strip():
             raise TransportValidationError("signaling correlation_id is required")
-        if any(key in self.payload for key in ("audio", "media", "audio_bytes")):
+        if any(key in self.payload for key in ("audio", "media", "audio_bytes", "audio_frame")):
             raise TransportValidationError("signaling payload cannot contain media")
         required = {
             SignalingType.OFFER: "sdp",
