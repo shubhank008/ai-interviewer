@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createSessionRequest, historyRequest, sessionWebSocketUrl, setupValidation } from './api.js'

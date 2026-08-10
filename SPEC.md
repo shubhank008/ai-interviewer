@@ -95,14 +95,13 @@ The local deterministic browser profile may use in-memory providers, but it must
 
 The React frontend now provides a protected, responsive application shell, deterministic local identity journey, setup validation, PDF selection and progress/error surfaces, live interview control states, history and feedback states, and a provider-neutral configured-auth seam. The local journey is verified with behavior tests and browser frames. Firebase configuration, real upload persistence, microphone/WebRTC/WebSocket media, replay, and completed evaluation retrieval remain deployment or subsequent integration work and are not claimed by local evidence.
 
-## 3. Capability-based architecture
-
-Business logic must depend on capability interfaces, not vendors. Every production, local, test, and experimental implementation is an interchangeable provider selected through configuration and runtime routing.
-
-
 ### 2.8 Phase 13 implementation status
 
 Phase 13 adds the authenticated browser session control loop. REST-created sessions expose owned WebSocket control and signaling boundaries with normalized envelopes, monotonic sequence cursors, replay after acknowledgement, heartbeat, cancellation, interruption, transcript/provider status events, and safe close/error handling. Browser WebRTC and microphone/playback lifecycle is represented by an injected provider-neutral media boundary; media frames never enter WebSocket payloads. The deterministic local mode uses in-memory adapters and does not prove real microphone, TURN/WebRTC networking, Firebase, or configured-provider readiness. Run `./scripts/test_phase13.sh` for marker evidence and `npm test --prefix frontend` for browser adapter tests.
+
+## 3. Capability-based architecture
+
+Business logic must depend on capability interfaces, not vendors. Every production, local, test, and experimental implementation is an interchangeable provider selected through configuration and runtime routing.
 
 Initial capabilities include:
 

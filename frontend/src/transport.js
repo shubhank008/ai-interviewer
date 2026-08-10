@@ -1,6 +1,6 @@
 export const CONNECTION_STATES = Object.freeze({ DISCONNECTED: 'disconnected', CONNECTING: 'connecting', CONNECTED: 'connected', RECONNECTING: 'reconnecting', FAILED: 'failed' })
 
-export function createSessionTransport({ WebSocketImpl = globalThis.WebSocket, url, token, sessionId, maxReconnects = 3, onEvent = () => {} }) {
+export function createSessionTransport({ WebSocketImpl = globalThis.WebSocket, url, token: _token, sessionId, maxReconnects = 3, onEvent = () => {} }) {
   let socket = null
   let cursor = 0
   let attempts = 0
