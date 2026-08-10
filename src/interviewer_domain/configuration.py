@@ -22,6 +22,11 @@ from .provider_adapters import (
     SpeechBackend,
     WhisperBackend,
 )
+from .provider_integration import (
+    FasterWhisperLocalBackend,
+    OpenRouterHTTPTransport,
+    PiperCommandBackend,
+)
 from .providers import InMemoryLLM, InMemorySTT, InMemoryTTS
 from .routing import FallbackRouter
 
@@ -53,10 +58,13 @@ class RuntimeSettings:
     stt_fallback_provider: str
     stt_api_key: str | None
     stt_model: str
+    stt_model_path: str | None
     tts_provider: str
     tts_fallback_provider: str
     tts_api_key: str | None
     tts_model: str
+    tts_model_path: str | None
+    tts_command: str | None
     llm_provider: str
     llm_fallback_provider: str
     llm_api_key: str | None
@@ -95,13 +103,16 @@ class RuntimeSettings:
             stt_fallback_provider=values.get("STT_FALLBACK_PROVIDER", "in-memory"),
             stt_api_key=_optional(values, "STT_API_KEY"),
             stt_model=values.get("STT_MODEL", "base.en"),
+            stt_model_path=_optional(values, "STT_MODEL_PATH"),
             tts_provider=values.get("TTS_PROVIDER", "in-memory"),
             tts_fallback_provider=values.get("TTS_FALLBACK_PROVIDER", "in-memory"),
             tts_api_key=_optional(values, "TTS_API_KEY"),
             tts_model=values.get("TTS_MODEL", "default"),
+            tts_model_path=_optional(values, "TTS_MODEL_PATH"),
+            tts_command=_optional(values, "TTS_COMMAND"),
             llm_provider=values.get("LLM_PROVIDER", "in-memory"),
             llm_fallback_provider=values.get("LLM_FALLBACK_PROVIDER", "in-memory"),
-            llm_api_key=_optional(values, "LLM_API_KEY"),
+            llm_api_key=_optional(values, "LLM_API_KEY") or _optional(values, "OPENROUTER_API_KEY"),
             llm_model=values.get("LLM_MODEL", "default"),
             webrtc_ice_servers=values.get(
                 "WEBRTC_ICE_SERVERS", "stun:stun.l.google.com:19302"
@@ -250,18 +261,27 @@ def compose_providers(
     injected = backends or ProviderBackends()
     if settings.profile is RuntimeProfile.LOCAL:
         return RuntimeProviders((InMemorySTT(),), (InMemoryTTS(),), (InMemoryLLM(),))
+    stt_backend: WhisperBackend | None = injected.stt
+    if stt_backend is None and settings.stt_provider == "faster-whisper" and settings.stt_model_path:
+        stt_backend = FasterWhisperLocalBackend(settings.stt_model_path)
     stt: STTProvider = (
-        FasterWhisperSTT(injected.stt, settings.stt_model)
+        FasterWhisperSTT(stt_backend, settings.stt_model)
         if settings.stt_provider == "faster-whisper"
         else InMemorySTT()
     )
+    tts_backend: SpeechBackend | None = injected.tts
+    if tts_backend is None and settings.tts_provider in {"piper", "kokoro"} and settings.tts_model_path and settings.tts_command:
+        tts_backend = PiperCommandBackend(settings.tts_command, settings.tts_model_path)
     tts: TTSProvider = (
-        PiperKokoroTTS(injected.tts, settings.tts_model)
+        PiperKokoroTTS(tts_backend, settings.tts_model)
         if settings.tts_provider in {"piper", "kokoro"}
         else InMemoryTTS()
     )
+    llm_transport: OpenRouterTransport | None = injected.llm
+    if llm_transport is None and settings.llm_provider == "openrouter":
+        llm_transport = OpenRouterHTTPTransport()
     llm: LLMProvider = (
-        OpenRouterLLM(injected.llm, settings.llm_api_key, settings.llm_model)
+        OpenRouterLLM(llm_transport, settings.llm_api_key, settings.llm_model)
         if settings.llm_provider == "openrouter"
         else InMemoryLLM()
     )
