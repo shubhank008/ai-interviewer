@@ -24,6 +24,7 @@ from .provider_adapters import (
 )
 from .provider_integration import (
     FasterWhisperLocalBackend,
+    IntegrationSkipped,
     OpenRouterHTTPTransport,
     PiperCommandBackend,
 )
@@ -263,7 +264,10 @@ def compose_providers(
         return RuntimeProviders((InMemorySTT(),), (InMemoryTTS(),), (InMemoryLLM(),))
     stt_backend: WhisperBackend | None = injected.stt
     if stt_backend is None and settings.stt_provider == "faster-whisper" and settings.stt_model_path:
-        stt_backend = FasterWhisperLocalBackend(settings.stt_model_path)
+        try:
+            stt_backend = FasterWhisperLocalBackend(settings.stt_model_path)
+        except IntegrationSkipped:
+            stt_backend = None
     stt: STTProvider = (
         FasterWhisperSTT(stt_backend, settings.stt_model)
         if settings.stt_provider == "faster-whisper"
@@ -271,7 +275,10 @@ def compose_providers(
     )
     tts_backend: SpeechBackend | None = injected.tts
     if tts_backend is None and settings.tts_provider in {"piper", "kokoro"} and settings.tts_model_path and settings.tts_command:
-        tts_backend = PiperCommandBackend(settings.tts_command, settings.tts_model_path)
+        try:
+            tts_backend = PiperCommandBackend(settings.tts_command, settings.tts_model_path)
+        except IntegrationSkipped:
+            tts_backend = None
     tts: TTSProvider = (
         PiperKokoroTTS(tts_backend, settings.tts_model)
         if settings.tts_provider in {"piper", "kokoro"}

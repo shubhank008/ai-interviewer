@@ -7,6 +7,7 @@ SDK, downloads a model, opens a socket, or reads a credential-bearing file.
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 import os
 import subprocess
@@ -281,5 +282,5 @@ def write_evidence(path: str | Path, evidence: list[IntegrationEvidence]) -> tup
     json_path.write_text(json.dumps({"schema_version": 1, "integrations": payload}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     rows = "\n".join(f"| {item.capability} | {item.status} | {item.reason} |" for item in evidence)
     markdown_path.write_text("# Phase 15 provider integration evidence\n\n| Capability | Status | Safe reason |\n|---|---|---|\n" + rows + "\n", encoding="utf-8")
-    html_path.write_text("<!doctype html><meta charset='utf-8'><title>Phase 15 evidence</title><h1>Phase 15 provider integration evidence</h1><table><tr><th>Capability</th><th>Status</th><th>Reason</th></tr>" + "".join(f"<tr><td>{item.capability}</td><td>{item.status}</td><td>{item.reason}</td></tr>" for item in evidence) + "</table>\n", encoding="utf-8")
+    html_path.write_text("<!doctype html><meta charset='utf-8'><title>Phase 15 evidence</title><h1>Phase 15 provider integration evidence</h1><table><tr><th>Capability</th><th>Status</th><th>Reason</th></tr>" + "".join(f"<tr><td>{html.escape(item.capability)}</td><td>{html.escape(item.status)}</td><td>{html.escape(item.reason)}</td></tr>" for item in evidence) + "</table>\n", encoding="utf-8")
     return json_path, markdown_path, html_path
