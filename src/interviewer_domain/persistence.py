@@ -348,11 +348,31 @@ class FirestoreDataStore:
     ) -> None:
         """Persist a transcript in the interview subcollection."""
         self.get_interview(user_id, interview_id)
+        payload = asdict(segment)
+        payload["user_id"] = user_id
         self.backend.set(
             f"{self.collection}/{interview_id}/transcripts",
             str(uuid4()),
-            asdict(segment),
+            payload,
         )
+
+    def list_transcripts(
+        self, user_id: str, interview_id: UUID
+    ) -> list[TranscriptSegment]:
+        """Return owned transcript segments from the Firestore subcollection."""
+        self.get_interview(user_id, interview_id)
+        subcollection = f"{self.collection}/{interview_id}/transcripts"
+        return [
+            TranscriptSegment(
+                turn_id=UUID(str(doc["turn_id"])),
+                speaker=str(doc["speaker"]),
+                text=str(doc["text"]),
+                is_final=bool(doc.get("is_final", True)),
+                start_ms=int(doc["start_ms"]) if doc.get("start_ms") is not None else None,
+                end_ms=int(doc["end_ms"]) if doc.get("end_ms") is not None else None,
+            )
+            for doc in self.backend.list(subcollection, "user_id", user_id)
+        ]
 
     def save_recording(
         self, user_id: str, interview_id: UUID, recording: Recording
