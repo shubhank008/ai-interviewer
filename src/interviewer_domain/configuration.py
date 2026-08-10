@@ -11,6 +11,7 @@ from .contracts import (
     CapabilityDescriptor,
     HealthStatus,
     LLMProvider,
+    ProviderError,
     STTProvider,
     TTSProvider,
 )
@@ -266,7 +267,7 @@ def compose_providers(
     if stt_backend is None and settings.stt_provider == "faster-whisper" and settings.stt_model_path:
         try:
             stt_backend = FasterWhisperLocalBackend(settings.stt_model_path)
-        except IntegrationSkipped:
+        except (IntegrationSkipped, ProviderError):
             stt_backend = None
     stt: STTProvider = (
         FasterWhisperSTT(stt_backend, settings.stt_model)
@@ -277,7 +278,7 @@ def compose_providers(
     if tts_backend is None and settings.tts_provider in {"piper", "kokoro"} and settings.tts_model_path and settings.tts_command:
         try:
             tts_backend = PiperCommandBackend(settings.tts_command, settings.tts_model_path)
-        except IntegrationSkipped:
+        except (IntegrationSkipped, ProviderError):
             tts_backend = None
     tts: TTSProvider = (
         PiperKokoroTTS(tts_backend, settings.tts_model)

@@ -280,7 +280,8 @@ def write_evidence(path: str | Path, evidence: list[IntegrationEvidence]) -> tup
     payload = [redact_evidence(item) for item in evidence]
     json_path, markdown_path, html_path = target / "phase15-report.json", target / "phase15-report.md", target / "phase15-report.html"
     json_path.write_text(json.dumps({"schema_version": 1, "integrations": payload}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    rows = "\n".join(f"| {item.capability} | {item.status} | {item.reason} |" for item in evidence)
+    escape_md = lambda s: s.replace("|", "\\|")
+    rows = "\n".join(f"| {escape_md(item.capability)} | {escape_md(item.status)} | {escape_md(item.reason)} |" for item in evidence)
     markdown_path.write_text("# Phase 15 provider integration evidence\n\n| Capability | Status | Safe reason |\n|---|---|---|\n" + rows + "\n", encoding="utf-8")
     html_path.write_text("<!doctype html><meta charset='utf-8'><title>Phase 15 evidence</title><h1>Phase 15 provider integration evidence</h1><table><tr><th>Capability</th><th>Status</th><th>Reason</th></tr>" + "".join(f"<tr><td>{html.escape(item.capability)}</td><td>{html.escape(item.status)}</td><td>{html.escape(item.reason)}</td></tr>" for item in evidence) + "</table>\n", encoding="utf-8")
     return json_path, markdown_path, html_path
