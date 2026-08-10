@@ -187,7 +187,7 @@ class FirestoreGoogleBackend:
 
     def __init__(self, project_id: str, database: str = "(default)") -> None:
         try:
-            from google.cloud import firestore  # type: ignore[import-untyped]
+            from google.cloud import firestore  # type: ignore[import-not-found,import-untyped]
         except ImportError as exc:
             raise IntegrationSkipped("google-cloud-firestore package is not installed") from exc
         try:
@@ -222,7 +222,7 @@ class Boto3ObjectBackend:
 
     def __init__(self, bucket: str, endpoint_url: str | None = None, region: str | None = None) -> None:
         try:
-            import boto3  # type: ignore[import-untyped]
+            import boto3  # type: ignore[import-not-found,import-untyped]
         except ImportError as exc:
             raise IntegrationSkipped("boto3 package is not installed") from exc
         self.bucket = bucket
