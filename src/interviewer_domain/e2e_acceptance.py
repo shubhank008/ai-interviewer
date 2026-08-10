@@ -14,7 +14,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
-from .contracts import CancellationToken, ErrorCode, ProviderError
+from .contracts import CancellationToken, ErrorCode, HealthStatus, ProviderError
 from .documents import LocalDocumentParser
 from .evaluation import InterviewContext, PostInterviewEvaluationService
 from .live_voice import LiveVoiceOrchestrator
@@ -346,8 +346,7 @@ async def run_local_acceptance(output_directory: str | Path = ".agent_tmp/phase1
                 report.record("invalid-pdf", outcome="PDF validation rejected")
 
             class _FailingProvider:
-                async def health(self) -> object:
-                    from interviewer_domain.contracts import HealthStatus
+                async def health(self) -> HealthStatus:
                     return HealthStatus(False, "simulated outage")
 
                 async def transcribe_stream(self, audio, turn_id, token):
@@ -355,18 +354,17 @@ async def run_local_acceptance(output_directory: str | Path = ".agent_tmp/phase1
                     yield  # pragma: no cover
 
             class _SucceedingSTT:
-                async def health(self) -> object:
-                    from interviewer_domain.contracts import HealthStatus
+                async def health(self) -> HealthStatus:
                     return HealthStatus(True)
 
                 async def transcribe_stream(self, audio, turn_id, token):
                     from interviewer_domain.models import TranscriptSegment
                     yield TranscriptSegment(turn_id, "candidate", "fallback succeeded", True, 0, 100)
 
-            router = FallbackRouter([_FailingProvider(), _SucceedingSTT()], "stt")
+            router = FallbackRouter([_FailingProvider(), _SucceedingSTT()], "stt")  # type: ignore[type-var]
             token = CancellationToken()
 
-            async def _call(provider: object, t: CancellationToken) -> list:
+            async def _call(provider: _FailingProvider | _SucceedingSTT, t: CancellationToken) -> list:
                 result = []
                 async for segment in provider.transcribe_stream(b"audio", record.id, t):
                     result.append(segment)
