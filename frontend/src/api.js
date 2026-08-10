@@ -19,6 +19,16 @@ export function sessionResourceRequest(id, view, token) {
   return { url: `${API_BASE}/sessions/${id}/${view}`, init: { headers: authHeaders(token) } }
 }
 
+export function sessionWebSocketUrl(id, token, locationObject = globalThis.location) {
+  const protocol = locationObject?.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${locationObject?.host || 'localhost'}/ws/v1/sessions/${id}?token=${encodeURIComponent(token)}`
+}
+
+export function signalingWebSocketUrl(id, token, locationObject = globalThis.location) {
+  const protocol = locationObject?.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${locationObject?.host || 'localhost'}/ws/v1/sessions/${id}/signaling?token=${encodeURIComponent(token)}`
+}
+
 export function completeSessionRequest(id, token) {
   return { url: `${API_BASE}/sessions/${id}/complete`, init: { method: 'POST', headers: authHeaders(token) } }
 }

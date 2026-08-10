@@ -128,3 +128,9 @@ The Dockerfile runs the API. Build the frontend with `npm run build --prefix fro
 ### Provider configuration and troubleshooting
 
 The domain remains provider-neutral: configure optional STT, TTS, and LLM adapters only through injected capability implementations and environment-backed secrets. If imports fail, set `PYTHONPATH=src`. API resource calls need `Authorization: Bearer dev-token` locally. Empty, expired, and cross-owner resources fail safely. The local parser supports text PDFs only; scanned or encrypted PDFs must fail safely until an OCR adapter is intentionally added. Frontend `/api` calls require a reverse-proxy or Vite dev proxy to the API.
+
+## Phase 13 browser WebSocket and WebRTC voice loop
+
+Phase 13 connects the live room to an authenticated, owner-checked WebSocket session channel and a separate provider-neutral WebRTC signaling/media boundary. Control payloads carry normalized session, transcript, status, heartbeat, cancellation, interruption, and signaling events only; media frames remain outside WebSocket messages. Reconnect resumes from the last acknowledged cursor, and stale or unauthorized sessions fail safely. The default local browser path uses injected in-memory seams and can exercise the same REST/WebSocket/signaling/UI contracts without credentials, browser-heavy dependencies, or media bytes in deterministic tests. Run `./scripts/test_phase13.sh` for exact markers.
+
+This local evidence does not claim real microphone capture, TURN/WebRTC connectivity, Firebase identity, durable audio persistence, or configured STT/TTS/LLM provider readiness. Configured mode must be explicitly enabled and fails safely when required credentials or capabilities are unavailable rather than silently falling back to local mode. Browser evidence is saved outside version control under the conversation observation directory.

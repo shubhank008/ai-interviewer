@@ -1,4 +1,5 @@
 import eslint from '@eslint/js'
+import reactPlugin from 'eslint-plugin-react'
 
 export default [
   {
@@ -20,8 +21,10 @@ export default [
         CustomEvent: 'readonly',
       },
     },
+    plugins: { react: reactPlugin },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'react/jsx-uses-vars': 'error',
     },
   },
 ]

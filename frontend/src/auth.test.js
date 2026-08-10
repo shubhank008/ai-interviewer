@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { localAuthProvider, validateCredentials } from './auth.js'
+import { localAuthProvider, configuredAuthProvider, validateCredentials } from './auth.js'
 
 function storage() {
   const values = new Map()
@@ -19,4 +19,22 @@ test('local auth signs in and restores the same profile', async () => {
 test('credential validation rejects an address without a domain', () => {
   assert.equal(validateCredentials('candidate'), 'Enter a valid email address.')
   assert.equal(validateCredentials('candidate@example.com'), '')
+})
+
+test('configuredAuthProvider delegates to the adapter and returns null for falsy', () => {
+  assert.equal(configuredAuthProvider(null), null)
+  assert.equal(configuredAuthProvider(undefined), null)
+  const calls = []
+  const adapter = {
+    restore: async () => { calls.push('restore'); return { email: 'a@b.com' } },
+    signIn: async email => { calls.push('signIn'); return { email } },
+    signUp: async email => { calls.push('signUp'); return { email } },
+    signOut: async () => { calls.push('signOut') },
+  }
+  const provider = configuredAuthProvider(adapter)
+  assert.ok(provider)
+  assert.equal(typeof provider.restore, 'function')
+  assert.equal(typeof provider.signIn, 'function')
+  assert.equal(typeof provider.signUp, 'function')
+  assert.equal(typeof provider.signOut, 'function')
 })

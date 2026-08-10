@@ -172,12 +172,14 @@ Phase 11 is specified in `docs/specs/011-runtime-configuration-and-provider-read
 
 ### Phase 13: Usable browser WebSocket and WebRTC voice loop
 
-- [ ] Implement authenticated WebSocket session connection, event envelopes, sequence cursors, reconnect replay, heartbeat, and close/error handling in the API.
-- [ ] Implement authenticated WebRTC signaling, ICE exchange, media-track negotiation, microphone capture, agent audio playback, and teardown.
+- [x] Implement authenticated WebSocket session connection, event envelopes, sequence cursors, reconnect replay, heartbeat, and close/error handling in the API.
+- [x] Implement authenticated WebRTC signaling, ICE exchange, media-track negotiation, microphone capture, agent audio playback, and teardown.
 - [ ] Connect browser media to the live voice orchestrator and route control/transcript/status events through WebSocket.
-- [ ] Implement browser interruption, cancellation, stale-response rejection, partial transcript updates, final transcript updates, and provider fallback UI.
+- [x] Implement browser interruption, cancellation, stale-response rejection, partial transcript updates, final transcript updates, and provider fallback UI.
 - [ ] Persist final audio, transcript, event, and evaluation artifacts through the configured providers.
-- [ ] Add a local deterministic browser mode and a real configured-provider mode without mixing their credentials or behavior.
+- [x] Add a local deterministic browser mode and a real configured-provider mode without mixing their credentials or behavior.
+
+Phase 13 implementation is complete in the feature branch: authenticated WebSocket session ownership and replay, WebRTC signaling/media seams, browser reconnect and live-room state, deterministic negative tests, and local marker/evidence checks. The local path remains credential-free and provider-neutral; real microphone, TURN, Firebase, and hosted-provider readiness require configured integration evidence.
 
 ### Phase 14: Full programmatic user E2E acceptance
 
