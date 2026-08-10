@@ -301,7 +301,7 @@ async def run_local_acceptance(output_directory: str | Path = ".agent_tmp/phase1
             data.save_recording(user_id, record.id, recording)
         browser.publish(SessionEventType.TRANSCRIPT_FINAL, {"text": first.transcript[-1].text, "start_ms": 0, "end_ms": 200}, "turn-1")
         browser.publish(SessionEventType.TRANSCRIPT_FINAL, {"text": second.transcript[-1].text, "start_ms": 200, "end_ms": 400}, "turn-2")
-        browser.publish(SessionEventType.PLAYBACK_STOPPED, {"reason": "interrupted"}, "interrupt-1")
+        browser.interrupt(user_id, "interrupt-1")
         replay = browser.connect(user_id, after_sequence=0)
         browser.disconnect(user_id)
         resumed = browser.connect(user_id, after_sequence=1)
@@ -311,10 +311,11 @@ async def run_local_acceptance(output_directory: str | Path = ".agent_tmp/phase1
 
         data.save_interview(record.__class__(record.user_id, record.mode, record.id, record.created_at, record.expires_at, "completed"))
         context = InterviewContext(record.mode, "Backend Engineer", "senior", job.decode(), resume_chunks[0].text)
-        evaluation = PostInterviewEvaluationService(data).evaluate(user_id, record.id, context, tuple(data.transcripts[record.id]))
+        transcripts = data.list_transcripts(user_id, record.id)
+        evaluation = PostInterviewEvaluationService(data).evaluate(user_id, record.id, context, tuple(transcripts))
         if evaluation.score is None or not data.get_evaluation(user_id, record.id):
             raise AssertionError("evaluation was not persisted")
-        report.record("persisted-evaluation", score=evaluation.score, transcript_segments=len(data.transcripts[record.id]), recording_count=len(data.recordings))
+        report.record("persisted-evaluation", score=evaluation.score, transcript_segments=len(transcripts), recording_count=len(data.recordings))
         history = persistence.resource(user_id, "history", now=now).payload["interviews"]
         result = persistence.resource(user_id, "results", record.id, now=now).payload
         if not history or result.get("evaluation") is None:

@@ -126,6 +126,9 @@ class PersistentDataStore(Protocol):
     def save_transcript(
         self, user_id: str, interview_id: UUID, segment: TranscriptSegment
     ) -> None: ...
+    def list_transcripts(
+        self, user_id: str, interview_id: UUID
+    ) -> list[TranscriptSegment]: ...
     def save_recording(
         self, user_id: str, interview_id: UUID, recording: Recording
     ) -> None: ...
@@ -231,6 +234,13 @@ class InMemoryPersistentDataStore:
         """Persist a transcript segment after checking interview ownership."""
         self.get_interview(user_id, interview_id)
         self.transcripts.setdefault(interview_id, []).append(segment)
+
+    def list_transcripts(
+        self, user_id: str, interview_id: UUID
+    ) -> list[TranscriptSegment]:
+        """Return owned transcript segments for an interview."""
+        self.get_interview(user_id, interview_id)
+        return list(self.transcripts.get(interview_id, []))
 
     def save_recording(
         self, user_id: str, interview_id: UUID, recording: Recording
