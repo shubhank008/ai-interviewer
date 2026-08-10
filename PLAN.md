@@ -183,12 +183,15 @@ Phase 13 implementation is complete in the feature branch: authenticated WebSock
 
 ### Phase 14: Full programmatic user E2E acceptance
 
-- [ ] Build a repeatable user-journey test: signup/login, provide job description, upload a valid local PDF resume, select mode, start, conduct turns, interrupt/reconnect, complete, and view results.
-- [ ] Simulate the candidate voice using a test candidate LLM plus TTS, feed audio through the same browser/media path, and transcribe it through the configured STT path.
-- [ ] Run the interviewer and candidate simulations as separate provider instances; never replace the production pipeline with expected strings.
-- [ ] Verify provider routing, RAG context, session state, WebSocket events, WebRTC media, timestamped transcript, persisted recording, evaluation, score, and deletion.
-- [ ] Add negative journeys for invalid login, unauthorized access, invalid PDF, provider outage, microphone denial, reconnect, cancellation, timeout, and incomplete interviews.
-- [ ] Produce human-readable evidence artifacts and clear pass/fail diagnostics for each journey.
+- [x] Build a repeatable user-journey test: signup/login, provide job description, upload a valid local PDF resume, select mode, start, conduct turns, interrupt/reconnect, complete, and view results.
+- [x] Simulate the candidate voice using a test candidate LLM plus TTS, feed audio through the same browser/media path, and transcribe it through the configured STT path.
+- [x] Run the interviewer and candidate simulations as separate provider instances; never replace the production pipeline with expected strings.
+- [x] Verify provider routing, RAG context, session state, WebSocket events, WebRTC media, timestamped transcript, persisted recording, evaluation, score, and deletion.
+- [x] Add negative journeys for invalid login, unauthorized access, invalid PDF, provider outage, microphone denial, reconnect, cancellation, timeout, and incomplete interviews.
+- [x] Produce human-readable evidence artifacts and clear pass/fail diagnostics for each journey.
+
+Phase 14 implementation is complete: `scripts/test_phase14.sh` runs real behavior-level positive and negative journeys, prints the marker contract, and writes timestamped JSON, Markdown, and HTML evidence. The default profile is deterministic and offline; configured integrations are opt-in and report explicit redacted skips when unavailable.
+
 
 ### Phase 15: Opt-in provider integration suite
 
