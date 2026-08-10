@@ -368,7 +368,9 @@ class FirestoreDataStore:
                 speaker=str(doc["speaker"]),
                 text=str(doc["text"]),
                 is_final=bool(doc.get("is_final", True)),
-                start_ms=int(doc["start_ms"]) if doc.get("start_ms") is not None else None,
+                start_ms=int(doc["start_ms"])
+                if doc.get("start_ms") is not None
+                else None,
                 end_ms=int(doc["end_ms"]) if doc.get("end_ms") is not None else None,
             )
             for doc in self.backend.list(subcollection, "user_id", user_id)

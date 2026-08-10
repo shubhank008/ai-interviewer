@@ -12,11 +12,26 @@ from interviewer_domain.contracts import (
     ErrorCode,
     ProviderError,
 )
-from interviewer_domain.e2e_acceptance import FORBIDDEN, MARKERS, run_local_acceptance_sync
-from interviewer_domain.evaluation import InterviewContext, PostInterviewEvaluationService
-from interviewer_domain.live_voice import LiveVoiceOrchestrator, PrefetchGuard, PrefetchedResponse
+from interviewer_domain.e2e_acceptance import (
+    FORBIDDEN,
+    MARKERS,
+    run_local_acceptance_sync,
+)
+from interviewer_domain.evaluation import (
+    InterviewContext,
+    PostInterviewEvaluationService,
+)
+from interviewer_domain.live_voice import (
+    LiveVoiceOrchestrator,
+    PrefetchGuard,
+    PrefetchedResponse,
+)
 from interviewer_domain.models import InterviewMode, InterviewSession
-from interviewer_domain.persistence import InMemoryPersistentDataStore, PersistenceService, UploadValidator
+from interviewer_domain.persistence import (
+    InMemoryPersistentDataStore,
+    PersistenceService,
+    UploadValidator,
+)
 from interviewer_domain.providers import (
     InMemoryDataStore,
     InMemoryEventBus,
@@ -59,12 +74,17 @@ class Phase14FullUserE2ETests(unittest.TestCase):
         self.assertEqual(invalid_pdf.exception.code, ErrorCode.INVALID_REQUEST)
         data = InMemoryPersistentDataStore()
         persistence = PersistenceService(data, InMemoryStorage())
-        record = persistence.create_interview("candidate", InterviewMode.TECHNICAL, datetime.now(timezone.utc))
+        record = persistence.create_interview(
+            "candidate", InterviewMode.TECHNICAL, datetime.now(timezone.utc)
+        )
         with self.assertRaises(ProviderError):
             data.get_interview("other-user", record.id)
         with self.assertRaises(ProviderError):
             PostInterviewEvaluationService(data).evaluate(
-                "candidate", record.id, InterviewContext(InterviewMode.TECHNICAL, "Engineer", "senior"), ()
+                "candidate",
+                record.id,
+                InterviewContext(InterviewMode.TECHNICAL, "Engineer", "senior"),
+                (),
             )
 
     def test_marker_output_is_complete_and_has_no_forbidden_diagnostics(self) -> None:
@@ -88,6 +108,7 @@ class ProviderOutageFallbackTests(unittest.TestCase):
         class _FailingProvider:
             async def health(self):
                 from interviewer_domain.contracts import HealthStatus
+
                 return HealthStatus(False, "down")
 
             async def transcribe_stream(self, audio, turn_id, token):
@@ -97,11 +118,15 @@ class ProviderOutageFallbackTests(unittest.TestCase):
         class _HealthyProvider:
             async def health(self):
                 from interviewer_domain.contracts import HealthStatus
+
                 return HealthStatus(True)
 
             async def transcribe_stream(self, audio, turn_id, token):
                 from interviewer_domain.models import TranscriptSegment
-                yield TranscriptSegment(turn_id, "candidate", "fallback worked", True, 0, 100)
+
+                yield TranscriptSegment(
+                    turn_id, "candidate", "fallback worked", True, 0, 100
+                )
 
         async def _run():
             router = FallbackRouter([_FailingProvider(), _HealthyProvider()], "stt")
@@ -125,6 +150,7 @@ class ProviderOutageFallbackTests(unittest.TestCase):
         class _AlwaysFail:
             async def health(self):
                 from interviewer_domain.contracts import HealthStatus
+
                 return HealthStatus(False)
 
             async def generate_stream(self, prompt, token):
@@ -146,6 +172,7 @@ class ProviderOutageFallbackTests(unittest.TestCase):
         class _CancelledProvider:
             async def health(self):
                 from interviewer_domain.contracts import HealthStatus
+
                 return HealthStatus(True)
 
             async def generate(self, prompt, token):
@@ -156,6 +183,7 @@ class ProviderOutageFallbackTests(unittest.TestCase):
         class _SecondProvider:
             async def health(self):
                 from interviewer_domain.contracts import HealthStatus
+
                 return HealthStatus(True)
 
             async def generate(self, prompt, token):
@@ -187,7 +215,9 @@ class MicrophoneDenialTests(unittest.TestCase):
     def test_signaling_with_media_payload_rejected(self) -> None:
         """Signaling messages containing audio bytes are rejected."""
         with self.assertRaises(TransportValidationError) as ctx:
-            SignalingMessage(uuid4(), SignalingType.OFFER, {"sdp": "v=0", "audio": b"secret"}, "c1")
+            SignalingMessage(
+                uuid4(), SignalingType.OFFER, {"sdp": "v=0", "audio": b"secret"}, "c1"
+            )
         self.assertIn("cannot contain media", str(ctx.exception))
 
     def test_unconnected_boundary_no_playback(self) -> None:
@@ -253,6 +283,7 @@ class StaleResponseTests(unittest.TestCase):
     def test_matching_answer_returns_prefetched_text(self) -> None:
         """Same answer text and sequence returns the cached response."""
         from interviewer_domain.live_voice import _digest
+
         guard = PrefetchGuard()
         answer = "test answer"
         guard.add(PrefetchedResponse(1, _digest(answer), "cached"))
@@ -263,6 +294,7 @@ class StaleResponseTests(unittest.TestCase):
     def test_changed_answer_returns_none(self) -> None:
         """Different answer text returns None and clears the cache."""
         from interviewer_domain.live_voice import _digest
+
         guard = PrefetchGuard()
         guard.add(PrefetchedResponse(1, _digest("original answer"), "cached"))
         result = guard.take("different answer", 1)
@@ -272,6 +304,7 @@ class StaleResponseTests(unittest.TestCase):
     def test_wrong_sequence_returns_none(self) -> None:
         """Matching digest but wrong turn sequence returns None."""
         from interviewer_domain.live_voice import _digest
+
         guard = PrefetchGuard()
         answer = "test answer"
         guard.add(PrefetchedResponse(1, _digest(answer), "cached"))
@@ -281,6 +314,7 @@ class StaleResponseTests(unittest.TestCase):
     def test_bounded_capacity(self) -> None:
         """Only the most recent N items are retained."""
         from interviewer_domain.live_voice import _digest
+
         guard = PrefetchGuard(maximum=2)
         guard.add(PrefetchedResponse(1, _digest("first answer"), "first"))
         guard.add(PrefetchedResponse(2, _digest("second answer"), "second"))
