@@ -10,6 +10,7 @@ export function createSessionTransport({ WebSocketImpl = globalThis.WebSocket, u
   const setState = value => { state = value; eventHandler({ type: 'connection', payload: { state: value }, sequence: cursor }) }
   const connect = () => {
     if (!WebSocketImpl) { setState(CONNECTION_STATES.FAILED); return }
+    if (socket) { socket.onopen = null; socket.onmessage = null; socket.onclose = null; socket.onerror = null; if (socket.readyState === 0 || socket.readyState === 1) socket.close(); socket = null }
     intentionalDisconnect = false
     setState(attempts ? CONNECTION_STATES.RECONNECTING : CONNECTION_STATES.CONNECTING)
     socket = new WebSocketImpl(url)
