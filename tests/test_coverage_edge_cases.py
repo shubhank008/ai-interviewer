@@ -11,8 +11,7 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from interviewer_domain.contracts import (
@@ -20,7 +19,7 @@ from interviewer_domain.contracts import (
     ErrorCode,
     ProviderError,
 )
-from interviewer_domain.models import Evaluation, InterviewMode, TranscriptSegment
+from interviewer_domain.models import Evaluation, InterviewMode
 
 
 class VoiceAdapterEdgeCases(unittest.TestCase):
@@ -547,7 +546,7 @@ class IntegrationConstructorEdgeCases(unittest.TestCase):
             mock_whisper.WhisperModel.side_effect = fake_whisper_model
 
             with patch.dict(sys.modules, {"faster_whisper": mock_whisper}):
-                backend = FasterWhisperLocalBackend(td)
+                FasterWhisperLocalBackend(td)
                 self.assertEqual(call_count, 2)
 
     def test_faster_whisper_constructor_provider_error(self) -> None:
