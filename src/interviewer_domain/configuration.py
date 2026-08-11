@@ -50,6 +50,7 @@ class RuntimeSettings:
 
     profile: RuntimeProfile
     firebase_project_id: str | None
+    firebase_credentials_path: str | None
     firebase_auth_domain: str | None
     firebase_api_key: str | None
     firestore_database: str | None
@@ -95,6 +96,7 @@ class RuntimeSettings:
         settings = cls(
             profile=profile,
             firebase_project_id=_optional(values, "FIREBASE_PROJECT_ID"),
+            firebase_credentials_path=_optional(values, "FIREBASE_CREDENTIALS_PATH"),
             firebase_auth_domain=_optional(values, "FIREBASE_AUTH_DOMAIN"),
             firebase_api_key=_optional(values, "FIREBASE_API_KEY"),
             firestore_database=_optional(values, "FIRESTORE_DATABASE"),

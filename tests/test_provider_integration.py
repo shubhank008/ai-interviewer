@@ -7,6 +7,10 @@ import unittest
 from pathlib import Path
 
 from interviewer_domain.contracts import CancellationToken, ErrorCode, ProviderError
+from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+from interviewer_domain.evaluation import InterviewContext
+from interviewer_domain.models import InterviewMode, TranscriptSegment
+from uuid import uuid4
 from interviewer_domain.provider_adapters import OpenRouterLLM
 from interviewer_domain.provider_integration import (
     IntegrationEvidence,
@@ -60,6 +64,40 @@ class ProviderIntegrationContractTests(unittest.TestCase):
             paths = write_evidence(directory, [item])
             self.assertEqual([path.suffix for path in paths], [".json", ".md", ".html"])
             self.assertTrue(all(Path(path).exists() for path in paths))
+
+    def test_openrouter_evaluator_normalizes_structured_feedback(self) -> None:
+        class Transport:
+            def complete(self, payload: dict, api_key: str) -> dict:
+                self.payload = payload
+                return {"choices": [{"message": {"content": json.dumps({
+                    "score": 82,
+                    "dimensions": [],
+                    "summary": "Clear answer.",
+                    "strengths": ["Ownership"],
+                    "weaknesses": ["Brevity"],
+                    "recommendations": ["Use STAR."],
+                })}}]}
+
+        transport = Transport()
+        segment = TranscriptSegment(uuid4(), "candidate", "I led the migration and improved reliability.")
+        result = OpenRouterEvaluator(transport, "test-key", "fast-model").evaluate(
+            InterviewContext(InterviewMode.TECHNICAL, "Engineer", "senior"), (segment,)
+        )
+        self.assertEqual(result.score, 82)
+        self.assertEqual(result.strengths, ("Ownership",))
+        self.assertEqual(transport.payload["temperature"], 0)
+
+    def test_openrouter_evaluator_rejects_invalid_score(self) -> None:
+        class Transport:
+            def complete(self, payload: dict, api_key: str) -> dict:
+                return {"choices": [{"message": {"content": '{"score": 101}'}}]}
+
+        segment = TranscriptSegment(uuid4(), "candidate", "An answer.")
+        with self.assertRaises(ProviderError) as context:
+            OpenRouterEvaluator(Transport(), "test-key", "fast-model").evaluate(
+                InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid"), (segment,)
+            )
+        self.assertEqual(context.exception.code, ErrorCode.INTERNAL)
 
     def test_local_model_constructor_never_downloads_missing_model(self) -> None:
         from interviewer_domain.provider_integration import FasterWhisperLocalBackend

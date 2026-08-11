@@ -10,6 +10,8 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel, Field
 
+from interviewer_domain.adapters.integrations import IntegrationSkipped
+from interviewer_domain.capabilities.contracts import AuthProvider
 from interviewer_domain.configuration import (
     ProviderReadinessChecker,
     RuntimeSettings,
@@ -18,13 +20,23 @@ from interviewer_domain.configuration import (
 from interviewer_domain.contracts import ErrorCode, ProviderError
 from interviewer_domain.models import InterviewMode
 from interviewer_domain.persistence import (
+    FirebaseAuthAdapter,
+    FirestoreDataStore,
+    PersistentDataStore,
+    PersistentStorageProvider,
+    S3CompatibleStorage,
     FixedWindowRateLimiter,
     InMemoryAuthProvider,
     InMemoryPersistentDataStore,
+    LocalFilesystemStorage,
     PersistenceService,
     UserIdentity,
 )
-from interviewer_domain.providers import InMemoryStorage
+from interviewer_domain.provider_integration import (
+    FirebaseAdminAuthBackend,
+    FirebaseStorageBackend,
+    FirestoreGoogleBackend,
+)
 from interviewer_domain.transport import (
     BrowserSessionState,
     CreateSessionRequest,
@@ -53,10 +65,42 @@ class InterviewApplication:
     """Own injected local capabilities and expose application use cases."""
 
     def __init__(self) -> None:
-        """Create a credential-free in-memory development composition."""
-        self.data = InMemoryPersistentDataStore()
-        self.persistence = PersistenceService(self.data, InMemoryStorage())
-        self.auth = InMemoryAuthProvider({"dev-token": UserIdentity("local-user")})
+        """Create the local composition or the explicitly configured live composition."""
+        self.data: PersistentDataStore
+        self.auth: AuthProvider
+        if settings.profile.value == "production":
+            auth_backend = FirebaseAdminAuthBackend(
+                settings.firebase_credentials_path, settings.firebase_project_id
+            )
+            firestore_backend = FirestoreGoogleBackend(
+                settings.firebase_project_id or "", settings.firestore_database or "(default)"
+            )
+            self.data = FirestoreDataStore(firestore_backend)
+            storage: PersistentStorageProvider
+            if settings.storage_backend == "local":
+                storage = LocalFilesystemStorage(settings.storage_path)
+            elif settings.storage_backend == "s3":
+                from interviewer_domain.adapters.integrations import Boto3ObjectBackend
+
+                try:
+                    storage = S3CompatibleStorage(Boto3ObjectBackend(settings.storage_bucket or ""))
+                except IntegrationSkipped as exc:
+                    raise RuntimeError(f"S3 storage backend requires boto3: {exc}") from exc
+            elif settings.storage_backend == "gcs":
+                assert settings.storage_bucket is not None
+                storage = S3CompatibleStorage(FirebaseStorageBackend(settings.storage_bucket))
+            else:
+                raise RuntimeError(f"unsupported STORAGE_BACKEND: {settings.storage_backend}")
+            self.persistence = PersistenceService(
+                self.data, storage, settings.retention_days
+            )
+            self.auth = FirebaseAuthAdapter(auth_backend)
+        else:
+            self.data = InMemoryPersistentDataStore()
+            self.persistence = PersistenceService(
+                self.data, LocalFilesystemStorage(settings.storage_path), settings.retention_days
+            )
+            self.auth = InMemoryAuthProvider({"dev-token": UserIdentity("local-user")})
         self.rate_limiter = FixedWindowRateLimiter(
             limit=settings.rate_limit, window_seconds=settings.rate_window_seconds
         )

@@ -90,7 +90,6 @@ A production interview is not complete until a real browser can:
 
 The local deterministic browser profile may use in-memory providers, but it must exercise the same API, WebSocket, WebRTC, persistence, and UI contracts. It must not be treated as evidence that configured production providers work.
 
-
 ### 2.7 Phase 12 implementation status
 
 The React frontend now provides a protected, responsive application shell, deterministic local identity journey, setup validation, PDF selection and progress/error surfaces, live interview control states, history and feedback states, and a provider-neutral configured-auth seam. The local journey is verified with behavior tests and browser frames. Firebase configuration, real upload persistence, microphone/WebRTC/WebSocket media, replay, and completed evaluation retrieval remain deployment or subsequent integration work and are not claimed by local evidence.
@@ -106,7 +105,6 @@ Phase 14 provides a behavior-level full-user acceptance harness in `src/intervie
 ### 2.10 Phase 15 provider integration suite
 
 Phase 15 adds explicitly selected provider integration profiles and concrete lazy transports for OpenRouter HTTP, operator-supplied Faster-Whisper models, Piper/Kokoro commands, Firebase Admin Auth, Firestore, S3-compatible storage, and configured browser/WebRTC infrastructure. The existing capability interfaces remain the application boundary, and provider wire formats, credentials, timeout/cancellation handling, redaction, and deletion behavior remain inside adapters. `scripts/test_phase15.sh` runs credential-free adapter contracts and writes redacted evidence; configured provider tests are separate and are never implied by skipped profiles. The current local environment does not claim real provider or browser readiness without configured execution evidence.
-
 
 ## 3. Capability-based architecture
 
@@ -261,7 +259,6 @@ Phase 10 establishes the credential-free offline portion of this policy: pinned 
 
 Phase 11 provides typed environment configuration with explicit `local` and `production` profiles. The local profile uses deterministic in-memory capabilities and requires no credentials or network. The production profile must fail before serving traffic when required Firebase, storage, or provider configuration is absent. Startup diagnostics expose only profile, provider names, configuration-presence flags, limits, and normalized health states. Provider-shaped adapters are exercised through injected seams; deterministic evidence must not be described as real provider or browser readiness.
 
-
 ## 9. Delivery phases
 
 1. **Domain and capability foundation:** define normalized models, interfaces, errors, provider routing, configuration, and local test providers.
@@ -279,6 +276,85 @@ Phase 11 provides typed environment configuration with explicit `local` and `pro
 13. **Browser voice integration:** implement authenticated WebSocket and WebRTC media behavior and connect the browser to the live voice loop.
 14. **Full user E2E acceptance:** validate login through completed evaluated interview using a real browser and separate interviewer and candidate simulation providers.
 15. **Provider integration suite:** add explicitly enabled tests against configured external providers and infrastructure.
-16. **Coverage and live-demo release:** enforce coverage, run a production-shaped release candidate, validate operations, and rehearse the first live demo.
+16. **Live Beta Enablement:** compose the explicit beta provider set into a real browser-to-provider vertical slice and validate beta acceptance criteria.
 
 The project is not production-ready for a live demo until phases 10 through 16 have passed their required gates. All features must follow the repository's SDD workflow: feature specification, implementation plan, marker contract, implementation, unit tests, end-to-end evidence, documentation, and landmine recording where applicable.
+
+## 10. Live Beta Enablement contract
+
+Phase 16 is the authoritative implementation program for reaching a real beta. The previous deterministic local phases establish contracts only. They cannot satisfy the requirements in this section.
+
+### 10.1 Fixed first-beta provider set
+
+| Capability | Required first-beta implementation | Abstract boundary |
+|---|---|---|
+| Auth | Firebase Auth Web SDK and Firebase Admin verification | `AuthProvider` |
+| Datastore | Firestore | `DataStore` |
+| Storage | Firebase Storage and local filesystem | `StorageProvider` |
+| Live LLM | OpenRouter | `LLMProvider` |
+| STT | Faster-Whisper | `STTProvider` |
+| TTS | Kokoro | `TTSProvider` |
+| Voice | Browser WebRTC with configured STUN/TURN | `AudioTransport` |
+| Evaluation | OpenRouter LLM evaluator after completion | `Evaluator` |
+| Workers | CPU-only bounded workers | worker boundary |
+| Retention | 14 days | retention policy |
+
+These choices supersede earlier candidate-provider lists for the first beta. Other providers may be added only behind the same boundaries after the beta path is working.
+
+### 10.2 Required source structure
+
+The source tree must keep abstractions, implementations, and domain behavior separate:
+
+```text
+src/interviewer_domain/
+  capabilities/              Protocols, normalized DTOs, provider errors
+  adapters/                  Firebase, Firestore, storage, OpenRouter, STT, TTS, WebRTC adapters
+  providers/in_memory/       Deterministic local implementations
+  services/                  Composition, retention, upload, interview, evaluation services
+  models/                    Domain entities and value objects
+  composition/               Local and production dependency graphs
+```
+
+Domain services may depend on `capabilities` and `models`, but must never import a vendor SDK. Adapters own SDK imports, wire schemas, credential handling, retries, timeouts, redaction, metadata, and provider error normalization. Compatibility re-exports may remain temporarily during migration but new code must use the package boundaries.
+
+### 10.3 Live service schemas and flow
+
+The live request flow is: Firebase browser login produces an ID token; FastAPI verifies it and derives the Firebase UID; setup validates the job description and 5 MB PDF limit; storage persists the original resume; parsing and retrieval create source-linked context; Firestore creates an owner-scoped session; WebSocket carries ordered control and transcript/status events; WebRTC carries microphone and interviewer audio; Faster-Whisper emits partial and final timestamped segments; the interview state machine builds grounded context; OpenRouter emits a validated structured response; Kokoro schedules browser-compatible audio; transcript/events/recording are persisted; completion freezes the transcript; the evaluator produces validated score and feedback; history/replay expose stored artifacts; deletion removes every raw and derived artifact.
+
+The normalized contracts are:
+
+- **Identity:** user ID, optional email, provider, issued-at, expiry, and assurance. Raw tokens never enter domain services.
+- **Setup:** job description, optional resume upload ID, recruiter/technical mode, optional seniority and location metadata.
+- **Session:** ID, owner, mode, lifecycle status, provider set, creation time, and expiry.
+- **Event:** schema version, session ID, sequence, correlation ID, timestamp, type, and metadata payload. Audio bytes never enter WebSocket events.
+- **Transcript:** segment ID, speaker, text, start/end milliseconds, final flag, confidence, and source.
+- **Interviewer response:** spoken text, question type, topic, evidence request, completion flag, and bounded state update.
+- **Evaluation:** score 0 through 100, summary, strengths, weaknesses, missed opportunities, recommendations, role assessment, rubric version, model metadata, and evidence references.
+
+### 10.4 Beta acceptance criteria
+
+- A clean CPU-only deployment starts using the documented production composition and no in-memory provider.
+- Firebase signup, login, refresh, logout, protected routes, server token verification, and owner isolation work in a real browser.
+- Firestore persists sessions, setup, events, final transcripts, evaluations, retention, and deletion state.
+- Firebase Storage and local filesystem adapters pass upload, download, replay, retention, and deletion tests.
+- A real PDF and job description reach parsing, source-linked retrieval, and the live prompt context.
+- A real microphone track reaches Faster-Whisper and produces partial and final timestamped transcript events.
+- OpenRouter produces validated structured streaming interviewer responses with cancellation, timeout, rate-limit, fallback, cost, and model metadata.
+- Kokoro produces browser-playable audio with sequencing, interruption, cancellation, and measured first-audio latency.
+- WebRTC works with configured STUN/TURN from an external browser network.
+- Real recruiter and technical interviews complete through the browser using the fixed provider set.
+- Candidate/interviewer audio, immutable transcript, events, and evaluation persist and replay.
+- The LLM evaluator runs only after completion and stores bounded feedback.
+- User deletion removes original, derived, cached, transcript, recording, evaluation, and provider-created test artifacts.
+- Negative cases cover invalid auth, owner mismatch, malformed PDF/audio, provider outage, timeout, cancellation, quota, WebRTC failure, storage failure, and deletion failure.
+- Evidence reports exercised, skipped, or failed per provider; skipped or deterministic results cannot satisfy beta acceptance.
+
+### 10.5 Verification boundary
+
+The project has three explicit evidence levels:
+
+1. Contract readiness: interfaces and deterministic tests.
+2. Provider readiness: real configured provider operation through the adapter.
+3. Beta readiness: a real browser user completes the entire flow and receives durable results.
+
+Only level 3 can close Live Beta Enablement.
