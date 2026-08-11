@@ -10,6 +10,7 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel, Field
 
+from interviewer_domain.adapters.integrations import IntegrationSkipped
 from interviewer_domain.configuration import (
     ProviderReadinessChecker,
     RuntimeSettings,
@@ -75,7 +76,10 @@ class InterviewApplication:
             elif settings.storage_backend == "s3":
                 from .adapters.integrations import Boto3ObjectBackend
 
-                storage = S3CompatibleStorage(Boto3ObjectBackend(settings.storage_bucket or ""))
+                try:
+                    storage = S3CompatibleStorage(Boto3ObjectBackend(settings.storage_bucket or ""))
+                except IntegrationSkipped as exc:
+                    raise RuntimeError(f"S3 storage backend requires boto3: {exc}") from exc
             else:
                 storage = S3CompatibleStorage(FirebaseStorageBackend(settings.storage_bucket))
             self.persistence = PersistenceService(
