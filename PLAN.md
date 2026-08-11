@@ -6,7 +6,7 @@ This document tracks the initial implementation roadmap for the voice-native AI 
 
 ## Current status
 
-Phases 0 through 9 provide the provider-independent domain foundation, deterministic offline pipeline, persistence seams, evaluation, and an initial API/frontend shell. The repository is not yet ready for a live demo. The mandatory production-readiness program is phases 10 through 16: real CI, configuration, selected providers, complete frontend identity and setup, browser WebSocket/WebRTC integration, full user E2E acceptance, opt-in provider integrations, enforced coverage, and release rehearsal.
+Phases 0 through 15 provide the provider-independent domain foundation, deterministic offline pipeline, persistence seams, evaluation, API/frontend shell, browser transport seams, and concrete provider adapters. The repository is not yet ready for a live beta. The active program is Live Beta Enablement: one explicit provider set must be composed into a real browser-to-provider vertical slice before any release gate can claim readiness.
 
 A passing offline test suite proves deterministic code-path behavior only. It does not prove that Firebase, storage, STT, TTS, LLM, WebRTC, browser permissions, deployment configuration, or production observability work together.
 
@@ -192,7 +192,6 @@ Phase 13 implementation is complete in the feature branch: authenticated WebSock
 
 Phase 14 implementation is complete: `scripts/test_phase14.sh` runs real behavior-level positive and negative journeys, prints the marker contract, and writes timestamped JSON, Markdown, and HTML evidence. The default profile is deterministic and offline; configured integrations are opt-in and report explicit redacted skips when unavailable.
 
-
 ### Phase 15: Opt-in provider integration suite
 
 - [x] Add separately selectable integration profiles and redacted JSON, Markdown, and HTML evidence for Firebase Auth, Firestore, object storage, STT, TTS, LLM, and WebRTC infrastructure.
@@ -204,15 +203,33 @@ Phase 14 implementation is complete: `scripts/test_phase14.sh` runs real behavio
 
 Phase 15 implementation provides real execution paths and an honest opt-in gate. The current environment has no Firebase, Faster-Whisper, Piper/Kokoro, or browser automation configuration, so no production-provider readiness is claimed by the offline run.
 
-### Phase 16: Coverage and live-demo release gate
+### Phase 16: Live Beta Enablement
 
-- [ ] Enforce separate backend domain, API, frontend, and browser E2E coverage thresholds in CI.
-- [ ] Require changed production code to have behavior-level tests and require every concrete provider adapter to have an integration or deterministic contract test.
-- [ ] Add coverage trend artifacts and prevent threshold regressions.
-- [ ] Run a clean Docker release candidate from documented instructions.
-- [ ] Verify production configuration, Firebase auth, storage, provider health, HTTPS, CORS, retention, deletion, monitoring, rollback, and incident procedures.
-- [ ] Run a scripted live-demo rehearsal and record the exact selected provider configuration and known limitations.
-- [ ] Declare demo readiness only after all mandatory gates pass; offline deterministic tests alone are insufficient.
+Specification, plan, and marker contract: `docs/specs/016-live-beta-enablement/`.
+
+- [ ] Restructure `src/interviewer_domain` into `capabilities/`, `adapters/`, `providers/in_memory/`, domain services, and a production composition package.
+- [ ] Compose the explicit beta set: Firebase Auth, Firestore, Firebase Storage plus local filesystem storage, OpenRouter, Faster-Whisper, Kokoro, WebRTC, and an OpenRouter LLM evaluator.
+- [ ] Implement production startup validation that rejects accidental in-memory providers and exposes active provider health without secrets.
+- [ ] Implement Firebase browser authentication, token refresh, protected routes, server verification, and owner isolation.
+- [ ] Implement Firestore session, event, transcript, evaluation, user, retention, and deletion repositories.
+- [ ] Implement Firebase Storage and local filesystem upload, download, replay, retention, and deletion lifecycle.
+- [ ] Implement real resume upload, text extraction, source-linked retrieval, and live prompt context.
+- [ ] Implement real WebRTC microphone ingress and interviewer audio egress with STUN/TURN configuration.
+- [ ] Implement CPU Faster-Whisper transcription with partial/final timestamped events and worker limits.
+- [ ] Implement OpenRouter structured streaming interviewer responses, cancellation, timeout, rate-limit, cost, and fallback handling.
+- [ ] Implement Kokoro chunked synthesis, browser-compatible audio, sequencing, interruption, and cancellation.
+- [ ] Implement final recording, immutable transcript, LLM evaluation, score validation, results, replay, and deletion.
+- [ ] Run a real browser recruiter and technical interview against the configured stack and save redacted frame/evidence artifacts.
+
+A deterministic test pass cannot mark Phase 16 complete. Every selected provider and the full browser journey must produce an exercised result; missing configuration is skipped and configured failure is failed.
+
+### Phase 17: Coverage and operational release gate
+
+- [ ] Enforce separate backend domain, API, frontend, provider, and browser E2E coverage thresholds.
+- [ ] Run a clean Docker release candidate with frontend, API, CPU workers, durable services, and media infrastructure.
+- [ ] Verify HTTPS, CORS, secure WebSocket origins, retention scheduling, deletion, monitoring, rollback, and incident procedures.
+- [ ] Run a scripted beta rehearsal with provider/model/version, latency, cost, quality, and limitation evidence.
+- [ ] Declare beta readiness only after Phase 16 real execution and all operational gates pass.
 
 ## SDD feature order
 
@@ -233,12 +250,15 @@ Each phase may contain smaller implementation slices, but no phase may be marked
 - Product interaction: voice loop is built directly; there is no separate text or chat interview mode.
 - Services: frontend, API, audio, and worker services are separate deployment boundaries.
 - Development: Docker-first and CPU-only, targeting approximately 4 GB RAM and 250 GB storage.
-- Storage: local storage first through `StorageProvider`, with cloud or S3-compatible implementations later.
-- Deployment: local Docker plus remote deployment adapters for platforms such as Vercel and Railway.
+- Storage: Firebase Storage and local filesystem adapters are the initial beta choices.
+- Deployment: CPU-only beta services with HTTPS, WebRTC/TURN, frontend, API, workers, and durable services.
 - Resume input: PDF-only upload, maximum 5 MB.
 - Job description input: text-only message box.
 - Retention: 14 days by default, with complete per-interview deletion available to the user.
 - Company and culture context: derive it from job-description or resume content and optional model-supported or `ResearchProvider` web research; do not request a separate company-information form.
+- Beta providers: Firebase Auth, Firestore, Firebase Storage/local storage, OpenRouter, Faster-Whisper, Kokoro, WebRTC, and an OpenRouter LLM evaluator.
+- Workers: CPU-only for the first beta.
+- Retention: 14 days by default with complete user deletion.
 
 ## Remaining decisions
 

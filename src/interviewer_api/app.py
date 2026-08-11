@@ -18,13 +18,21 @@ from interviewer_domain.configuration import (
 from interviewer_domain.contracts import ErrorCode, ProviderError
 from interviewer_domain.models import InterviewMode
 from interviewer_domain.persistence import (
+    FirebaseAuthAdapter,
+    FirestoreDataStore,
+    S3CompatibleStorage,
     FixedWindowRateLimiter,
     InMemoryAuthProvider,
     InMemoryPersistentDataStore,
+    LocalFilesystemStorage,
     PersistenceService,
     UserIdentity,
 )
-from interviewer_domain.providers import InMemoryStorage
+from interviewer_domain.provider_integration import (
+    FirebaseAdminAuthBackend,
+    FirebaseStorageBackend,
+    FirestoreGoogleBackend,
+)
 from interviewer_domain.transport import (
     BrowserSessionState,
     CreateSessionRequest,
@@ -53,10 +61,27 @@ class InterviewApplication:
     """Own injected local capabilities and expose application use cases."""
 
     def __init__(self) -> None:
-        """Create a credential-free in-memory development composition."""
-        self.data = InMemoryPersistentDataStore()
-        self.persistence = PersistenceService(self.data, InMemoryStorage())
-        self.auth = InMemoryAuthProvider({"dev-token": UserIdentity("local-user")})
+        """Create the local composition or the explicitly configured live composition."""
+        if settings.profile.value == "production":
+            auth_backend = FirebaseAdminAuthBackend(
+                settings.firebase_credentials_path, settings.firebase_project_id
+            )
+            firestore_backend = FirestoreGoogleBackend(
+                settings.firebase_project_id or "", settings.firestore_database or "(default)"
+            )
+            self.data = FirestoreDataStore(firestore_backend)
+            self.persistence = PersistenceService(
+                self.data,
+                S3CompatibleStorage(FirebaseStorageBackend(settings.storage_bucket)),
+                settings.retention_days,
+            )
+            self.auth = FirebaseAuthAdapter(auth_backend)
+        else:
+            self.data = InMemoryPersistentDataStore()
+            self.persistence = PersistenceService(
+                self.data, LocalFilesystemStorage(settings.storage_path), settings.retention_days
+            )
+            self.auth = InMemoryAuthProvider({"dev-token": UserIdentity("local-user")})
         self.rate_limiter = FixedWindowRateLimiter(
             limit=settings.rate_limit, window_seconds=settings.rate_window_seconds
         )

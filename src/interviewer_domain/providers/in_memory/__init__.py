@@ -3,7 +3,7 @@
 from collections import defaultdict
 from uuid import UUID
 
-from .contracts import (
+from ...contracts import (
     CancellationToken,
     CapabilityDescriptor,
     ErrorCode,
@@ -12,7 +12,7 @@ from .contracts import (
     StreamAudioChunk,
     StreamTextChunk,
 )
-from .models import LifecycleEvent, Recording, TranscriptSegment
+from ...models import LifecycleEvent, Recording, TranscriptSegment
 
 
 class InMemorySTT:

@@ -1,154 +1,273 @@
-# AI Mock Interview Platform
+# AI Interviewer
 
-A browser-based, voice-native mock interview platform for practicing realistic recruiter and technical interviews with an adaptive LLM interviewer.
+AI Interviewer is a browser-based, voice-native mock interview platform. A candidate provides a job description, optionally uploads a PDF resume, selects a mode, and practices a conversational interview with an adaptive interviewer persona.
 
-## Product direction
+Supported interview modes:
 
-Candidates provide a job description and optionally a resume. The platform uses that context to conduct a role-, seniority-, location-, and company-aware interview with either:
+- **Recruiter screen:** background, motivation, role fit, communication, logistics, availability, location, and work authorization where relevant.
+- **Technical or hiring-manager interview:** technical depth, problem solving, system design, domain knowledge, projects, behavioral signals, and role-specific follow-up questions.
 
-- A recruiter-screen persona
-- A technical or hiring-manager persona
+The intended post-interview experience includes replayable audio, a timestamped speaker-labeled transcript, a score out of 100, a summary, strengths, missed opportunities, role-specific feedback, and concrete improvements.
 
-The interview is designed to be dynamic and conversational. It uses streaming speech-to-text, LLM responses, and text-to-speech, then provides a replayable audio recording, timestamped transcript, summary, structured feedback, and a score out of 100.
+> **Current status:** deterministic local domain and acceptance paths are implemented, and Phase 15 added opt-in concrete provider transports. The latest Phase 15 run skipped every real integration because safe credentials, model paths, and a browser integration URL were absent. This repository must not yet claim live production interview readiness.
 
-## Architecture direction
+## Contents
 
-The project uses capability-based interfaces rather than vendor-specific business logic. Local, hosted, open-source, and experimental providers can be swapped and A/B tested behind common interfaces for:
+- [Status](#status)
+- [How it works](#how-it-works)
+- [Architecture](#architecture)
+- [Repository layout](#repository-layout)
+- [Local development](#local-development)
+- [API and browser boundaries](#api-and-browser-boundaries)
+- [Provider integrations](#provider-integrations)
+- [Configuration](#configuration)
+- [Testing and evidence](#testing-and-evidence)
+- [Production deployment](#production-deployment)
+- [Security and privacy](#security-and-privacy)
+- [Roadmap and readiness](#roadmap-and-readiness)
 
-- LLM generation
-- Speech-to-text
-- Text-to-speech
-- Document parsing and resume RAG
-- Optional external company and culture research
-- Authentication and data storage
-- Audio transport and event delivery
-- Storage and observability
+## Status
 
-The initial application stack is React with Tailwind v4 and shadcn/ui for a minimal, clean, mobile-friendly frontend, and FastAPI for the backend. The system is split into frontend, API, audio, and worker services.
+| Capability | Local path | Configured path | Evidence |
+|---|---|---|---|
+| Setup, modes, PDF parsing, retrieval | Implemented | Needs application verification | Phase 14 offline |
+| Live voice orchestration | In-memory STT, LLM, TTS | Provider adapters exist | Live run pending |
+| STT | In-memory fixture | Faster-Whisper local backend | Phase 15 contract; skipped live |
+| TTS | In-memory fixture | Piper/Kokoro command backend | Phase 15 contract; skipped live |
+| LLM | In-memory fixture | OpenRouter HTTP transport | Phase 15 contract; skipped live |
+| Auth and data | Dev token and memory stores | Firebase Admin, Firestore, S3 seams | Skipped live |
+| Browser media | Local WebSocket/WebRTC boundary | Real microphone and TURN | Skipped live |
+| Evaluation | Deterministic post-interview evaluator | Provider selection is future work | Phase 14 offline |
 
-Phase 4 adds provider-neutral adapters in `src/interviewer_domain/provider_adapters.py` for Faster-Whisper-compatible STT, Piper/Kokoro-compatible TTS, and OpenRouter-compatible LLM transports. These adapters are optional: tests inject deterministic backends, do not access the network, and do not require credentials or model downloads. `FallbackRouter` and `ProviderFlags` provide configuration seams without placing vendor names in interview business logic. `ProviderBenchmark` records first-byte and end-to-end latency, fixture quality, estimated cost, failures, and CPU time. See `docs/specs/004-provider-benchmark-harness/` for the contract and limitations.
+Requirements are in [`SPEC.md`](SPEC.md), implementation status is in [`PLAN.md`](PLAN.md), and provider operations are in [`docs/provider-readiness.md`](docs/provider-readiness.md).
 
-The browser communication model is:
+## How it works
 
-- WebRTC for live microphone and agent audio. Media frames never enter the control channel.
-- WebSocket for ordered interview state, transcript events, interruptions, playback control, and WebRTC signaling.
-- Versioned HTTP REST resources under `/api/v1` for setup and session bootstrap; later phases add uploads, history, recordings, transcripts, and results.
-- Optional backend Pub/Sub or event-bus workflows for asynchronous processing and fan-out.
+1. The candidate authenticates, enters a text job description, selects a mode, and optionally selects a PDF resume.
+2. Text PDF ingestion validates, parses, normalizes, chunks, and retrieves relevant evidence. Documents are untrusted data, never system instructions.
+3. A session is created through the versioned API and authorized for the current user.
+4. HTTP handles setup and resources, WebSocket handles ordered control and transcript/status events, and WebRTC handles microphone and agent audio. Media frames never enter WebSocket control messages.
+5. `LiveVoiceOrchestrator` coordinates STT, interview state, LLM generation, TTS scheduling, interruption, cancellation, fallback, and timestamped artifacts.
+6. Completion persists transcript, recording metadata, events, and evaluation artifacts. Evaluation runs only after completion from final transcript evidence.
+7. History, replay, transcript, results, retention, and deletion use owner-checked boundaries.
 
-Phase 5 implements these provider-independent seams in `src/interviewer_domain/transport.py`. `LocalSessionEventChannel` supports strictly ordered, correlated, idempotent events and replay after an acknowledged cursor. `LocalWebRTCMediaTransport` and `LocalBrowserControlTransport` make the media/control boundary executable offline. See [`docs/specs/005-browser-transport-session-events/`](docs/specs/005-browser-transport-session-events/) for the schemas, marker contract, and test plan.
+The local profile exercises these contracts without credentials or external network calls. It does not prove speech quality, model quality, Firebase behavior, or production WebRTC connectivity.
 
-Phase 6 adds `LiveVoiceOrchestrator` in `src/interviewer_domain/live_voice.py`. It connects incremental STT, cancellable LLM and secondary responses, digest-guarded prefetch, ordered TTS scheduling, interruption handling, timestamped artifacts, latency telemetry, and fallback routing through protocols. Deterministic streaming fixtures in `providers.py` exercise the complete loop without browsers, credentials, network access, or heavyweight models. See [`docs/specs/006-live-voice-loop/`](docs/specs/006-live-voice-loop/) for the specification, plan, and marker contract.
+## Architecture
 
-Phase 7 adds provider-independent persistence in `src/interviewer_domain/persistence.py`. `FirebaseAuthAdapter`, `FirestoreDataStore`, `LocalFilesystemStorage`, and `S3CompatibleStorage` use injected backends, while deterministic local services enforce owner isolation, 14-day retention metadata, complete interview deletion, PDF upload bounds, and fixed-window rate limits. Because this repository has no frontend source tree, setup, active interview, history, replay, transcript, and results are represented as stable UI-independent resource contracts rather than an invented React application. See [`docs/specs/007-persistence-user-identity/`](docs/specs/007-persistence-user-identity/) for the specification, plan, and marker contract.
+Business logic is provider-neutral. Capability interfaces define normalized payloads, cancellation, timeouts, errors, health, and discovery. Vendor formats, SDK imports, credentials, retries, and provider failures remain in adapters.
 
-Phase 8 adds `DeterministicEvaluator` and `PostInterviewEvaluationService` in `src/interviewer_domain/evaluation.py`. The evaluator runs only after completion, scores recruiter and technical rubrics from final candidate transcript segments, preserves role, seniority, job-description, resume, and mode context, and emits versioned evidence-linked feedback with confidence and a bounded score. Results are saved and exposed through the existing owned persistence resource. The evaluator protocol is replaceable by future providers, while current tests remain offline, credential-free, and deterministic. See [`docs/specs/008-post-interview-evaluation/`](docs/specs/008-post-interview-evaluation/) for the specification, plan, and marker contract.
-
-Candidate provider implementations include local Faster-Whisper, hosted Groq Whisper, local Kokoro or Piper, and OpenRouter or self-hosted LLMs. These are comparison candidates, not final production decisions. Local development is Docker-first and CPU-only, with an approximate 4 GB RAM and 250 GB storage target.
-
-Resume input is PDF-only with a 5 MB limit, while job descriptions are supplied as text. The Phase 3 local ingestion slice extracts text-based PDFs, preserves source-linked chunks, provides deterministic topic retrieval, and marks instruction-like document text as untrusted data. OCR and external research remain integration work; Phase 7 now provides persistent retention metadata and enforcement boundaries. Uploaded and generated content is treated as untrusted input and must pass prompt-injection and output-safety guardrails. Interview data is retained for 14 days by default and can be completely deleted per interview.
-
-## Project status
-
-The repository has completed the domain and capability foundation, the Phase 2 voice-first session engine, the Phase 3 local document ingestion and retrieval slice, the Phase 4 provider-neutral adapter and benchmark harness, the Phase 5 browser transport and session events slice, the Phase 6 live voice orchestration loop, the Phase 7 provider-independent persistence and user-identity layer, the Phase 8 deterministic post-interview evaluation, the Phase 9 production runtime and API/frontend shell, the Phase 10 test integrity and CI gates, the Phase 11 runtime configuration and provider readiness, and the Phase 12 production frontend and identity. The provider-independent Python package is under `src/interviewer_domain/`, with deterministic providers, a mock voice-shaped turn, recruiter or technical session state-machine coverage, local PDF/text parsing with topic retrieval, provider-neutral STT/TTS/LLM adapters with fallback routing and benchmarking, versioned REST/WebSocket/WebRTC transport seams, cancellable streaming live-voice orchestration with digest-guarded prefetch, ordered TTS scheduling, and timestamped artifacts, owner-checked persistence with retention and deletion, and a deterministic evaluator with mode-specific rubrics and evidence-linked feedback in `tests/`. Run `python -m unittest discover -s tests -v` for the local test gate. Read [`SPEC.md`](SPEC.md) for the product specification and [`PLAN.md`](PLAN.md) for the SDD implementation roadmap. The first implementation will build the voice loop directly rather than creating a separate text-only interview mode.
-
-Each feature will be developed through the repository's SDD workflow:
-
-1. Feature specification
-2. Implementation plan
-3. Marker contract
-4. Capability-first implementation
-5. Unit and mock end-to-end tests
-6. Evidence and documentation
-7. Landmine review and roadmap update
-
-## Phase 9 production runtime
-
-The repository includes a runnable FastAPI composition root at `src/interviewer_api/app.py` and a Vite React frontend under `frontend/`. The API exposes `GET /healthz`, versioned health/version routes, authenticated session creation, history, setup, active, replay, transcript, results, and completion resources. The frontend provides setup, active interview, history/replay/transcript, and results views and is API-backed rather than a static placeholder.
-
-### Prerequisites and installation
-
-Use Python 3.12+, Node.js 20+, npm, and optionally Docker Compose. No credentials are needed for the deterministic local path.
-
-```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
-npm install --prefix frontend
-export PYTHONPATH=src
+```text
+React browser UI
+    | HTTP REST: setup, sessions, history, transcript, results
+    | WebSocket: control, signaling, transcript, status, replay
+    | WebRTC: microphone and agent audio
+    v
+FastAPI composition root
+    | AuthProvider
+    | DocumentParser + retrieval
+    | Interview state machine + question planning
+    | LiveVoiceOrchestrator
+    |   STTProvider -> LLMProvider -> TTSProvider
+    | PersistenceService -> DataStore + StorageProvider
+    | PostInterviewEvaluationService
+    v
+Local, self-hosted, and hosted provider adapters
 ```
 
-The local `Bearer dev-token` is a development-only fixture. Never use it in deployment. Inject real owner-checked identity, durable data/storage providers, HTTPS, and secrets through deployment configuration. Provider adapters use injected transports and must not place credentials in source or frontend bundles.
+Provider paths currently include `OpenRouterHTTPTransport`, `FasterWhisperLocalBackend`, `PiperCommandBackend`, `FirebaseAdminAuthBackend`, `FirestoreGoogleBackend`, and `Boto3ObjectBackend`. In-memory providers remain available for deterministic tests. Optional SDKs are imported lazily, model weights are never downloaded automatically, and configured providers must not silently fall back to memory.
 
-### Development, tests, and checks
+## Repository layout
 
-```bash
-PYTHONPATH=src uvicorn interviewer_api.app:app --reload --port 8000
-npm run dev --prefix frontend
-PYTHONPATH=src python -m unittest discover -s tests -v
-PYTHONPATH=src python -m compileall -q src tests
-npm run build --prefix frontend
+```text
+src/interviewer_domain/       Models, contracts, providers, routing, orchestration
+src/interviewer_api/          FastAPI REST, WebSocket, and composition root
+frontend/src/                 React UI, API clients, auth, media, transport
+scripts/                      Quality gates and phase evidence runners
+tests/                        Offline, contract, acceptance, provider tests
+docs/specs/                   SDD specifications, plans, marker contracts
+SPEC.md                       Product specification
+PLAN.md                       Phase roadmap
+.env.example                  Safe environment template
+Dockerfile                    API image
+docker-compose.yml            Local API container definition
 ```
 
-`tests/test_phase9_production.py` calls real ASGI routes and public domain interfaces across ingestion, retrieval, provider routing, live voice, transport, persistence, evaluation, failure, reconnect, cancellation, partial audio, authorization, retention, rate limits, benchmarks, and privacy boundaries. It does not grep source strings or depend on credentials, network, browser automation, or heavyweight models.
+## Local development
 
-## Phase 11 runtime configuration and provider readiness
+Requirements are Python 3.12+, `pip`, Node.js, npm, and optionally Docker.
 
-Copy `.env.example` to the deployment environment and set `APP_PROFILE=local` for the credential-free deterministic path. `RuntimeSettings` validates environment values and preserves the existing 5 MB PDF and 14-day retention decisions. `APP_PROFILE=production` requires explicit Firebase, Firestore, storage, and provider configuration instead of silently selecting in-memory providers. The API's `/api/v1/readiness` endpoint reports redacted profile, capability, and health information.
-
-Production-shaped STT, TTS, and LLM adapters are `FasterWhisperSTT`, `PiperKokoroTTS`, and `OpenRouterLLM`, selected through existing capability interfaces and injected backend or transport seams. `FallbackRouter` tries configured providers in order. The default tests never download models or call networks. See [`docs/provider-readiness.md`](docs/provider-readiness.md) for provider data sharing, retention, cost, latency, and failure characteristics. Run `./scripts/test_phase11.sh` to verify all Phase 11 markers and forbidden-pattern guards. This evidence does not claim real provider, Firebase, browser, or WebRTC readiness.
-
-
-## Phase 12 production frontend and identity
-
-Phase 12 adds the production-shaped React workspace in `frontend/src/`. It uses an editorial field-notebook visual system with responsive setup, live-room, history, feedback, loading, empty, validation, permission, reconnect, provider-error, deletion, retention, and offline states. Visual components live in `ui.jsx` and `style.css`; versioned request builders remain in `api.js`; identity is behind `AuthProvider`-shaped functions in `auth.js`.
-
-The default browser path uses a deterministic, credential-free local profile persisted in session storage. `configuredAuthProvider(adapter)` is the seam for a Firebase adapter, but Firebase credentials and SDK setup are intentionally not included. The local sign-in and setup screenshots are evidence of the UI composition only, not Firebase, WebSocket, WebRTC, microphone, or external provider readiness. Run `./scripts/test_phase12.sh` for exact marker evidence and `npm run test:coverage --prefix frontend` for the frontend behavior gate. Browser evidence is saved outside Git at `/home/openhands/.openhands/agent-canvas/conversations/067dc08685fd4d25a5d690c3f62dd0d9/observations/`.
-
-
-For the strict Phase 10 gate, install the pinned development tools and run:
+### Run the deterministic API
 
 ```bash
+python -m venv .venv
+. .venv/bin/activate
 pip install -r requirements-dev.txt
-./scripts/lint_and_typecheck.sh
-./scripts/test_backend.sh
-npm ci --prefix frontend
-./scripts/test_frontend.sh
+export PYTHONPATH="$PWD/src"
+export APP_PROFILE=local
+uvicorn interviewer_api.app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-The backend gate runs 50 offline unittest cases, the mock interview evidence path, and an enforced 80% aggregate coverage floor. The frontend gate runs ESLint, Node tests with an 80% line/function/statement and 70% branch coverage floor, and a production Vite build. These gates are credential-free and do not claim provider, browser, or production readiness. Generated coverage and frontend build output are ignored by Git. GitHub Actions runs the same scripts and uploads coverage reports.
+Check it with `curl http://127.0.0.1:8000/healthz`, `curl http://127.0.0.1:8000/api/v1/health`, and `curl http://127.0.0.1:8000/api/v1/readiness`. The local API uses `Authorization: Bearer dev-token`; this is a development fixture and must never be deployed.
 
-### Docker, deployment, and architecture
+### Run the frontend
+
+In another terminal:
+
+```bash
+cd frontend
+npm ci
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+Open <http://127.0.0.1:5173>. The current frontend uses local identity and a development token. A reverse proxy must route `/api` and WebSocket upgrades to the API. Real microphone/WebRTC use requires HTTPS.
+
+```bash
+npm run lint
+npm test
+npm run test:coverage
+npm run build
+```
+
+### Run with Docker
+
+The supplied Compose file runs the API only. It does not serve React, provide Firebase, start model workers, provide TURN, or provision durable storage.
 
 ```bash
 docker compose up --build
-# API health: http://localhost:8000/healthz
+curl http://127.0.0.1:8000/healthz
 ```
 
-The Dockerfile runs the API. Build the frontend with `npm run build --prefix frontend`, then serve `frontend/dist` through a static host or HTTPS reverse proxy. Before production traffic, add a durable database and object store, real identity, retention scheduling, structured logs, metrics/traces, rate-limit policy, provider health checks, and deployment-specific benchmark evidence. No cloud provider is selected by this phase.
+Run the frontend separately or serve its built `frontend/dist` through an HTTPS reverse proxy.
 
-### Provider configuration and troubleshooting
+## API and browser boundaries
 
-The domain remains provider-neutral: configure optional STT, TTS, and LLM adapters only through injected capability implementations and environment-backed secrets. If imports fail, set `PYTHONPATH=src`. API resource calls need `Authorization: Bearer dev-token` locally. Empty, expired, and cross-owner resources fail safely. The local parser supports text PDFs only; scanned or encrypted PDFs must fail safely until an OCR adapter is intentionally added. Frontend `/api` calls require a reverse-proxy or Vite dev proxy to the API.
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/healthz` | Liveness |
+| GET | `/api/v1/health` | Versioned health |
+| GET | `/api/v1/readiness` | Redacted profile and capability readiness |
+| GET | `/api/v1/version` | API version |
+| POST | `/api/v1/sessions` | Create an owned session |
+| GET | `/api/v1/history` | List owned history |
+| GET | `/api/v1/sessions/{id}/{view}` | Retrieve an owned view |
+| POST | `/api/v1/sessions/{id}/complete` | Complete a session |
+| WS | `/ws/v1/sessions/{id}` | Authenticated control channel |
+| WS | `/ws/v1/sessions/{id}/signaling` | Authenticated signaling channel |
 
-## Phase 13 browser WebSocket and WebRTC voice loop
+The FastAPI composition root is still development-oriented: it creates in-memory auth, persistence, and storage at startup. Concrete production provider classes exist, but complete production composition and verification remain outstanding.
 
-Phase 13 connects the live room to an authenticated, owner-checked WebSocket session channel and a separate provider-neutral WebRTC signaling/media boundary. Control payloads carry normalized session, transcript, status, heartbeat, cancellation, interruption, and signaling events only; media frames remain outside WebSocket messages. Reconnect resumes from the last acknowledged cursor, and stale or unauthorized sessions fail safely. The default local browser path uses injected in-memory seams and can exercise the same REST/WebSocket/signaling/UI contracts without credentials, browser-heavy dependencies, or media bytes in deterministic tests. Run `./scripts/test_phase13.sh` for exact markers.
+## Provider integrations
 
-This local evidence does not claim real microphone capture, TURN/WebRTC connectivity, Firebase identity, durable audio persistence, or configured STT/TTS/LLM provider readiness. Configured mode must be explicitly enabled and fails safely when required credentials or capabilities are unavailable rather than silently falling back to local mode. Browser evidence is saved outside version control under the conversation observation directory.
-
-## Phase 14 full programmatic user E2E acceptance
-
-Phase 14 adds a repeatable offline acceptance journey spanning deterministic local auth, job setup, valid PDF parsing, RAG retrieval, separate candidate and interviewer provider instances, browser WebSocket/WebRTC seams, candidate audio, STT/TTS/LLM capability calls, interruption, reconnect, completion, persistence, evaluation, replay/history, and deletion. It also exercises invalid login, unauthorized access, malformed PDF, provider fallback, microphone denial, cancellation, timeout, stale responses, and incomplete interviews.
-
-Run `./scripts/test_phase14.sh` for behavior-level markers and evidence. JSON, Markdown, and HTML reports are written to `.agent_tmp/phase14-evidence/` by default, or to `PHASE14_EVIDENCE_DIR`. The local profile is not Firebase or hosted-provider evidence: configured integrations are reported only when their explicit credentials and opt-in settings are present, and otherwise receive a redacted skip reason.
-
-## Phase 15 opt-in provider integrations
-
-Phase 15 adds real, lazy provider transports without changing the offline profile. `OpenRouterHTTPTransport` calls the OpenRouter OpenAI-compatible API when `LLM_API_KEY` and `LLM_PROVIDER=openrouter` are configured. `FasterWhisperLocalBackend` validates an operator-supplied model directory without downloading weights, and `PiperCommandBackend` invokes an operator-installed local speech command. Firebase Admin, Firestore, and S3-compatible adapters are available behind the existing auth, durable data, and storage protocols.
-
-Run the offline Phase 15 contract and evidence check with:
+Phase 15 profiles distinguish `exercised`, `skipped`, and `failed`. Missing configuration is a skip, not a readiness pass. A selected profile that fails is a failure.
 
 ```bash
+export PYTHONPATH="$PWD/src"
+./scripts/test_phase15.sh
+export PHASE15_PROFILES=openrouter,faster-whisper,piper,firebase,firestore,storage,webrtc
 ./scripts/test_phase15.sh
 ```
 
-Select integrations explicitly with `PHASE15_PROFILES=openrouter,faster-whisper,piper,firebase,firestore,storage,webrtc` and provide the documented variables in `.env.example`. The runner never silently substitutes an in-memory provider: absent configuration is a redacted `skipped` result, and configured failures are `failed`. Evidence is written outside Git under `.agent_tmp/phase15-evidence/`. Real provider, Firebase, storage, model, browser, and TURN readiness requires configured integration execution and is not claimed by the default offline gates.
+The current Phase 15 runner validates configuration and writes evidence, but does not automatically execute every selected live operation. Real readiness requires deliberate configured runs with real inputs, safe test accounts or buckets, and recorded evidence.
+
+- **OpenRouter:** set `OPENROUTER_API_KEY`, `LLM_MODEL`, and `LLM_PROVIDER=openrouter`. Review data sharing, retention, region, cost, and rate limits.
+- **Faster-Whisper:** install the optional package and provide an already-downloaded model directory through `STT_MODEL_PATH`. Weights are never downloaded by the application. Set `STT_PROVIDER=faster-whisper`.
+- **Piper or Kokoro:** provide an operator-installed command plus `TTS_MODEL_PATH` and `TTS_COMMAND`. Verify output sample rate, codec, playback, latency, cancellation, and license.
+- **Firebase and Firestore:** provide `FIREBASE_PROJECT_ID` and a protected `FIREBASE_CREDENTIALS_PATH`. Use a non-production project and verify claims, revoked tokens, rules, owner isolation, deletion, and region.
+- **S3-compatible storage:** set `STORAGE_BACKEND`, `STORAGE_BUCKET`, and provider credentials. Use a dedicated test bucket and verify upload, download, prefixes, retries, lifecycle, and deletion.
+- **Browser and WebRTC:** set `PHASE15_BROWSER_URL` to an HTTPS browser environment and configure `WEBRTC_ICE_SERVERS` with deployment STUN/TURN. This repository does not provide a TURN server.
+
+## Configuration
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Purpose |
+|---|---|
+| `APP_PROFILE` | `local` for deterministic development; `production` requires explicit providers |
+| `PHASE15_PROFILES` | Opt-in integration profiles |
+| `STT_PROVIDER`, `STT_MODEL_PATH` | STT selection and local model path |
+| `TTS_PROVIDER`, `TTS_MODEL_PATH`, `TTS_COMMAND` | TTS selection and command |
+| `LLM_PROVIDER`, `LLM_MODEL`, `OPENROUTER_API_KEY` | LLM selection and credential |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH` | Firebase Admin and Firestore |
+| `STORAGE_BACKEND`, `STORAGE_BUCKET` | Durable object storage |
+| `PHASE15_BROWSER_URL` | Browser integration target |
+| `WEBRTC_ICE_SERVERS` | STUN/TURN list |
+| `RETENTION_DAYS` | Default retention, currently 14 days |
+| `RATE_LIMIT`, `RATE_WINDOW_SECONDS` | Rate limiting |
+| `CORS_ORIGINS` | Allowed browser origins |
+
+Never put credentials in `.env.example`, source, Git history, screenshots, logs, evidence, or frontend bundles.
+
+## Testing and evidence
+
+Default gates are credential-free:
+
+```bash
+export PYTHONPATH="$PWD/src"
+./scripts/lint_and_typecheck.sh
+./scripts/test_backend.sh
+./scripts/test_frontend.sh
+./scripts/test_phase11.sh
+./scripts/test_phase13.sh
+./scripts/test_phase14.sh
+./scripts/test_phase15.sh
+```
+
+Evidence is written under `.agent_tmp/` and ignored by Git. Offline evidence proves application contracts, not external availability, speech quality, LLM quality, Firebase rules, TURN connectivity, or production security.
+
+## Production deployment
+
+Production is not yet a supported one-command deployment. Before accepting real candidate data:
+
+1. Replace development auth, in-memory persistence, and in-memory storage with Firebase/Auth, Firestore or another reviewed datastore, and durable object storage.
+2. Implement browser Firebase sign-in/session restoration and server-side ID-token verification. Remove `dev-token` from production composition.
+3. Benchmark STT, TTS, and LLM providers for first-audio latency, turn latency, interruption, cancellation, retries, rate limits, cost, quality, and fallback.
+4. Deploy HTTPS, secure WebSocket origin checks, STUN/TURN, microphone permissions, compatible codecs and sample rates, and browser-to-server media verification.
+5. Add encryption, owner-scoped keys, retention jobs, deletion verification, backups, restore tests, and provider-side deletion review.
+6. Add secrets management, redacted logs, metrics, traces, alerts, readiness probes, abuse controls, patching, rollback, and incident procedures.
+7. Build the frontend with `npm run build`, serve it over HTTPS, and route `/api` plus WebSocket upgrades to the API.
+8. Run configured Phase 15 integrations with test accounts and real browser media, then complete the Phase 16 coverage and live-demo gate.
+
+Use separate frontend, API, model/audio worker, and asynchronous evaluation services as load requires. The current Compose file is a local API definition, not a production topology.
+
+## Security and privacy
+
+Resumes, job descriptions, voice recordings, transcripts, and evaluations may contain personal data.
+
+- Treat documents and provider responses as untrusted input and never allow them to override system instructions.
+- Send only the minimum permitted context to external providers.
+- Review provider training, retention, region, and deletion policies before enabling them.
+- Use separate test projects, buckets, credentials, and model configurations.
+- Redact credentials, prompts, transcript text, audio, and personal data from logs and evidence.
+- Enforce owner checks on sessions, transcripts, recordings, evaluations, and deletion.
+- Use HTTPS and secure WebSocket origins in production.
+- Keep the default retention decision at 14 days unless a reviewed deployment policy changes it.
+- Verify deletion in every durable store and external provider that received the data.
+
+## Roadmap and readiness
+
+Phases 1 through 15 establish product specifications, capability contracts, local PDF/RAG, live voice orchestration, persistence/evaluation boundaries, browser transport, offline acceptance, and concrete opt-in provider transports.
+
+Phase 15 is merged, but its real-provider execution checkbox remains incomplete. The latest evidence says OpenRouter, Faster-Whisper, Piper/Kokoro, Firebase, Firestore, storage, and WebRTC were skipped because required configuration was absent. The project is therefore **not ready to claim a live production interview**.
+
+Phase 16 must not be closed until it has separate backend/frontend/browser/provider coverage, a clean Docker release candidate, real authentication and owner isolation, real STT/TTS/LLM voice turns, durable artifact and deletion verification, HTTPS/CORS/WebSocket/TURN security, operations procedures, and a scripted live-browser rehearsal recording provider/model, latency, cost, quality, and limitations.
+
+## Known limitations
+
+- Text PDFs are supported; scanned or encrypted PDFs need a future OCR adapter.
+- The default frontend uses local identity and a development bearer token.
+- The API composition uses in-memory auth, persistence, and storage locally.
+- Docker Compose does not include the frontend, model workers, durable stores, or TURN.
+- Browser media is a provider-neutral seam, not proof of microphone, codec, playback, or TURN behavior.
+- Phase 15 transports exist, but the repository contains no model weights, Firebase credentials, TURN service, or production secrets.
+- Phase 15 evidence is not live readiness. A profile must produce an `exercised` result from a deliberate real run.
+
+## Contributing
+
+Use the SDD workflow for every feature or fix: specification, plan, marker contract, capability-first implementation, behavior tests, evidence, documentation, quality gates, and `/no-mistakes` before pushing or opening a pull request. Keep commits focused and never commit secrets or generated evidence.
+
+## License
+
+No license has been declared in this repository yet.
