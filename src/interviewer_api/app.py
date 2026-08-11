@@ -80,8 +80,11 @@ class InterviewApplication:
                     storage = S3CompatibleStorage(Boto3ObjectBackend(settings.storage_bucket or ""))
                 except IntegrationSkipped as exc:
                     raise RuntimeError(f"S3 storage backend requires boto3: {exc}") from exc
-            else:
+            elif settings.storage_backend == "gcs":
+                assert settings.storage_bucket is not None
                 storage = S3CompatibleStorage(FirebaseStorageBackend(settings.storage_bucket))
+            else:
+                raise RuntimeError(f"unsupported STORAGE_BACKEND: {settings.storage_backend}")
             self.persistence = PersistenceService(
                 self.data, storage, settings.retention_days
             )
