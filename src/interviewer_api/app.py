@@ -452,7 +452,7 @@ async def session_websocket(websocket: WebSocket, session_id: UUID) -> None:
                 raise TransportValidationError("unsupported session command")
     except WebSocketDisconnect:
         state.disconnect(user_id)
-    except (TransportValidationError, KeyError, ValueError) as error:
+    except (TransportValidationError, KeyError, ValueError, ProviderError) as error:
         event = state.publish(SessionEventType.ERROR, {"code": "invalid_control", "message": str(error)}, correlation_id)
         await websocket.send_json(event.to_dict())
         await websocket.close(code=1003, reason="invalid control payload")
