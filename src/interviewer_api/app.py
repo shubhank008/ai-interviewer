@@ -70,10 +70,16 @@ class InterviewApplication:
                 settings.firebase_project_id or "", settings.firestore_database or "(default)"
             )
             self.data = FirestoreDataStore(firestore_backend)
+            if settings.storage_backend == "local":
+                storage = LocalFilesystemStorage(settings.storage_path)
+            elif settings.storage_backend == "s3":
+                from .adapters.integrations import Boto3ObjectBackend
+
+                storage = S3CompatibleStorage(Boto3ObjectBackend(settings.storage_bucket or ""))
+            else:
+                storage = S3CompatibleStorage(FirebaseStorageBackend(settings.storage_bucket))
             self.persistence = PersistenceService(
-                self.data,
-                S3CompatibleStorage(FirebaseStorageBackend(settings.storage_bucket)),
-                settings.retention_days,
+                self.data, storage, settings.retention_days
             )
             self.auth = FirebaseAuthAdapter(auth_backend)
         else:
