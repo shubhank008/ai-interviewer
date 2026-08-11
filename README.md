@@ -156,6 +156,7 @@ Run the frontend separately or serve its built `frontend/dist` through an HTTPS 
 | GET | `/api/v1/sessions/{id}/{view}` | Retrieve an owned view |
 | POST | `/api/v1/sessions/{id}/complete` | Complete a session |
 | WS | `/ws/v1/sessions/{id}` | Authenticated control channel |
+| WS | `/ws/v1/sessions/{id}/media` | Authenticated microphone frame channel |
 | WS | `/ws/v1/sessions/{id}/signaling` | Authenticated signaling channel |
 
 The FastAPI composition root is still development-oriented: it creates in-memory auth, persistence, and storage at startup. Concrete production provider classes exist, but complete production composition and verification remain outstanding.
