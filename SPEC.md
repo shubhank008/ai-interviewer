@@ -331,7 +331,158 @@ The normalized contracts are:
 - **Interviewer response:** spoken text, question type, topic, evidence request, completion flag, and bounded state update.
 - **Evaluation:** score 0 through 100, summary, strengths, weaknesses, missed opportunities, recommendations, role assessment, rubric version, model metadata, and evidence references.
 
-### 10.4 Beta acceptance criteria
+### 10.4 Architecture and provider flows
+
+The platform is organized as a browser media plane, an authenticated control plane, and provider-independent domain services. Concrete providers are selected by the composition root and are never called directly by the browser or interview state machine.
+
+### 10.4.1 High-level platform flow
+
+```mermaid
+flowchart LR
+    U[Candidate browser] -->|Firebase ID token| API[FastAPI API]
+    U -->|WebSocket control and events| API
+    U <-->|WebRTC microphone and interviewer audio| MEDIA[Audio transport]
+    API --> AUTH[AuthProvider]
+    API --> SETUP[Setup and RAG service]
+    SETUP --> STORE[StorageProvider]
+    SETUP --> RAG[Parser, embeddings, retrieval]
+    API --> SESSION[Interview session runtime]
+    SESSION --> ROUTERS[STT, LLM, TTS fallback routers]
+    ROUTERS --> STT[Faster-Whisper]
+    ROUTERS --> LLM[OpenRouter]
+    ROUTERS --> TTS[Kokoro]
+    SESSION --> EVENTS[Ordered event bus]
+    SESSION --> RECORDS[Transcript and recording persistence]
+    API --> COMPLETE[Completion boundary]
+    COMPLETE --> EVAL[Post-interview evaluator]
+    EVAL --> RESULTS[Score and feedback]
+    RECORDS --> DB[Firestore and object storage]
+    RESULTS --> DB
+    DB --> U
+```
+
+### 10.4.2 Complete browser interview sequence
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant A as FastAPI
+    participant F as Firebase Auth
+    participant S as Session runtime
+    participant V as Voice routers
+    participant D as Firestore/storage
+    participant E as Evaluator
+    B->>F: Sign in and obtain ID token
+    B->>A: Create session with mode and role inputs
+    A->>F: Verify token and derive owner UID
+    A->>D: Persist owner-scoped session
+    A-->>B: Session and control/media endpoints
+    B->>A: Open authenticated control and media channels
+    B->>A: Send microphone frame, then turn.start
+    A->>S: Drain media frame into live turn
+    S->>V: STT with fallback and cancellation
+    V-->>S: Candidate transcript
+    S-->>B: Partial and final transcript events
+    S->>V: Grounded LLM response
+    V-->>S: Response text chunks
+    S->>V: Kokoro TTS synthesis
+    V-->>S: Ordered audio chunks
+    S-->>B: Playback metadata and provider events
+    S->>D: Persist transcript, recording metadata, and events
+    B->>A: Complete session
+    A->>D: Freeze status and read final transcript
+    A->>E: Evaluate final transcript only
+    E-->>A: Validated score and feedback
+    A->>D: Persist evaluation
+    B->>A: Request results and replay
+    A-->>B: Transcript, recording, score, and feedback
+```
+
+### 10.4.3 Provider and implementation flows
+
+#### Authentication and owner isolation
+
+```mermaid
+flowchart TD
+    TOKEN[Firebase ID token] --> VERIFY[Firebase Admin adapter]
+    VERIFY --> CLAIMS[Normalized UID and expiry]
+    CLAIMS --> OWNER[Owner-scoped API dependency]
+    OWNER --> RESOURCES[Session and result resources]
+    VERIFY -->|invalid or expired| DENY[401 without token details]
+```
+
+#### Job description, resume, and RAG context
+
+```mermaid
+flowchart LR
+    INPUT[Job description and PDF resume] --> VALIDATE[Size, type, content validation]
+    VALIDATE --> OBJECT[StorageProvider original artifact]
+    VALIDATE --> PARSE[DocumentParser]
+    PARSE --> CHUNKS[Source-attributed untrusted chunks]
+    CHUNKS --> EMBED[EmbeddingProvider]
+    EMBED --> INDEX[VectorStore]
+    INDEX --> RETRIEVE[Topic-aware retrieval]
+    RETRIEVE --> PROMPT[Grounded interview context]
+    PROMPT --> LLM[LLMProvider]
+```
+
+#### Live STT, LLM, and TTS provider chains
+
+```mermaid
+flowchart TD
+    AUDIO[Microphone frame] --> STTROUTER[STT fallback router]
+    STTROUTER --> STT1[Faster-Whisper adapter]
+    STTROUTER -. retryable failure .-> STT2[Configured STT fallback]
+    STT1 --> TRANSCRIPT[Partial and final transcript]
+    TRANSCRIPT --> STATE[Interview state and retrieved context]
+    STATE --> LLMROUTER[LLM fallback router]
+    LLMROUTER --> LLM1[OpenRouter structured response]
+    LLMROUTER -. retryable failure .-> LLM2[Configured LLM fallback]
+    LLM1 --> TEXT[Validated interviewer text]
+    TEXT --> TTSROUTER[TTS fallback router]
+    TTSROUTER --> TTS1[Kokoro adapter]
+    TTSROUTER -. retryable failure .-> TTS2[Configured TTS fallback]
+    TTS1 --> CHUNKS[Ordered browser audio chunks]
+    CHUNKS --> PLAY[WebRTC playback]
+    STTROUTER -. normalized errors and metrics .-> OBS[Events and observability]
+    LLMROUTER -. normalized errors and metrics .-> OBS
+    TTSROUTER -. normalized errors and metrics .-> OBS
+```
+
+#### Persistence, replay, retention, and deletion
+
+```mermaid
+flowchart LR
+    EVENTS[Control events] --> FIRESTORE[Firestore documents]
+    TRANSCRIPT[Immutable transcript] --> FIRESTORE
+    EVAL[Validated evaluation] --> FIRESTORE
+    AUDIO[Interview audio] --> STORAGE[Firebase Storage or local storage]
+    FIRESTORE --> HISTORY[History and results]
+    STORAGE --> REPLAY[Replay and download]
+    RETENTION[14-day retention worker] --> FIRESTORE
+    RETENTION --> STORAGE
+    DELETE[User deletion] --> FIRESTORE
+    DELETE --> STORAGE
+```
+
+#### Post-interview evaluation
+
+```mermaid
+flowchart TD
+    COMPLETE[Completion request] --> FREEZE[Mark session completed]
+    FREEZE --> FINAL[Read final immutable transcript]
+    FINAL --> CONTEXT[Role, mode, seniority, and metadata]
+    CONTEXT --> EVALUATOR[Evaluator adapter]
+    FINAL --> EVALUATOR
+    EVALUATOR --> VALIDATE[Score and schema validation]
+    VALIDATE --> SAVE[Persist evaluation]
+    SAVE --> FEEDBACK[Score, summary, strengths, gaps, recommendations]
+    FINAL -. no live grading .-> LIVE[Live agent receives no grading result]
+```
+
+These diagrams describe the beta execution boundary. Deterministic local providers exercise the same contracts, but do not prove configured external providers or browser infrastructure are ready.
+
+## 10.4 Beta acceptance criteria
 
 - A clean CPU-only deployment starts using the documented production composition and no in-memory provider.
 - Firebase signup, login, refresh, logout, protected routes, server token verification, and owner isolation work in a real browser.

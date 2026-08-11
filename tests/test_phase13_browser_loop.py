@@ -102,3 +102,45 @@ class Phase13BrowserLoopTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class LiveExecutionPathTests(unittest.TestCase):
+    """Verify the browser transport reaches live providers and evaluation."""
+
+    def test_media_turn_and_completion_evaluation_use_application_runtime(self) -> None:
+        """A buffered microphone frame is transcribed, answered, and evaluated."""
+        client = TestClient(app)
+        response = client.post(
+            "/api/v1/sessions",
+            headers={"Authorization": "Bearer dev-token"},
+            json={"mode": "recruiter"},
+        )
+        self.assertEqual(response.status_code, 201)
+        session_id = response.json()["id"]
+        with client.websocket_connect(
+            f"/ws/v1/sessions/{session_id}/media?token=dev-token"
+        ) as media:
+            media.send_bytes(b"candidate microphone audio")
+        with client.websocket_connect(
+            f"/ws/v1/sessions/{session_id}?token=dev-token"
+        ) as control:
+            control.send_json({
+                "session_id": session_id,
+                "type": "turn.start",
+                "correlation_id": "turn-1",
+                "payload": {"sequence": 1},
+            })
+            event = control.receive_json()
+            self.assertEqual(event["type"], "playback.started")
+            self.assertIn("text", event["payload"])
+        completed = client.post(
+            f"/api/v1/sessions/{session_id}/complete",
+            headers={"Authorization": "Bearer dev-token"},
+        )
+        self.assertEqual(completed.status_code, 200)
+        self.assertIn("score", completed.json())
+        results = client.get(
+            f"/api/v1/sessions/{session_id}/results",
+            headers={"Authorization": "Bearer dev-token"},
+        )
+        self.assertEqual(results.status_code, 200)
+        self.assertIn("evaluation", results.json()["payload"])
