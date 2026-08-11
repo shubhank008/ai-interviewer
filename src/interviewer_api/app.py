@@ -432,11 +432,12 @@ async def session_websocket(websocket: WebSocket, session_id: UUID) -> None:
                 result = await application.voice_sessions[session_id].process_turn(
                     Turn(session_id, int(command.payload.get("sequence", 1)), "candidate", audio)
                 )
-                await websocket.send_json(state.publish(
-                    SessionEventType.PLAYBACK_STARTED,
-                    {"text": result.response, "audio_chunks": len(result.audio), "latency_ms": result.latency_ms},
-                    command.correlation_id,
-                ).to_dict())
+                if not result.interrupted:
+                    await websocket.send_json(state.publish(
+                        SessionEventType.PLAYBACK_STARTED,
+                        {"text": result.response, "audio_chunks": len(result.audio), "latency_ms": result.latency_ms},
+                        command.correlation_id,
+                    ).to_dict())
             elif command.command_type == SessionCommandType.SIGNALING:
                 message = SignalingMessage(
                     session_id,
