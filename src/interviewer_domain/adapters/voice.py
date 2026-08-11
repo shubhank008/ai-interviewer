@@ -27,6 +27,12 @@ class OpenRouterTransport(Protocol):
     async def complete(self, payload: dict[str, Any], api_key: str) -> dict[str, Any]: ...
 
 
+class SyncOpenRouterTransport(Protocol):
+    """Synchronous transport boundary for an OpenAI-compatible hosted chat endpoint."""
+
+    def complete(self, payload: dict[str, Any], api_key: str) -> dict[str, Any]: ...
+
+
 class FasterWhisperSTT:
     """Adapt an injected Faster-Whisper model without importing it at module load."""
 

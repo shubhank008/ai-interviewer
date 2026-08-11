@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from typing import Any
 
 from ..contracts import ErrorCode, ProviderError
 from ..evaluation import EVALUATION_VERSION, Evaluator, InterviewContext
 from ..models import Evaluation, TranscriptSegment
-from .voice import OpenRouterTransport
+from .voice import SyncOpenRouterTransport
 
 
 class OpenRouterEvaluator(Evaluator):
     """Evaluate a completed transcript through a structured OpenRouter response."""
 
-    def __init__(self, transport: OpenRouterTransport, api_key: str, model: str, rubric_version: str = EVALUATION_VERSION) -> None:
+    def __init__(self, transport: SyncOpenRouterTransport, api_key: str, model: str, rubric_version: str = EVALUATION_VERSION) -> None:
         self.transport = transport
         self.api_key = api_key
         self.model = model
@@ -43,7 +42,7 @@ class OpenRouterEvaluator(Evaluator):
             ],
         }
         try:
-            response = asyncio.run(self.transport.complete(payload, self.api_key))
+            response = self.transport.complete(payload, self.api_key)
             content = response["choices"][0]["message"]["content"]
             value = json.loads(content) if isinstance(content, str) else content
             return self._normalize(value, context, transcript)
@@ -51,8 +50,6 @@ class OpenRouterEvaluator(Evaluator):
             raise
         except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
             raise ProviderError(ErrorCode.INTERNAL, "evaluator response was malformed") from exc
-        except RuntimeError as exc:
-            raise ProviderError(ErrorCode.INTERNAL, "evaluator cannot run inside an active event loop") from exc
 
     def _normalize(self, value: Any, context: InterviewContext, transcript: tuple[TranscriptSegment, ...]) -> Evaluation:
         """Validate model output and discard fields outside the public schema."""

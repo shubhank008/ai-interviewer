@@ -81,6 +81,39 @@ class OpenRouterHTTPTransport:
         return value
 
 
+class SyncOpenRouterHTTPTransport:
+    """Synchronous OpenRouter transport using the OpenAI-compatible HTTP contract."""
+
+    def __init__(self, base_url: str = "https://openrouter.ai/api/v1", timeout: float = 30.0) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+
+    def complete(self, payload: dict[str, Any], api_key: str) -> dict[str, Any]:
+        """Send one bounded synchronous request and normalize network or payload failures."""
+        if not api_key:
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "provider credential is missing")
+        try:
+            import httpx
+
+            with httpx.Client(timeout=self.timeout) as client:
+                response = client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json=payload,
+                )
+                response.raise_for_status()
+                value = response.json()
+        except httpx.TimeoutException as exc:
+            raise ProviderError(ErrorCode.TIMEOUT, "hosted LLM request timed out", True) from exc
+        except ProviderError:
+            raise
+        except Exception as exc:
+            raise ProviderError(ErrorCode.UNAVAILABLE, "hosted LLM request failed", True) from exc
+        if not isinstance(value, dict):
+            raise ProviderError(ErrorCode.INTERNAL, "hosted LLM response was malformed")
+        return value
+
+
 class FasterWhisperLocalBackend:
     """Load a user-supplied Faster-Whisper model without downloading weights."""
 

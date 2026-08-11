@@ -67,7 +67,7 @@ class ProviderIntegrationContractTests(unittest.TestCase):
 
     def test_openrouter_evaluator_normalizes_structured_feedback(self) -> None:
         class Transport:
-            async def complete(self, payload: dict, api_key: str) -> dict:
+            def complete(self, payload: dict, api_key: str) -> dict:
                 self.payload = payload
                 return {"choices": [{"message": {"content": json.dumps({
                     "score": 82,
@@ -89,7 +89,7 @@ class ProviderIntegrationContractTests(unittest.TestCase):
 
     def test_openrouter_evaluator_rejects_invalid_score(self) -> None:
         class Transport:
-            async def complete(self, payload: dict, api_key: str) -> dict:
+            def complete(self, payload: dict, api_key: str) -> dict:
                 return {"choices": [{"message": {"content": '{"score": 101}'}}]}
 
         segment = TranscriptSegment(uuid4(), "candidate", "An answer.")
