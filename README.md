@@ -75,12 +75,15 @@ FastAPI composition root
 Local, self-hosted, and hosted provider adapters
 ```
 
-Provider paths currently include `OpenRouterHTTPTransport`, `FasterWhisperLocalBackend`, `PiperCommandBackend`, `FirebaseAdminAuthBackend`, `FirestoreGoogleBackend`, and `Boto3ObjectBackend`. In-memory providers remain available for deterministic tests. Optional SDKs are imported lazily, model weights are never downloaded automatically, and configured providers must not silently fall back to memory.
+Provider paths currently include `OpenRouterHTTPTransport`, `FasterWhisperLocalBackend`, `PiperCommandBackend`, `FirebaseAdminAuthBackend`, `FirestoreGoogleBackend`, `Boto3ObjectBackend`, and `FirebaseStorageBackend`. In-memory providers remain available for deterministic tests. Optional SDKs are imported lazily, model weights are never downloaded automatically, and configured providers must not silently fall back to memory.
 
 ## Repository layout
 
 ```text
-src/interviewer_domain/       Models, contracts, providers, routing, orchestration
+src/interviewer_domain/       Domain models, contracts, routing, orchestration
+  capabilities/               Protocols, normalized DTOs, provider errors
+  adapters/                   Firebase, Firestore, storage, OpenRouter, STT, TTS, WebRTC adapters
+  providers/in_memory/        Deterministic local implementations
 src/interviewer_api/          FastAPI REST, WebSocket, and composition root
 frontend/src/                 React UI, API clients, auth, media, transport
 scripts/                      Quality gates and phase evidence runners

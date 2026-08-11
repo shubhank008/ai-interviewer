@@ -239,7 +239,7 @@ Feature specifications have been completed through `011-runtime-configuration-an
 2. `013-browser-webrtc-websocket-voice-loop`
 3. `014-full-user-e2e-acceptance`
 4. `015-provider-integration-suite`
-5. `016-coverage-and-live-demo-readiness`
+5. `016-live-beta-enablement`
 
 Each phase may contain smaller implementation slices, but no phase may be marked complete using only static fixtures or an offline mock when its acceptance criteria require configured infrastructure.
 

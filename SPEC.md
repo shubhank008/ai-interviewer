@@ -276,7 +276,7 @@ Phase 11 provides typed environment configuration with explicit `local` and `pro
 13. **Browser voice integration:** implement authenticated WebSocket and WebRTC media behavior and connect the browser to the live voice loop.
 14. **Full user E2E acceptance:** validate login through completed evaluated interview using a real browser and separate interviewer and candidate simulation providers.
 15. **Provider integration suite:** add explicitly enabled tests against configured external providers and infrastructure.
-16. **Coverage and live-demo release:** enforce coverage, run a production-shaped release candidate, validate operations, and rehearse the first live demo.
+16. **Live Beta Enablement:** compose the explicit beta provider set into a real browser-to-provider vertical slice and validate beta acceptance criteria.
 
 The project is not production-ready for a live demo until phases 10 through 16 have passed their required gates. All features must follow the repository's SDD workflow: feature specification, implementation plan, marker contract, implementation, unit tests, end-to-end evidence, documentation, and landmine recording where applicable.
 

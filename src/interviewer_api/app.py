@@ -11,6 +11,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocke
 from pydantic import BaseModel, Field
 
 from interviewer_domain.adapters.integrations import IntegrationSkipped
+from interviewer_domain.capabilities.contracts import AuthProvider
 from interviewer_domain.configuration import (
     ProviderReadinessChecker,
     RuntimeSettings,
@@ -21,6 +22,8 @@ from interviewer_domain.models import InterviewMode
 from interviewer_domain.persistence import (
     FirebaseAuthAdapter,
     FirestoreDataStore,
+    PersistentDataStore,
+    PersistentStorageProvider,
     S3CompatibleStorage,
     FixedWindowRateLimiter,
     InMemoryAuthProvider,
@@ -63,6 +66,8 @@ class InterviewApplication:
 
     def __init__(self) -> None:
         """Create the local composition or the explicitly configured live composition."""
+        self.data: PersistentDataStore
+        self.auth: AuthProvider
         if settings.profile.value == "production":
             auth_backend = FirebaseAdminAuthBackend(
                 settings.firebase_credentials_path, settings.firebase_project_id
@@ -71,10 +76,11 @@ class InterviewApplication:
                 settings.firebase_project_id or "", settings.firestore_database or "(default)"
             )
             self.data = FirestoreDataStore(firestore_backend)
+            storage: PersistentStorageProvider
             if settings.storage_backend == "local":
                 storage = LocalFilesystemStorage(settings.storage_path)
             elif settings.storage_backend == "s3":
-                from .adapters.integrations import Boto3ObjectBackend
+                from interviewer_domain.adapters.integrations import Boto3ObjectBackend
 
                 try:
                     storage = S3CompatibleStorage(Boto3ObjectBackend(settings.storage_bucket or ""))
