@@ -37,23 +37,24 @@ class ProviderMetadata:
 class LocalWhisperBackend:
     """Run an operator-selected OpenAI Whisper or WhisperX model locally."""
 
-    def __init__(self, provider: str, model: str, device: str, language: str | None = None) -> None:
+    def __init__(self, provider: str, model: str, device: str, language: str | None = None, model_path: str | None = None) -> None:
         self.provider = provider
         self.model_name = model
         self.device = device
         self.language = language
+        self.model_path = model_path
         if provider == "whisperx":
             try:
                 import whisperx  # type: ignore[import-not-found]
             except ImportError as exc:
                 raise IntegrationSkipped("whisperx package is not installed") from exc
-            self.model = whisperx.load_model(model, device, compute_type="float32" if device != "cpu" else "int8")
+            self.model = whisperx.load_model(model, device, compute_type="float32" if device != "cpu" else "int8", download_root=model_path)
         elif provider == "openai-whisper":
             try:
                 import whisper  # type: ignore[import-not-found]
             except ImportError as exc:
                 raise IntegrationSkipped("openai-whisper package is not installed") from exc
-            self.model = whisper.load_model(model, device=device)
+            self.model = whisper.load_model(model, device=device, download_root=model_path)
         else:
             raise IntegrationSkipped("unsupported local Whisper provider")
 

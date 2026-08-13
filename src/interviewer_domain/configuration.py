@@ -77,12 +77,14 @@ class RuntimeSettings:
     stt_fallback_provider: str
     stt_api_key: str | None
     stt_model: str
+    stt_model_path: str | None
     stt_cpu: bool
     stt_language: str
     tts_provider: str
     tts_fallback_provider: str
     tts_api_key: str | None
     tts_model: str
+    tts_model_path: str | None
     tts_language: str
     tts_command: str | None
     llm_provider: str
@@ -125,12 +127,14 @@ class RuntimeSettings:
             stt_fallback_provider=values.get("STT_FALLBACK_PROVIDER", "in-memory").lower(),
             stt_api_key=_optional(values, "STT_API_KEY"),
             stt_model=values.get("STT_MODEL", "small").lower(),
+            stt_model_path=_optional(values, "STT_MODEL_PATH"),
             stt_cpu=_boolean(values, "STT_CPU", True),
             stt_language=values.get("STT_LANGUAGE", values.get("DEFAULT_LANGUAGE", "en")).lower(),
             tts_provider=values.get("TTS_PROVIDER", "in-memory").lower(),
             tts_fallback_provider=values.get("TTS_FALLBACK_PROVIDER", "in-memory").lower(),
             tts_api_key=_optional(values, "TTS_API_KEY"),
             tts_model=values.get("TTS_MODEL", "default").lower(),
+            tts_model_path=_optional(values, "TTS_MODEL_PATH"),
             tts_language=values.get("TTS_LANGUAGE", values.get("DEFAULT_LANGUAGE", "en")).lower(),
             tts_command=_optional(values, "TTS_COMMAND"),
             llm_provider=values.get("LLM_PROVIDER", "in-memory"),
@@ -290,14 +294,14 @@ def compose_providers(
     stt_backend: WhisperBackend | None = injected.stt
     if stt_backend is None and settings.stt_provider == "faster-whisper":
         try:
-            stt_backend = FasterWhisperLocalBackend(settings.stt_model, device="cpu" if settings.stt_cpu else "cuda")
+            stt_backend = FasterWhisperLocalBackend(settings.stt_model_path, device="cpu" if settings.stt_cpu else "cuda")
         except (IntegrationSkipped, ProviderError) as exc:
             if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.stt is None:
                 raise ConfigurationError("configured STT provider is unavailable") from exc
             stt_backend = None
     if stt_backend is None and settings.stt_provider in {"openai-whisper", "whisperx"}:
         try:
-            stt_backend = LocalWhisperBackend(settings.stt_provider, settings.stt_model, "cpu" if settings.stt_cpu else "cuda", language=settings.stt_language)
+            stt_backend = LocalWhisperBackend(settings.stt_provider, settings.stt_model, "cpu" if settings.stt_cpu else "cuda", language=settings.stt_language, model_path=settings.stt_model_path)
         except (IntegrationSkipped, ProviderError) as exc:
             if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.stt is None:
                 raise ConfigurationError("configured STT provider is unavailable") from exc
@@ -327,7 +331,7 @@ def compose_providers(
         try:
             if not settings.tts_command:
                 raise IntegrationSkipped("TTS_COMMAND is not configured")
-            tts_backend = PiperCommandBackend(settings.tts_command, settings.tts_model)
+            tts_backend = PiperCommandBackend(settings.tts_command, settings.tts_model_path)
         except (IntegrationSkipped, ProviderError) as exc:
             if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
                 raise ConfigurationError("configured TTS provider is unavailable") from exc
@@ -374,8 +378,12 @@ def validate_beta_composition(settings: RuntimeSettings) -> None:
     ]
     if settings.stt_provider not in {"faster-whisper", "openai-whisper", "whisperx"}:
         missing.append("STT_PROVIDER=one of faster-whisper, openai-whisper, whisperx")
-    if settings.tts_provider not in {"kokoro"}:
-        missing.append("TTS_PROVIDER=kokoro")
+    elif not settings.stt_model_path:
+        missing.append("STT_MODEL_PATH")
+    if settings.tts_provider not in {"piper", "kokoro", "kokoro-onnx"}:
+        missing.append("TTS_PROVIDER=one of piper, kokoro, kokoro-onnx")
+    elif settings.tts_provider != "kokoro" and not settings.tts_model_path:
+        missing.append("TTS_MODEL_PATH")
     if settings.llm_provider != "openrouter":
         missing.append("LLM_PROVIDER=openrouter")
     if not settings.llm_api_key:
