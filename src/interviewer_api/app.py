@@ -25,6 +25,7 @@ from interviewer_domain.configuration import (
     ProviderReadinessChecker,
     RuntimeSettings,
     compose_providers,
+    validate_beta_composition,
 )
 from interviewer_domain.contracts import ErrorCode, ProviderError
 from interviewer_domain.models import InterviewMode, InterviewSession, Turn, TranscriptSegment, Recording, LifecycleEvent
@@ -189,6 +190,7 @@ class InterviewApplication:
         self.data: PersistentDataStore
         self.auth: AuthProvider
         if settings.profile.value == "production":
+            validate_beta_composition(settings)
             auth_backend = FirebaseAdminAuthBackend(
                 settings.firebase_credentials_path, settings.firebase_project_id
             )

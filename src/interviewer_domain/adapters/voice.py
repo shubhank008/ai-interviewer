@@ -10,13 +10,13 @@ from ..models import TranscriptSegment
 
 
 class WhisperBackend(Protocol):
-    """Minimal synchronous boundary for a Faster-Whisper compatible backend."""
+    """Minimal synchronous boundary for a local speech recognizer."""
 
     def transcribe(self, audio: bytes) -> str: ...
 
 
 class SpeechBackend(Protocol):
-    """Minimal boundary for Piper or Kokoro-compatible speech synthesis."""
+    """Minimal boundary for local speech synthesis."""
 
     def synthesize(self, text: str) -> bytes: ...
 
@@ -97,6 +97,39 @@ class PiperKokoroTTS:
     async def health(self) -> HealthStatus:
         """Report whether an injected speech dependency is ready."""
         return HealthStatus(self.backend is not None, "configured" if self.backend else "dependency not configured")
+
+
+class OpenAIWhisperSTT(FasterWhisperSTT):
+    """Adapt an injected OpenAI Whisper-compatible backend."""
+
+    def capabilities(self) -> CapabilityDescriptor:
+        """Describe the OpenAI Whisper provider."""
+        return CapabilityDescriptor("openai-whisper", False, True)
+
+
+class WhisperXSTT(FasterWhisperSTT):
+    """Adapt an injected WhisperX backend."""
+
+    def capabilities(self) -> CapabilityDescriptor:
+        """Describe the WhisperX provider."""
+        return CapabilityDescriptor("whisperX", False, True)
+
+
+class KokoroTTS(PiperKokoroTTS):
+    """Adapt an injected Kokoro Python backend."""
+
+    def capabilities(self) -> CapabilityDescriptor:
+        """Describe Kokoro synthesis."""
+        return CapabilityDescriptor("kokoro", False, True)
+
+
+class KokoroOnnxTTS(PiperKokoroTTS):
+    """Adapt an injected Kokoro ONNX backend."""
+
+    def capabilities(self) -> CapabilityDescriptor:
+        """Describe Kokoro ONNX synthesis."""
+        return CapabilityDescriptor("kokoro-onnx", False, True)
+
 
 
 class OpenRouterLLM:

@@ -33,6 +33,96 @@ class ProviderMetadata:
     limitation: str | None = None
 
 
+
+class LocalWhisperBackend:
+    """Run an operator-selected OpenAI Whisper or WhisperX model locally."""
+
+    def __init__(self, provider: str, model: str, device: str, model_path: str | None = None) -> None:
+        self.provider = provider
+        self.model_name = model
+        self.device = device
+        self.model_path = model_path
+        if provider == "whisperx":
+            try:
+                import whisperx  # type: ignore[import-not-found]
+            except ImportError as exc:
+                raise IntegrationSkipped("whisperx package is not installed") from exc
+            self.model = whisperx.load_model(model, device, compute_type="float32" if device != "cpu" else "int8", download_root=model_path)
+        elif provider == "openai-whisper":
+            try:
+                import whisper  # type: ignore[import-not-found]
+            except ImportError as exc:
+                raise IntegrationSkipped("openai-whisper package is not installed") from exc
+            self.model = whisper.load_model(model, device=device, download_root=model_path)
+        else:
+            raise IntegrationSkipped("unsupported local Whisper provider")
+
+    def transcribe(self, audio: bytes) -> str:
+        """Decode common audio bytes and return normalized transcript text."""
+        if not audio:
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "audio payload is empty")
+        try:
+            import io
+            import soundfile as sf  # type: ignore[import-not-found]
+            samples, _ = sf.read(io.BytesIO(audio), dtype="float32")
+            if self.provider == "whisperx":
+                result = self.model.transcribe(samples, language=None)
+                return str(result.get("text", "")).strip()
+            result = self.model.transcribe(samples, language=None, fp16=self.device != "cpu")
+            return str(result.get("text", "")).strip()
+        except ProviderError:
+            raise
+        except Exception as exc:
+            raise ProviderError(ErrorCode.INTERNAL, "local speech recognition failed", True) from exc
+
+    def metadata(self) -> ProviderMetadata:
+        """Return safe provider metadata without exposing model paths."""
+        return ProviderMetadata(self.provider, self.model_name, "installed", "local", self.device)
+
+
+class KokoroPythonBackend:
+    """Run the official Kokoro Python pipeline with an injected model choice."""
+
+    def __init__(self, language: str = "en", voice: str = "af_heart") -> None:
+        try:
+            from kokoro import KPipeline  # type: ignore[import-not-found]
+        except ImportError as exc:
+            raise IntegrationSkipped("kokoro package is not installed") from exc
+        self.voice = voice
+        self.pipeline = KPipeline(lang_code=language[0])
+
+    def synthesize(self, text: str) -> bytes:
+        """Synthesize text into a normalized WAV byte payload."""
+        if not text.strip():
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "text is empty")
+        try:
+            import io
+            import soundfile as sf  # type: ignore[import-not-found]
+            chunks = [audio for _, _, audio in self.pipeline(text, voice=self.voice)]
+            if not chunks:
+                raise ProviderError(ErrorCode.INTERNAL, "Kokoro returned empty audio")
+            output = io.BytesIO()
+            sf.write(output, chunks[0] if len(chunks) == 1 else _concat_audio(chunks), 24000, format="WAV")
+            return output.getvalue()
+        except ProviderError:
+            raise
+        except Exception as exc:
+            raise ProviderError(ErrorCode.INTERNAL, "Kokoro synthesis failed", True) from exc
+
+    def metadata(self) -> ProviderMetadata:
+        """Return safe Kokoro metadata."""
+        return ProviderMetadata("kokoro", self.voice, "installed", "local", "cpu")
+
+
+def _concat_audio(chunks: list[Any]) -> Any:
+    """Concatenate tensor or array chunks without importing either eagerly."""
+    try:
+        import numpy as np  # type: ignore[import-not-found]
+        return np.concatenate([chunk.detach().cpu().numpy() if hasattr(chunk, "detach") else chunk for chunk in chunks])
+    except Exception as exc:
+        raise ProviderError(ErrorCode.INTERNAL, "Kokoro audio normalization failed") from exc
+
+
 @dataclass(frozen=True, slots=True)
 class IntegrationEvidence:
     """One redacted exercised, skipped, or failed integration result."""
@@ -196,9 +286,11 @@ class FirebaseAdminAuthBackend:
             raise IntegrationSkipped("firebase-admin package is not installed") from exc
         try:
             if not firebase_admin._apps:
-                if not credential_path:
-                    raise IntegrationSkipped("FIREBASE_CREDENTIALS_PATH is not configured")
-                firebase_admin.initialize_app(credentials.Certificate(credential_path), {"projectId": project_id} if project_id else None)
+                if not credential_path and not project_id:
+                    raise IntegrationSkipped("Firebase ADC requires FIREBASE_PROJECT_ID")
+                options = {"projectId": project_id} if project_id else None
+                credential = credentials.Certificate(credential_path) if credential_path else credentials.ApplicationDefault()
+                firebase_admin.initialize_app(credential, options)
             self._auth = auth
         except IntegrationSkipped:
             raise
@@ -237,6 +329,10 @@ class FirestoreGoogleBackend:
     def get(self, collection: str, document_id: str) -> dict[str, Any] | None:
         value = self._collection(collection).document(document_id).get()
         return value.to_dict() if value.exists else None
+
+    def delete_document(self, collection: str, document_id: str) -> None:
+        """Delete one document while leaving unrelated owner records untouched."""
+        self._collection(collection).document(document_id).delete()
 
     def list(self, collection: str, field: str, value: str) -> list[dict[str, Any]]:
         return [doc.to_dict() for doc in self._collection(collection).where(field, "==", value).stream()]
