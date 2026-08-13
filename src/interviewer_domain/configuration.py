@@ -17,15 +17,21 @@ from .contracts import (
 )
 from .provider_adapters import (
     FasterWhisperSTT,
+    KokoroOnnxTTS,
+    KokoroTTS,
+    OpenAIWhisperSTT,
     OpenRouterLLM,
     OpenRouterTransport,
     PiperKokoroTTS,
     SpeechBackend,
     WhisperBackend,
+    WhisperXSTT,
 )
 from .provider_integration import (
     FasterWhisperLocalBackend,
     IntegrationSkipped,
+    KokoroPythonBackend,
+    LocalWhisperBackend,
     OpenRouterHTTPTransport,
     PiperCommandBackend,
 )
@@ -54,6 +60,7 @@ class RuntimeSettings:
     firebase_auth_domain: str | None
     firebase_api_key: str | None
     firestore_database: str | None
+    default_language: str
     storage_backend: str
     storage_bucket: str | None
     storage_path: str
@@ -62,11 +69,14 @@ class RuntimeSettings:
     stt_api_key: str | None
     stt_model: str
     stt_model_path: str | None
+    stt_cpu: bool
+    stt_language: str
     tts_provider: str
     tts_fallback_provider: str
     tts_api_key: str | None
     tts_model: str
     tts_model_path: str | None
+    tts_language: str
     tts_command: str | None
     llm_provider: str
     llm_fallback_provider: str
@@ -99,25 +109,29 @@ class RuntimeSettings:
             firebase_credentials_path=_optional(values, "FIREBASE_CREDENTIALS_PATH"),
             firebase_auth_domain=_optional(values, "FIREBASE_AUTH_DOMAIN"),
             firebase_api_key=_optional(values, "FIREBASE_API_KEY"),
-            firestore_database=_optional(values, "FIRESTORE_DATABASE"),
+            firestore_database=_optional(values, "FIRESTORE_DATABASE") or "(default)",
+            default_language=values.get("DEFAULT_LANGUAGE", "en").lower(),
             storage_backend=values.get("STORAGE_BACKEND", "local"),
             storage_bucket=_optional(values, "STORAGE_BUCKET"),
             storage_path=values.get("STORAGE_PATH", "./var/storage"),
-            stt_provider=values.get("STT_PROVIDER", "in-memory"),
-            stt_fallback_provider=values.get("STT_FALLBACK_PROVIDER", "in-memory"),
+            stt_provider=values.get("STT_PROVIDER", "in-memory").lower(),
+            stt_fallback_provider=values.get("STT_FALLBACK_PROVIDER", "in-memory").lower(),
             stt_api_key=_optional(values, "STT_API_KEY"),
-            stt_model=values.get("STT_MODEL", "base.en"),
+            stt_model=values.get("STT_MODEL", "small").lower(),
             stt_model_path=_optional(values, "STT_MODEL_PATH"),
-            tts_provider=values.get("TTS_PROVIDER", "in-memory"),
-            tts_fallback_provider=values.get("TTS_FALLBACK_PROVIDER", "in-memory"),
+            stt_cpu=_boolean(values, "STT_CPU", True),
+            stt_language=values.get("STT_LANGUAGE", values.get("DEFAULT_LANGUAGE", "en")).lower(),
+            tts_provider=values.get("TTS_PROVIDER", "in-memory").lower(),
+            tts_fallback_provider=values.get("TTS_FALLBACK_PROVIDER", "in-memory").lower(),
             tts_api_key=_optional(values, "TTS_API_KEY"),
-            tts_model=values.get("TTS_MODEL", "default"),
+            tts_model=values.get("TTS_MODEL", "default").lower(),
             tts_model_path=_optional(values, "TTS_MODEL_PATH"),
+            tts_language=values.get("TTS_LANGUAGE", values.get("DEFAULT_LANGUAGE", "en")).lower(),
             tts_command=_optional(values, "TTS_COMMAND"),
             llm_provider=values.get("LLM_PROVIDER", "in-memory"),
             llm_fallback_provider=values.get("LLM_FALLBACK_PROVIDER", "in-memory"),
-            llm_api_key=_optional(values, "LLM_API_KEY") or _optional(values, "OPENROUTER_API_KEY"),
-            llm_model=values.get("LLM_MODEL", "default"),
+            llm_api_key=_optional(values, "LLM_API_KEY"),
+            llm_model=values.get("LLM_MODEL", "default").lstrip("~"),
             webrtc_ice_servers=values.get(
                 "WEBRTC_ICE_SERVERS", "stun:stun.l.google.com:19302"
             ),
@@ -169,8 +183,8 @@ class RuntimeSettings:
                 "production configuration is missing: "
                 + ", ".join(sorted(set(missing)))
             )
-        recognized_stt = {"faster-whisper", "in-memory"}
-        recognized_tts = {"piper", "kokoro", "in-memory"}
+        recognized_stt = {"in-memory", "faster-whisper", "openai-whisper", "whisperx"}
+        recognized_tts = {"in-memory", "piper", "kokoro", "kokoro-onnx"}
         recognized_llm = {"openrouter", "in-memory"}
         if self.stt_provider not in recognized_stt:
             raise ConfigurationError(
@@ -268,23 +282,43 @@ def compose_providers(
     stt_backend: WhisperBackend | None = injected.stt
     if stt_backend is None and settings.stt_provider == "faster-whisper" and settings.stt_model_path:
         try:
-            stt_backend = FasterWhisperLocalBackend(settings.stt_model_path)
+            stt_backend = FasterWhisperLocalBackend(settings.stt_model_path, device="cpu" if settings.stt_cpu else "cuda")
         except (IntegrationSkipped, ProviderError):
             stt_backend = None
+    if stt_backend is None and settings.stt_provider in {"openai-whisper", "whisperx"}:
+        try:
+            stt_backend = LocalWhisperBackend(settings.stt_provider, settings.stt_model, "cpu" if settings.stt_cpu else "cuda", settings.stt_model_path)
+        except (IntegrationSkipped, ProviderError):
+            stt_backend = None
+    stt_classes = {
+        "faster-whisper": FasterWhisperSTT,
+        "openai-whisper": OpenAIWhisperSTT,
+        "whisperx": WhisperXSTT,
+    }
     stt: STTProvider = (
-        FasterWhisperSTT(stt_backend, settings.stt_model)
-        if settings.stt_provider == "faster-whisper"
+        stt_classes[settings.stt_provider](stt_backend, settings.stt_model)
+        if settings.stt_provider in stt_classes
         else InMemorySTT()
     )
     tts_backend: SpeechBackend | None = injected.tts
-    if tts_backend is None and settings.tts_provider in {"piper", "kokoro"} and settings.tts_model_path and settings.tts_command:
+    if tts_backend is None and settings.tts_provider == "kokoro":
+        try:
+            tts_backend = KokoroPythonBackend(settings.tts_language, settings.tts_model)
+        except (IntegrationSkipped, ProviderError):
+            tts_backend = None
+    if tts_backend is None and settings.tts_provider == "piper" and settings.tts_model_path and settings.tts_command:
         try:
             tts_backend = PiperCommandBackend(settings.tts_command, settings.tts_model_path)
         except (IntegrationSkipped, ProviderError):
             tts_backend = None
+    tts_classes = {
+        "piper": PiperKokoroTTS,
+        "kokoro": KokoroTTS,
+        "kokoro-onnx": KokoroOnnxTTS,
+    }
     tts: TTSProvider = (
-        PiperKokoroTTS(tts_backend, settings.tts_model)
-        if settings.tts_provider in {"piper", "kokoro"}
+        tts_classes[settings.tts_provider](tts_backend, settings.tts_model)
+        if settings.tts_provider in tts_classes
         else InMemoryTTS()
     )
     llm_transport: OpenRouterTransport | None = injected.llm
@@ -300,6 +334,36 @@ def compose_providers(
         (tts, _fallback_tts(settings, injected)),
         (llm, _fallback_llm(settings, injected)),
     )
+
+
+def validate_beta_composition(settings: RuntimeSettings) -> None:
+    """Reject production startup unless the explicit beta set is configured."""
+    if settings.profile is not RuntimeProfile.PRODUCTION:
+        raise ConfigurationError("Phase 16 beta composition requires production profile")
+    missing = [
+        name
+        for name, value in (
+            ("FIREBASE_PROJECT_ID", settings.firebase_project_id),
+            ("STT_MODEL", settings.stt_model),
+        )
+        if not value
+    ]
+    if settings.stt_provider not in {"faster-whisper", "openai-whisper", "whisperx"}:
+        missing.append("STT_PROVIDER=one of faster-whisper, openai-whisper, whisperx")
+    elif not settings.stt_model_path:
+        missing.append("STT_MODEL_PATH")
+    if settings.tts_provider not in {"piper", "kokoro", "kokoro-onnx"}:
+        missing.append("TTS_PROVIDER=one of piper, kokoro, kokoro-onnx")
+    elif settings.tts_provider != "kokoro" and not settings.tts_model_path:
+        missing.append("TTS_MODEL_PATH")
+    if settings.llm_provider != "openrouter":
+        missing.append("LLM_PROVIDER=openrouter")
+    if not settings.llm_api_key:
+        missing.append("LLM_API_KEY")
+    if missing:
+        raise ConfigurationError(
+            "Phase 16 beta composition is incomplete: " + ", ".join(sorted(missing))
+        )
 
 
 def _fallback_stt(settings: RuntimeSettings, backends: ProviderBackends) -> STTProvider:
