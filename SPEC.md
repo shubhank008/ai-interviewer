@@ -239,7 +239,7 @@ The project must maintain distinct verification tiers:
 4. **Provider integration tests:** run against explicitly configured Firebase, storage, STT, TTS, LLM, and WebRTC services only when tagged and enabled by environment configuration.
 5. **Release and live-demo tests:** run the production-shaped Docker deployment with selected providers, HTTPS, monitoring, retention, deletion, and rollback procedures.
 
-The offline tiers must never claim provider or live-browser readiness. Provider integration and browser evidence must be reported separately.
+The offline tiers must never claim provider or live-rehearsal readiness. Provider integration and agent-to-agent rehearsal evidence must be reported separately.
 
 ### 8.3 CI and coverage gates
 
@@ -503,15 +503,15 @@ These diagrams describe the beta execution boundary. Deterministic local provide
 - Firestore persists sessions, setup, events, final transcripts, evaluations, retention, and deletion state.
 - Firebase Storage and local filesystem adapters pass upload, download, replay, retention, and deletion tests.
 - A real PDF and job description reach parsing, source-linked retrieval, and the live prompt context.
-- Timestamped browser microphone chunks reach WhisperX small and produce partial and final transcript events.
+- Timestamped agent audio buffers reach WhisperX small and produce partial and final transcript events.
 - OpenRouter produces validated structured streaming interviewer responses with cancellation, timeout, rate-limit, fallback, cost, and model metadata.
 - Kokoro produces browser-playable audio with sequencing, interruption, cancellation, and measured first-audio latency.
-- The selected browser audio transport works from an external browser network; if benchmark evidence selects WebRTC, configured STUN/TURN works as part of that acceptance.
-- Real recruiter and technical interviews complete through the browser using the fixed provider set.
+- The Interviewer Agent and Interviewee Agent complete recruiter and technical interviews through the backend using the fixed live provider set.
+- Browser audio transport, external browser networking, WebRTC, STUN, and TURN are deferred from Phase 16 acceptance.
 - Candidate/interviewer audio, immutable transcript, events, and evaluation persist and replay.
 - The LLM evaluator runs only after completion and stores bounded feedback.
 - User deletion removes original, derived, cached, transcript, recording, evaluation, and provider-created test artifacts.
-- Negative cases cover invalid auth, owner mismatch, malformed PDF/audio, provider outage, timeout, cancellation, quota, WebRTC failure, storage failure, and deletion failure.
+- Negative cases cover invalid auth, owner mismatch, malformed or scanned/encrypted PDF/audio, provider outage, timeout, cancellation, quota, storage failure, and deletion failure.
 - Evidence reports exercised, skipped, or failed per provider; skipped or deterministic results cannot satisfy beta acceptance.
 
 ### 10.5 Verification boundary
