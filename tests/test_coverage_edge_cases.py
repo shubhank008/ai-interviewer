@@ -1005,7 +1005,7 @@ class SessionEdgeCases(unittest.TestCase):
     """Behavioral edge cases for session engine error paths."""
 
     def test_cancel_active_session(self) -> None:
-        from interviewer_domain.session import InterviewSessionEngine, QuestionPlanner
+        from interviewer_domain.session import InterviewSessionEngine
         from interviewer_domain.models import InterviewSession, InterviewMode
 
         session = InterviewSession(user_id="alice", mode=InterviewMode.RECRUITER)
