@@ -210,7 +210,7 @@ Specification, plan, and marker contract: `docs/specs/016-live-beta-enablement/`
 - [ ] Restructure `src/interviewer_domain` into `capabilities/`, `adapters/`, `providers/in_memory/`, domain services, and a production composition package.
 - [x] Compose the explicit beta set: Firebase Auth, Firestore, Firebase Storage selected by `STORAGE_BACKEND=gcs`, OpenRouter, WhisperX small, Kokoro, timestamped agent audio buffers, and an OpenRouter LLM evaluator.
 - [x] Implement production startup validation that rejects accidental in-memory providers and exposes active provider health without secrets.
-- [ ] Implement Firebase browser authentication, token refresh, protected routes, server verification, and owner isolation.
+- [ ] Future task: implement Firebase browser authentication, token refresh, protected routes, server verification, and owner isolation. This is intentionally deferred and does not block the Phase 16 programmatic rehearsal.
 - [ ] Implement Firestore session, event, transcript, evaluation, user, retention, and deletion repositories.
 - [x] Implement Firebase Storage upload, download, replay, retention, and deletion lifecycle; retain local storage only for development and deterministic checks. Keep FTP and S3 out of scope.
 - [ ] Implement real resume upload, text extraction, source-linked retrieval, and live prompt context.

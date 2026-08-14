@@ -251,7 +251,7 @@ Phases 1 through 15 establish product specifications, capability contracts, loca
 
 Phase 15 is merged, but its real-provider execution checkbox remains incomplete. The latest evidence says OpenRouter, Faster-Whisper, Piper/Kokoro, Firebase, Firestore, storage, and browser audio were skipped because required configuration was absent. The project is therefore **not ready to claim a live production interview**.
 
-Phase 16 must not be closed until it has backend/provider coverage, a clean Docker release candidate, real authentication and owner isolation, real STT/TTS/LLM voice turns, durable artifact and deletion verification, operations procedures, and a scripted live agent-to-agent rehearsal recording provider/model, latency, cost, quality, and limitations.
+Phase 16 must not be closed until it has backend/provider coverage, a clean Docker release candidate, the configured live provider turns, durable artifact and deletion verification, operations procedures, and a scripted live agent-to-agent rehearsal recording provider/model, latency, cost, quality, and limitations.
 
 ## Known limitations
 
