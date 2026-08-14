@@ -368,7 +368,10 @@ async def complete(
         record = application.data.get_interview(user_id, interview_id)
         application.data.save_interview(replace(record, status="completed"))
         transcript = tuple(application.data.list_transcripts(user_id, interview_id))
-        evaluation = application.evaluators[interview_id].evaluate(
+        evaluator = application.evaluators.get(interview_id)
+        if evaluator is None:
+            raise HTTPException(status_code=404, detail="evaluator not found for session")
+        evaluation = evaluator.evaluate(
             user_id, interview_id,
             InterviewContext(record.mode, "the supplied role", "the supplied seniority"),
             transcript,
@@ -433,11 +436,12 @@ async def session_websocket(websocket: WebSocket, session_id: UUID) -> None:
                 result = await application.voice_sessions[session_id].process_turn(
                     Turn(session_id, int(command.payload.get("sequence", 1)), "candidate", audio)
                 )
-                await websocket.send_json(state.publish(
-                    SessionEventType.PLAYBACK_STARTED,
-                    {"text": result.response, "audio_chunks": len(result.audio), "latency_ms": result.latency_ms},
-                    command.correlation_id,
-                ).to_dict())
+                if not result.interrupted:
+                    await websocket.send_json(state.publish(
+                        SessionEventType.PLAYBACK_STARTED,
+                        {"text": result.response, "audio_chunks": len(result.audio), "latency_ms": result.latency_ms},
+                        command.correlation_id,
+                    ).to_dict())
             elif command.command_type == SessionCommandType.SIGNALING:
                 message = SignalingMessage(
                     session_id,
@@ -456,7 +460,7 @@ async def session_websocket(websocket: WebSocket, session_id: UUID) -> None:
                 raise TransportValidationError("unsupported session command")
     except WebSocketDisconnect:
         state.disconnect(user_id)
-    except (TransportValidationError, KeyError, ValueError) as error:
+    except (TransportValidationError, KeyError, ValueError, ProviderError) as error:
         event = state.publish(SessionEventType.ERROR, {"code": "invalid_control", "message": str(error)}, correlation_id)
         await websocket.send_json(event.to_dict())
         await websocket.close(code=1003, reason="invalid control payload")
@@ -473,14 +477,17 @@ async def media_websocket(websocket: WebSocket, session_id: UUID) -> None:
         return
     try:
         state.authorize(user_id)
+    except TransportValidationError:
         await websocket.accept()
+        await websocket.close(code=4403, reason="session access denied")
+        return
+    await websocket.accept()
+    try:
         while True:
             frame = await websocket.receive_bytes()
             await application.media_boundaries[session_id].capture_microphone(frame)
     except WebSocketDisconnect:
         return
-    except TransportValidationError:
-        await websocket.close(code=1003, reason="invalid media")
 
 
 @app.websocket("/ws/v1/sessions/{session_id}/signaling")
@@ -494,6 +501,11 @@ async def signaling_websocket(websocket: WebSocket, session_id: UUID) -> None:
         return
     try:
         state.authorize(user_id)
+    except TransportValidationError:
+        await websocket.accept()
+        await websocket.close(code=4403, reason="session access denied")
+        return
+    try:
         await websocket.accept()
         raw = await websocket.receive_json()
         message = SignalingMessage(

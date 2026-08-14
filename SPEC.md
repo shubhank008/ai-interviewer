@@ -496,7 +496,7 @@ flowchart TD
 
 These diagrams describe the beta execution boundary. Deterministic local providers exercise the same contracts, but do not prove configured external providers or browser infrastructure are ready.
 
-## 10.4 Beta acceptance criteria
+### 10.5 Beta acceptance criteria
 
 - A clean CPU-only deployment starts using the documented production composition and no in-memory provider.
 - Firebase signup, login, refresh, logout, protected routes, server token verification, and owner isolation work in a real browser.
@@ -514,7 +514,7 @@ These diagrams describe the beta execution boundary. Deterministic local provide
 - Negative cases cover invalid auth, owner mismatch, malformed or scanned/encrypted PDF/audio, provider outage, timeout, cancellation, quota, storage failure, and deletion failure.
 - Evidence reports exercised, skipped, or failed per provider; skipped or deterministic results cannot satisfy beta acceptance.
 
-### 10.5 Verification boundary
+### 10.6 Verification boundary
 
 The project has three explicit evidence levels:
 

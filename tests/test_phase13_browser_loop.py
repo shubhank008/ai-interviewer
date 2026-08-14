@@ -100,9 +100,6 @@ class Phase13BrowserLoopTests(unittest.TestCase):
             self.assertEqual(socket.receive_json()["type"], "ice_candidate")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 class LiveExecutionPathTests(unittest.TestCase):
     """Verify the browser transport reaches live providers and evaluation."""
 
@@ -144,3 +141,7 @@ class LiveExecutionPathTests(unittest.TestCase):
         )
         self.assertEqual(results.status_code, 200)
         self.assertIn("evaluation", results.json()["payload"])
+
+
+if __name__ == "__main__":
+    unittest.main()
