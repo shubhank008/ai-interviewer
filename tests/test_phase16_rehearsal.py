@@ -23,7 +23,7 @@ class Phase16RehearsalTests(unittest.TestCase):
     def test_configured_without_executor_fails(self) -> None:
         """Configured providers fail until a real live executor is supplied."""
         results = Phase16Rehearsal(
-            environ={"OPENROUTER_API_KEY": "secret", "LLM_MODEL": "model"}
+            environ={"LLM_API_KEY": "secret", "LLM_MODEL": "model"}
         ).run()
         llm = next(result for result in results if result.operation.marker == "llm-interviewer-stream-ok")
         self.assertEqual(llm.status, "failed")
