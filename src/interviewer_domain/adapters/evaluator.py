@@ -59,7 +59,20 @@ class OpenRouterEvaluator(Evaluator):
         if isinstance(score, bool) or not isinstance(score, (int, float)) or not 0 <= score <= 100:
             raise ProviderError(ErrorCode.INTERNAL, "evaluator score was outside 0 to 100")
         dimensions = value.get("dimensions", [])
-        if not isinstance(dimensions, list) or not all(isinstance(item, dict) for item in dimensions):
+        if isinstance(dimensions, dict):
+            dimensions = [
+                {"dimension": str(name)[:200], "assessment": str(result)[:500]}
+                for name, result in dimensions.items()
+            ]
+        elif isinstance(dimensions, list):
+            dimensions = [
+                item if isinstance(item, dict) else {"assessment": str(item)[:500]}
+                for item in dimensions
+                if isinstance(item, (dict, str, int, float)) and not isinstance(item, bool)
+            ]
+        else:
+            raise ProviderError(ErrorCode.INTERNAL, "evaluator dimensions were malformed")
+        if not dimensions:
             raise ProviderError(ErrorCode.INTERNAL, "evaluator dimensions were malformed")
         def strings(key: str) -> tuple[str, ...]:
             values = value.get(key, [])
