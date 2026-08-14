@@ -275,6 +275,18 @@ def compose_providers(
     injected = backends or ProviderBackends()
     if settings.profile is RuntimeProfile.LOCAL:
         return RuntimeProviders((InMemorySTT(),), (InMemoryTTS(),), (InMemoryLLM(),))
+    if strict:
+        fallback_names = {
+            "STT_FALLBACK_PROVIDER": settings.stt_fallback_provider,
+            "TTS_FALLBACK_PROVIDER": settings.tts_fallback_provider,
+            "LLM_FALLBACK_PROVIDER": settings.llm_fallback_provider,
+        }
+        unsafe_fallbacks = [name for name, value in fallback_names.items() if value == "in-memory"]
+        if unsafe_fallbacks:
+            raise ConfigurationError(
+                "production composition cannot use deterministic fallbacks: "
+                + ", ".join(unsafe_fallbacks)
+            )
     stt_backend: WhisperBackend | None = injected.stt
     if stt_backend is None and settings.stt_provider == "faster-whisper":
         try:
@@ -361,20 +373,20 @@ def validate_beta_composition(settings: RuntimeSettings) -> None:
 
 def _fallback_stt(settings: RuntimeSettings, backends: ProviderBackends) -> STTProvider:
     """Build the configured STT fallback without importing optional dependencies."""
-    return (
-        FasterWhisperSTT(backends.stt, settings.stt_model)
-        if settings.stt_fallback_provider == "faster-whisper"
-        else InMemorySTT()
-    )
+    if settings.stt_fallback_provider == "faster-whisper":
+        return FasterWhisperSTT(backends.stt, settings.stt_model)
+    if settings.stt_fallback_provider == "whisperx":
+        return WhisperXSTT(backends.stt, settings.stt_model)
+    return InMemorySTT()
 
 
 def _fallback_tts(settings: RuntimeSettings, backends: ProviderBackends) -> TTSProvider:
     """Build the configured TTS fallback without importing optional dependencies."""
-    return (
-        PiperKokoroTTS(backends.tts, settings.tts_model)
-        if settings.tts_fallback_provider in {"piper", "kokoro"}
-        else InMemoryTTS()
-    )
+    if settings.tts_fallback_provider == "piper":
+        return PiperKokoroTTS(backends.tts, settings.tts_model)
+    if settings.tts_fallback_provider == "kokoro":
+        return KokoroTTS(backends.tts, settings.tts_model)
+    return InMemoryTTS()
 
 
 def _fallback_llm(settings: RuntimeSettings, backends: ProviderBackends) -> LLMProvider:

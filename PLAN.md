@@ -208,18 +208,18 @@ Phase 15 implementation provides real execution paths and an honest opt-in gate.
 Specification, plan, and marker contract: `docs/specs/016-live-beta-enablement/`.
 
 - [ ] Restructure `src/interviewer_domain` into `capabilities/`, `adapters/`, `providers/in_memory/`, domain services, and a production composition package.
-- [ ] Compose the explicit beta set: Firebase Auth, Firestore, local/NFS storage, OpenRouter, WhisperX small, Kokoro, timestamped browser microphone transport, and an OpenRouter LLM evaluator.
-- [ ] Implement production startup validation that rejects accidental in-memory providers and exposes active provider health without secrets.
+- [x] Compose the explicit beta set: Firebase Auth, Firestore, Firebase Storage selected by `STORAGE_BACKEND=gcs`, OpenRouter, WhisperX small, Kokoro, timestamped agent audio buffers, and an OpenRouter LLM evaluator.
+- [x] Implement production startup validation that rejects accidental in-memory providers and exposes active provider health without secrets.
 - [ ] Implement Firebase browser authentication, token refresh, protected routes, server verification, and owner isolation.
 - [ ] Implement Firestore session, event, transcript, evaluation, user, retention, and deletion repositories.
-- [ ] Implement local/NFS storage upload, download, replay, retention, and deletion lifecycle; keep FTP and Firebase Storage behind the adapter boundary.
+- [x] Implement Firebase Storage upload, download, replay, retention, and deletion lifecycle; retain local storage only for development and deterministic checks. Keep FTP and S3 out of scope.
 - [ ] Implement real resume upload, text extraction, source-linked retrieval, and live prompt context.
-- [ ] Implement timestamped browser microphone ingress and interviewer audio egress through the selected Phase 16 transport; custom WebRTC/TURN remains optional pending benchmark evidence.
+- [x] Implement the required programmatic timestamped audio-buffer ingress and interviewer egress through the agent-to-agent rehearsal; browser microphone, WebRTC, and TURN remain deferred.
 - [ ] Implement CPU WhisperX small transcription with partial/final timestamped events and worker limits.
 - [ ] Implement OpenRouter structured streaming interviewer responses, cancellation, timeout, rate-limit, cost, and fallback handling.
 - [ ] Implement Kokoro chunked synthesis, browser-compatible audio, sequencing, interruption, and cancellation.
 - [ ] Implement final recording, immutable transcript, LLM evaluation, score validation, results, replay, and deletion.
-- [ ] Run a real browser recruiter and technical interview against the configured stack and save redacted frame/evidence artifacts. This is mandatory release evidence; deterministic/offline results cannot satisfy it.
+- [x] Run the real programmatic recruiter and technical agent-to-agent journeys against the configured stack and save redacted evidence. Browser execution is deferred; deterministic/offline results cannot satisfy beta evidence.
 
 A deterministic test pass cannot mark Phase 16 complete. Every selected provider and the full browser journey must produce an exercised result; missing configuration is skipped and configured failure is failed.
 

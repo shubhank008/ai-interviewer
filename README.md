@@ -171,13 +171,13 @@ export PYTHONPATH="$PWD/src"
 ./scripts/test_phase16.sh
 ```
 
-The Phase 16 rehearsal runner must execute every selected live operation with real test accounts, fixtures, providers, and browser media. It must write only redacted evidence and benchmark metadata.
+The Phase 16 rehearsal runner must execute every selected live operation with real test accounts, fixtures, live providers, and programmatic agent-to-agent audio buffers. It must write only redacted evidence and benchmark metadata.
 
 - **OpenRouter:** set `LLM_API_KEY`, `LLM_MODEL=~deepseek/deepseek-v4-flash-latest`, and `LLM_PROVIDER=openrouter`. Do not use the legacy `OPENROUTER_API_KEY`. Requests use a 60-second timeout and up to three transient retries; permanent errors fail without retry. Record only redacted token, time, model, and cost metrics.
 - **WhisperX:** set `STT_PROVIDER=whisperx`, `STT_MODEL=small`, `STT_CPU=true`, and `STT_LANGUAGE=en`. The provider receives a model name; `STT_MODEL_PATH` is obsolete and must not be required. Install and exercise WhisperX in the live environment.
 - **Kokoro:** set `TTS_PROVIDER=kokoro`, `TTS_MODEL`, and `TTS_LANGUAGE=en`. The Python adapter resolves its runtime from the model/language configuration. `TTS_MODEL_PATH` and `TTS_COMMAND` are obsolete. Select a supported voice randomly per invocation, normalize browser-compatible audio, and benchmark playback, cancellation, and quality.
 - **Firebase and Firestore:** provide `FIREBASE_PROJECT_ID`, protected `FIREBASE_CREDENTIALS_PATH`, Firebase Web Auth configuration, and EU Firestore. Use email/password and Google Sign-In Auth with open signup. Firestore rules remain managed in Firebase; application owner checks remain mandatory.
-- **Storage:** the first live run uses `STORAGE_BACKEND=local` with a local/NFS-compatible path. FTP is deferred; Firebase Storage is the selected provider. S3/GCS are out of scope. Exercise upload, replay, retention, partial failure, and deletion for the selected backend.
+- **Storage:** the live beta uses `STORAGE_BACKEND=gcs` to select Firebase Storage bucket `gs://the-interviewer-c3a01.firebasestorage.app`. `STORAGE_BACKEND=local` is for development and deterministic checks. FTP and S3 are out of scope. Exercise upload, replay, retention, partial failure, and deletion.
 - **Agent audio:** the Phase 16 rehearsal exchanges timestamped in-memory audio buffers between Interviewer and Interviewee Agents. Browser audio and WebRTC/TURN are deferred to the browser transport phase.
 - **Fixtures:** use `tests/demo_resume.pdf` and `tests/demo_jobdescription.txt`; enforce 10 MB limits for each job description and resume. Text-only PDF parsing must fail gracefully for scanned or encrypted documents.
 
@@ -194,7 +194,7 @@ cp .env.example .env
 | `TTS_PROVIDER`, `TTS_MODEL`, `TTS_LANGUAGE` | Kokoro selection, provider model setting, and language; beta uses English with random per-call voice selection |
 | `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY` | OpenRouter selection, configured model, and unified credential |
 | `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH`, Firebase Web Auth settings | Beta Firebase Admin/Web Auth and EU Firestore |
-| `STORAGE_BACKEND`, `STORAGE_PATH`, `STORAGE_BUCKET`, FTP settings | Local/NFS first, with FTP or Firebase Storage adapter options |
+| `STORAGE_BACKEND`, `STORAGE_PATH`, `STORAGE_BUCKET` | `gcs` selects locked Firebase Storage for beta; `local` is development/deterministic only |
 | `WEBRTC_ICE_SERVERS` | Optional benchmark transport configuration; timestamped browser chunks are the initial beta transport |
 | `RETENTION_DAYS` | Resume and default artifact retention, 14 days |
 | `AUDIO_RETENTION_DAYS` | Combined interview recording retention, 7 days |
