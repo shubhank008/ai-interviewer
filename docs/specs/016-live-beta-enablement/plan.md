@@ -5,7 +5,8 @@
 - Abstract interfaces precede concrete adapters and business logic remains vendor-neutral.
 - The explicit beta provider set is Firebase Auth, Firestore, local/FTP/Firebase Storage, OpenRouter, WhisperX small, Kokoro, a benchmark-selected browser audio transport, and an OpenRouter-based evaluator.
 - CPU-only workers are required; no model downloads happen automatically.
-- Live tests are the only Phase 16 release evidence. Offline tests may protect contracts but cannot pass beta readiness.
+- Phase 16 is live-mandatory. Live provider and browser tests are the only release evidence. Offline tests protect contracts only and cannot justify stopping implementation or pass beta readiness.
+- Delegated implementation must not use a `where feasible`, `safest coherent vertical slice`, or deterministic-only escape hatch. It must continue through configured provider execution and browser acceptance unless a genuine external authorization, security, or infrastructure blocker is recorded.
 - Never log or store credentials, raw provider payloads, resume text, transcript text, or audio in evidence.
 - Preserve owner isolation, 10 MB job-description and resume limits, 14-day resume retention, 7-day combined-audio retention, 30-day audit/access retention, deletion, cancellation, retries, timeouts, and redacted readiness.
 - Browser audio uses the simplest reliable timestamped chunk, VAD, streaming-Whisper, or WebRTC transport selected by benchmark evidence; media bytes never enter WebSocket control events.

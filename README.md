@@ -32,12 +32,12 @@ The intended post-interview experience includes replayable audio, a timestamped 
 |---|---|---|---|
 | Setup, modes, PDF parsing, retrieval | Implemented | Needs application verification | Phase 14 offline |
 | Live voice orchestration | In-memory STT, LLM, TTS | Provider adapters exist | Live run pending |
-| STT | In-memory fixture | Faster-Whisper local backend | Phase 15 contract; skipped live |
-| TTS | In-memory fixture | Piper/Kokoro command backend | Phase 15 contract; skipped live |
-| LLM | In-memory fixture | OpenRouter HTTP transport | Phase 15 contract; skipped live |
-| Auth and data | Dev token and memory stores | Firebase Auth, Firestore, local/FTP/Firebase Storage | Skipped live |
-| Browser media | Local timestamped audio boundary | Selected real browser microphone transport | Skipped live |
-| Evaluation | Deterministic post-interview evaluator | Provider selection is future work | Phase 14 offline |
+| STT | Contract fixture only | WhisperX small on CPU | Live execution pending |
+| TTS | Contract fixture only | Kokoro Python, English, randomized voice | Live execution pending |
+| LLM | Contract fixture only | OpenRouter through `LLM_API_KEY` | Live execution pending |
+| Auth and data | Development fixtures only | Firebase Auth, Firestore, local/NFS storage | Live execution pending |
+| Browser media | Timestamped chunk contract | Browser microphone chunk transport | Live execution pending |
+| Evaluation | Contract evaluator only | OpenRouter post-interview evaluator | Live execution pending |
 
 Requirements are in [`SPEC.md`](SPEC.md), implementation status is in [`PLAN.md`](PLAN.md), and provider operations are in [`docs/provider-readiness.md`](docs/provider-readiness.md).
 
@@ -161,7 +161,7 @@ Run the frontend separately or serve its built `frontend/dist` through an HTTPS 
 | WS | `/ws/v1/sessions/{id}/media` | Authenticated microphone frame channel |
 | WS | `/ws/v1/sessions/{id}/signaling` | Authenticated signaling channel |
 
-The FastAPI composition root is being moved to the Phase 16 live beta configuration: Firebase passwordless email-link Auth, Firestore, local/NFS-compatible or FTP or Firebase Storage, WhisperX small, OpenRouter, and Kokoro. The single Docker container is the initial self-hosted/Railway benchmark target. The live composition and browser rehearsal remain outstanding until the Phase 16 markers are exercised.
+The FastAPI composition root targets the Phase 16 live beta configuration: Firebase passwordless email-link Auth, Firestore, local/NFS-compatible storage for the first run, WhisperX small on CPU, OpenRouter through `LLM_API_KEY`, and Kokoro. The single Docker container is the initial self-hosted/Railway benchmark target. Offline tests protect contracts only; live composition and browser rehearsal are required before beta readiness.
 
 ## Provider integrations
 
@@ -174,12 +174,12 @@ export PYTHONPATH="$PWD/src"
 
 The Phase 16 rehearsal runner must execute every selected live operation with real test accounts, fixtures, providers, and browser media. It must write only redacted evidence and benchmark metadata.
 
-- **OpenRouter:** set `OPENROUTER_API_KEY`, `LLM_MODEL=~deepseek/deepseek-v4-flash-latest`, and `LLM_PROVIDER=openrouter`. Requests use a 60-second timeout and up to three transient retries; permanent errors fail without retry. Record redacted token, time, and cost metrics. Review external LLM data sharing.
-- **WhisperX:** set `STT_PROVIDER=whisperx`, `STT_MODEL=small`, and provision model assets before startup. The application never downloads weights automatically. Benchmark latency, CPU, memory, and failure behavior without setting a release target first.
-- **Kokoro:** set `TTS_PROVIDER=kokoro` and `TTS_LANGUAGE=en`. Select a supported voice randomly per invocation, normalize to a browser-compatible format, and benchmark playback, cancellation, and quality.
-- **Firebase and Firestore:** provide the beta `FIREBASE_PROJECT_ID`, protected `FIREBASE_CREDENTIALS_PATH`, Firebase Web Auth configuration, and EU Firestore. Use passwordless email-link Auth with open signup. Firestore rules remain managed in Firebase; application owner checks remain mandatory.
-- **Storage:** support `STORAGE_BACKEND=local`, `ftp`, or `firebase`. Local storage must work on an NFS-mounted path. The beta Firebase bucket is `gs://the-interviewer-c3a01.firebasestorage.app` in US-EAST1. Exercise every adapter's upload, replay, retention, partial failure, and deletion behavior. S3/GCS are out of scope.
-- **Browser audio:** begin with the simplest reliable timestamped microphone-chunk path. Benchmark Silero VAD, SimulStreaming, or a full WebRTC/TURN path before selecting one. Do not assume custom TURN is required.
+- **OpenRouter:** set `LLM_API_KEY`, `LLM_MODEL=~deepseek/deepseek-v4-flash-latest`, and `LLM_PROVIDER=openrouter`. Do not use the legacy `OPENROUTER_API_KEY`. Requests use a 60-second timeout and up to three transient retries; permanent errors fail without retry. Record only redacted token, time, model, and cost metrics.
+- **WhisperX:** set `STT_PROVIDER=whisperx`, `STT_MODEL=small`, `STT_CPU=true`, and `STT_LANGUAGE=en`. The provider receives a model name; `STT_MODEL_PATH` is obsolete and must not be required. Install and exercise WhisperX in the live environment.
+- **Kokoro:** set `TTS_PROVIDER=kokoro`, `TTS_MODEL`, and `TTS_LANGUAGE=en`. The Python adapter resolves its runtime from the model/language configuration. `TTS_MODEL_PATH` and `TTS_COMMAND` are obsolete. Select a supported voice randomly per invocation, normalize browser-compatible audio, and benchmark playback, cancellation, and quality.
+- **Firebase and Firestore:** provide `FIREBASE_PROJECT_ID`, protected `FIREBASE_CREDENTIALS_PATH`, Firebase Web Auth configuration, and EU Firestore. Use passwordless email-link Auth with open signup. Firestore rules remain managed in Firebase; application owner checks remain mandatory.
+- **Storage:** the first live run uses `STORAGE_BACKEND=local` with a local/NFS-compatible path. FTP and Firebase Storage remain supported adapter options. S3/GCS are out of scope. Exercise upload, replay, retention, partial failure, and deletion for the selected backend.
+- **Browser audio:** use timestamped microphone chunks with the selected VAD/streaming-Whisper seam. Full custom WebRTC/TURN is not a prerequisite for this phase unless benchmark evidence selects it.
 - **Fixtures:** use `tests/resume_demo.pdf` and `tests/job_description.txt`; enforce 10 MB limits for each job description and resume. Show an unlocked-PDF error for protected documents and route scanned PDFs through an explicit extraction pass.
 
 ## Configuration
@@ -190,15 +190,13 @@ cp .env.example .env
 
 | Variable | Purpose |
 |---|---|
-| `APP_PROFILE` | `local` for deterministic development; `production` requires explicit providers |
-| `PHASE15_PROFILES` | Legacy opt-in integration profiles; Phase 16 uses the live rehearsal runner |
-| `STT_PROVIDER`, `STT_MODEL`, `STT_CPU`, `STT_LANGUAGE` | WhisperX selection, model identifier/path, device, and language; beta uses `whisperx` and `small` |
-| `TTS_PROVIDER`, `TTS_VOICE`, `TTS_LANGUAGE` | Kokoro provider, optional voice pool, and language; beta uses English with random per-call voice selection |
-| `LLM_PROVIDER`, `LLM_MODEL`, `OPENROUTER_API_KEY` | OpenRouter selection, beta model, and credential |
+| `APP_PROFILE` | `production` for the live beta; local is contract/development mode only |
+| `STT_PROVIDER`, `STT_MODEL`, `STT_CPU`, `STT_LANGUAGE` | WhisperX selection, model name, CPU mode, and language; beta uses `whisperx` and `small` |
+| `TTS_PROVIDER`, `TTS_MODEL`, `TTS_LANGUAGE` | Kokoro selection, provider model setting, and language; beta uses English with random per-call voice selection |
+| `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY` | OpenRouter selection, configured model, and unified credential |
 | `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH`, Firebase Web Auth settings | Beta Firebase Admin/Web Auth and EU Firestore |
-| `STORAGE_BACKEND`, `STORAGE_PATH`, `STORAGE_BUCKET`, FTP settings | Local/NFS, FTP, or Firebase Storage |
-| `PHASE15_BROWSER_URL` | Legacy browser integration target; Phase 16 runner owns live browser rehearsal |
-| `WEBRTC_ICE_SERVERS` | Used only if benchmark selects a WebRTC transport |
+| `STORAGE_BACKEND`, `STORAGE_PATH`, `STORAGE_BUCKET`, FTP settings | Local/NFS first, with FTP or Firebase Storage adapter options |
+| `WEBRTC_ICE_SERVERS` | Optional benchmark transport configuration; timestamped browser chunks are the initial beta transport |
 | `RETENTION_DAYS` | Resume and default artifact retention, 14 days |
 | `AUDIO_RETENTION_DAYS` | Combined interview recording retention, 7 days |
 | `AUDIT_RETENTION_DAYS` | Audit/access record retention, 30 days |

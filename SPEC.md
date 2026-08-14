@@ -16,7 +16,7 @@ The candidate can provide:
 - An optional PDF resume upload
 - Interview mode: recruiter screen or technical or hiring-manager interview
 
-The first release limits uploaded resume files to 5 MB. The system extracts role requirements, topics, seniority signals, company and culture signals, and useful resume facts before the interview starts. Prompt-injection and content-security guardrails must treat uploaded resume text and job-description text as untrusted data, never as system instructions.
+The Phase 16 beta limits uploaded resume files to 10 MB. The system extracts role requirements, topics, seniority signals, company and culture signals, and useful resume facts before the interview starts. Prompt-injection and content-security guardrails must treat uploaded resume text and job-description text as untrusted data, never as system instructions.
 
 No separate text or chat interview mode is planned. Text appears as setup input, live transcript, status, and post-interview feedback while the interview itself is voice-based.
 
@@ -209,7 +209,7 @@ The design must support:
 - Encryption in transit and at rest through the selected infrastructure
 - Redaction or restricted handling of sensitive resume information
 - Provider-specific data-sharing controls
-- Rate limits and upload validation, including the 5 MB PDF limit
+- Rate limits and upload validation, including the Phase 16 10 MB PDF limit
 - Prompt-injection defenses that isolate untrusted document and research content from system and developer instructions
 - Content validation and output constraints for secondary responses and external research
 - Recovery from provider timeouts, disconnects, and partial audio failures
@@ -288,18 +288,32 @@ Phase 16 is the authoritative implementation program for reaching a real beta. T
 
 | Capability | Required first-beta implementation | Abstract boundary |
 |---|---|---|
-| Auth | Firebase Auth Web SDK and Firebase Admin verification | `AuthProvider` |
-| Datastore | Firestore | `DataStore` |
-| Storage | Firebase Storage and local filesystem | `StorageProvider` |
-| Live LLM | OpenRouter | `LLMProvider` |
-| STT | Faster-Whisper | `STTProvider` |
-| TTS | Kokoro | `TTSProvider` |
-| Voice | Browser WebRTC with configured STUN/TURN | `AudioTransport` |
+| Auth | Firebase Web Auth passwordless email-link Auth with Firebase Admin verification | `AuthProvider` |
+| Datastore | EU Firestore | `DataStore` |
+| Storage | Local/NFS for the first live run, with FTP and Firebase Storage adapters | `StorageProvider` |
+| Live LLM | OpenRouter using `LLM_API_KEY` and configured `LLM_MODEL` | `LLMProvider` |
+| STT | WhisperX using the `small` model on CPU | `STTProvider` |
+| TTS | Kokoro Python using `TTS_LANGUAGE`, with random per-invocation voice selection | `TTSProvider` |
+| Voice | Browser microphone chunks with timestamps and the selected VAD/streaming-Whisper seam | `AudioTransport` |
 | Evaluation | OpenRouter LLM evaluator after completion | `Evaluator` |
-| Workers | CPU-only bounded workers | worker boundary |
-| Retention | 14 days | retention policy |
+| Workers | CPU-only bounded workers in one initial Docker container | worker boundary |
+| Retention | Resume 14 days, combined audio 7 days, audit/access records 30 days | retention policy |
 
 These choices supersede earlier candidate-provider lists for the first beta. Other providers may be added only behind the same boundaries after the beta path is working.
+
+### 10.1.1 Authoritative implementation decisions
+
+These decisions are final for Phase 16 and must not be reopened by delegated implementation agents:
+
+- Use `.env` as the configured source for the live beta runtime. Never print or commit its values.
+- Use `FIREBASE_CREDENTIALS_PATH` for backend Firebase Admin credentials when configured; Firebase Web Auth settings are separate browser configuration.
+- Use `LLM_API_KEY`, not `OPENROUTER_API_KEY`, for the OpenRouter credential.
+- Do not require `STT_MODEL_PATH`, `TTS_MODEL_PATH`, or `TTS_COMMAND`; WhisperX and Kokoro receive provider model/language configuration through `STT_MODEL`, `TTS_MODEL`, and language settings.
+- Use WhisperX `small` on CPU by default, Kokoro English with random supported voice selection, and OpenRouter with the configured model.
+- Use local/NFS storage for the first live run. FTP and Firebase Storage remain supported adapter options; S3 and GCS are out of scope.
+- Use timestamped browser microphone chunks as the initial live audio transport. Full custom WebRTC/TURN is not required to close this phase unless benchmark evidence selects it.
+- Use one Docker container for the initial beta benchmark.
+- Live provider and browser execution is mandatory evidence. Offline tests are contract protection only.
 
 ### 10.2 Required source structure
 
@@ -319,7 +333,7 @@ Domain services may depend on `capabilities` and `models`, but must never import
 
 ### 10.3 Live service schemas and flow
 
-The live request flow is: Firebase browser login produces an ID token; FastAPI verifies it and derives the Firebase UID; setup validates the job description and 5 MB PDF limit; storage persists the original resume; parsing and retrieval create source-linked context; Firestore creates an owner-scoped session; WebSocket carries ordered control and transcript/status events; WebRTC carries microphone and interviewer audio; Faster-Whisper emits partial and final timestamped segments; the interview state machine builds grounded context; OpenRouter emits a validated structured response; Kokoro schedules browser-compatible audio; transcript/events/recording are persisted; completion freezes the transcript; the evaluator produces validated score and feedback; history/replay expose stored artifacts; deletion removes every raw and derived artifact.
+The live request flow is: Firebase browser login produces an ID token; FastAPI verifies it and derives the Firebase UID; setup validates the job description and 10 MB PDF limit; storage persists the original resume; parsing and retrieval create source-linked context; Firestore creates an owner-scoped session; WebSocket carries ordered control and transcript/status events; timestamped browser microphone chunks reach the selected audio transport; WhisperX small emits partial and final timestamped segments; the interview state machine builds grounded context; OpenRouter emits a validated structured response; Kokoro schedules browser-compatible audio; transcript/events/recording are persisted; completion freezes the transcript; the evaluator produces validated score and feedback; history/replay expose stored artifacts; deletion removes every raw and derived artifact.
 
 The normalized contracts are:
 
@@ -341,14 +355,14 @@ The platform is organized as a browser media plane, an authenticated control pla
 flowchart LR
     U[Candidate browser] -->|Firebase ID token| API[FastAPI API]
     U -->|WebSocket control and events| API
-    U <-->|WebRTC microphone and interviewer audio| MEDIA[Audio transport]
+    U -->|Timestamped microphone chunks| MEDIA[Audio transport]
     API --> AUTH[AuthProvider]
     API --> SETUP[Setup and RAG service]
     SETUP --> STORE[StorageProvider]
     SETUP --> RAG[Parser, embeddings, retrieval]
     API --> SESSION[Interview session runtime]
     SESSION --> ROUTERS[STT, LLM, TTS fallback routers]
-    ROUTERS --> STT[Faster-Whisper]
+    ROUTERS --> STT[WhisperX small]
     ROUTERS --> LLM[OpenRouter]
     ROUTERS --> TTS[Kokoro]
     SESSION --> EVENTS[Ordered event bus]
@@ -431,7 +445,7 @@ flowchart LR
 ```mermaid
 flowchart TD
     AUDIO[Microphone frame] --> STTROUTER[STT fallback router]
-    STTROUTER --> STT1[Faster-Whisper adapter]
+    STTROUTER --> STT1[WhisperX small adapter]
     STTROUTER -. retryable failure .-> STT2[Configured STT fallback]
     STT1 --> TRANSCRIPT[Partial and final transcript]
     TRANSCRIPT --> STATE[Interview state and retrieved context]
@@ -489,10 +503,10 @@ These diagrams describe the beta execution boundary. Deterministic local provide
 - Firestore persists sessions, setup, events, final transcripts, evaluations, retention, and deletion state.
 - Firebase Storage and local filesystem adapters pass upload, download, replay, retention, and deletion tests.
 - A real PDF and job description reach parsing, source-linked retrieval, and the live prompt context.
-- A real microphone track reaches Faster-Whisper and produces partial and final timestamped transcript events.
+- Timestamped browser microphone chunks reach WhisperX small and produce partial and final transcript events.
 - OpenRouter produces validated structured streaming interviewer responses with cancellation, timeout, rate-limit, fallback, cost, and model metadata.
 - Kokoro produces browser-playable audio with sequencing, interruption, cancellation, and measured first-audio latency.
-- WebRTC works with configured STUN/TURN from an external browser network.
+- The selected browser audio transport works from an external browser network; if benchmark evidence selects WebRTC, configured STUN/TURN works as part of that acceptance.
 - Real recruiter and technical interviews complete through the browser using the fixed provider set.
 - Candidate/interviewer audio, immutable transcript, events, and evaluation persist and replay.
 - The LLM evaluator runs only after completion and stores bounded feedback.

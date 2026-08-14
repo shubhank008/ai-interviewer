@@ -208,18 +208,18 @@ Phase 15 implementation provides real execution paths and an honest opt-in gate.
 Specification, plan, and marker contract: `docs/specs/016-live-beta-enablement/`.
 
 - [ ] Restructure `src/interviewer_domain` into `capabilities/`, `adapters/`, `providers/in_memory/`, domain services, and a production composition package.
-- [ ] Compose the explicit beta set: Firebase Auth, Firestore, Firebase Storage plus local filesystem storage, OpenRouter, Faster-Whisper, Kokoro, WebRTC, and an OpenRouter LLM evaluator.
+- [ ] Compose the explicit beta set: Firebase Auth, Firestore, local/NFS storage, OpenRouter, WhisperX small, Kokoro, timestamped browser microphone transport, and an OpenRouter LLM evaluator.
 - [ ] Implement production startup validation that rejects accidental in-memory providers and exposes active provider health without secrets.
 - [ ] Implement Firebase browser authentication, token refresh, protected routes, server verification, and owner isolation.
 - [ ] Implement Firestore session, event, transcript, evaluation, user, retention, and deletion repositories.
-- [ ] Implement Firebase Storage and local filesystem upload, download, replay, retention, and deletion lifecycle.
+- [ ] Implement local/NFS storage upload, download, replay, retention, and deletion lifecycle; keep FTP and Firebase Storage behind the adapter boundary.
 - [ ] Implement real resume upload, text extraction, source-linked retrieval, and live prompt context.
-- [ ] Implement real WebRTC microphone ingress and interviewer audio egress with STUN/TURN configuration.
-- [ ] Implement CPU Faster-Whisper transcription with partial/final timestamped events and worker limits.
+- [ ] Implement timestamped browser microphone ingress and interviewer audio egress through the selected Phase 16 transport; custom WebRTC/TURN remains optional pending benchmark evidence.
+- [ ] Implement CPU WhisperX small transcription with partial/final timestamped events and worker limits.
 - [ ] Implement OpenRouter structured streaming interviewer responses, cancellation, timeout, rate-limit, cost, and fallback handling.
 - [ ] Implement Kokoro chunked synthesis, browser-compatible audio, sequencing, interruption, and cancellation.
 - [ ] Implement final recording, immutable transcript, LLM evaluation, score validation, results, replay, and deletion.
-- [ ] Run a real browser recruiter and technical interview against the configured stack and save redacted frame/evidence artifacts.
+- [ ] Run a real browser recruiter and technical interview against the configured stack and save redacted frame/evidence artifacts. This is mandatory release evidence; deterministic/offline results cannot satisfy it.
 
 A deterministic test pass cannot mark Phase 16 complete. Every selected provider and the full browser journey must produce an exercised result; missing configuration is skipped and configured failure is failed.
 
@@ -252,7 +252,7 @@ Each phase may contain smaller implementation slices, but no phase may be marked
 - Development: Docker-first and CPU-only, targeting approximately 4 GB RAM and 250 GB storage.
 - Storage: Firebase Storage and local filesystem adapters are the initial beta choices.
 - Deployment: CPU-only beta services with HTTPS, WebRTC/TURN, frontend, API, workers, and durable services.
-- Resume input: PDF-only upload, maximum 5 MB.
+- Resume input: PDF-only upload, maximum 10 MB for the Phase 16 beta.
 - Job description input: text-only message box.
 - Retention: 14 days by default, with complete per-interview deletion available to the user.
 - Company and culture context: derive it from job-description or resume content and optional model-supported or `ResearchProvider` web research; do not request a separate company-information form.

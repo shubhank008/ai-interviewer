@@ -21,7 +21,21 @@ The beta uses one explicit provider set rather than a collection of unexercised 
 | Combined audio retention | 7 days | policy service |
 | Audit-log retention | 30 days | policy service |
 
-The beta is a live vertical slice. Offline tests and deterministic providers are not release evidence and must never mark beta readiness as passed.
+The beta is a live vertical slice. Offline tests and deterministic providers are contract protection only. They are not release evidence and must never mark beta readiness as passed. Delegated implementation must continue through the configured live providers and browser journeys; it must not stop at a deterministic slice.
+
+## Authoritative implementation decisions
+
+These Phase 16 decisions are final and must be taken from the main `SPEC.md` without reopening ordinary product choices:
+
+- Load the existing `.env` safely for live runs; never print or commit its values.
+- Use `FIREBASE_CREDENTIALS_PATH` for backend Firebase Admin credentials and Firebase Web Auth settings for the browser.
+- Use `LLM_API_KEY`, not `OPENROUTER_API_KEY`.
+- Use WhisperX `small` on CPU by default. Do not require `STT_MODEL_PATH`.
+- Use Kokoro Python with `TTS_LANGUAGE=en` and random supported voice selection. Do not require `TTS_MODEL_PATH` or `TTS_COMMAND`.
+- Use local/NFS storage for the first live run. FTP and Firebase Storage remain adapter options; S3/GCS are out of scope.
+- Use timestamped browser microphone chunks and the selected VAD/streaming-Whisper seam. Full custom WebRTC/TURN is not a prerequisite.
+- Use one Docker container for the initial beta benchmark.
+- Live provider and browser execution is mandatory evidence. Offline tests protect contracts only.
 
 ## Service flow
 
