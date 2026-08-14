@@ -74,7 +74,6 @@ class RuntimeSettings:
     tts_api_key: str | None
     tts_model: str
     tts_language: str
-    tts_command: str | None
     llm_provider: str
     llm_fallback_provider: str
     llm_api_key: str | None
@@ -122,7 +121,6 @@ class RuntimeSettings:
             tts_api_key=_optional(values, "TTS_API_KEY"),
             tts_model=values.get("TTS_MODEL", "default").lower(),
             tts_language=values.get("TTS_LANGUAGE", values.get("DEFAULT_LANGUAGE", "en")).lower(),
-            tts_command=_optional(values, "TTS_COMMAND"),
             llm_provider=values.get("LLM_PROVIDER", "in-memory"),
             llm_fallback_provider=values.get("LLM_FALLBACK_PROVIDER", "in-memory"),
             llm_api_key=_optional(values, "LLM_API_KEY"),

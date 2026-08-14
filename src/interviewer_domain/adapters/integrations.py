@@ -440,7 +440,7 @@ def skip_reason(profile: str, environ: Mapping[str, str] | None = None) -> str:
     """Return a precise safe reason without revealing credential values."""
     values = os.environ if environ is None else environ
     requirements = {
-        "openrouter": ("OPENROUTER_API_KEY", "LLM_MODEL"),
+        "openrouter": ("LLM_API_KEY", "LLM_MODEL"),
         "faster-whisper": ("STT_MODEL",),
         "piper": ("TTS_MODEL", "TTS_COMMAND"),
         "firebase": ("FIREBASE_PROJECT_ID", "FIREBASE_CREDENTIALS_PATH"),

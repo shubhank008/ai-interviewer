@@ -164,7 +164,7 @@ class PersistenceTests(unittest.TestCase):
         with self.assertRaises(ProviderError):
             validator.validate_resume("resume.pdf", b"not-pdf", "application/pdf")
         with self.assertRaises(ProviderError):
-            validator.validate_resume("resume.pdf", b"%PDF" + b"x" * (5 * 1024 * 1024), "application/pdf")
+            validator.validate_resume("resume.pdf", b"%PDF" + b"x" * (10 * 1024 * 1024 + 1), "application/pdf")
         limiter = FixedWindowRateLimiter(limit=2, window_seconds=60)
         self.assertTrue(limiter.allow("alice", datetime(2027, 1, 1, tzinfo=timezone.utc)))
         self.assertTrue(limiter.allow("alice", datetime(2027, 1, 1, tzinfo=timezone.utc)))
