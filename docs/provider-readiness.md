@@ -32,7 +32,7 @@ Run `./scripts/test_phase16.sh` for contract checks plus the live rehearsal. The
 | `openrouter` | `LLM_API_KEY`, `LLM_MODEL` | OpenRouter structured interviewer and evaluator calls with bounded timeout/retries |
 | `whisperx` | `STT_PROVIDER=whisperx`, `STT_MODEL=small`, `STT_CPU=true` | Install and exercise WhisperX using model-name configuration; no model-path setting is required |
 | `kokoro` | `TTS_PROVIDER=kokoro`, `TTS_LANGUAGE=en` | Install and exercise Kokoro Python with normalized browser audio and random supported voice |
-| `firebase` | Firebase Web settings and `FIREBASE_CREDENTIALS_PATH` | Exercise passwordless Auth, Admin verification, owner isolation, and logout/deletion |
+| `firebase` | Firebase Web settings and `FIREBASE_CREDENTIALS_PATH` | Exercise email/password and Google Auth, Admin verification, owner isolation, token refresh, and logout/deletion |
 | `firestore` | `FIREBASE_PROJECT_ID`, `FIRESTORE_DATABASE`, backend credentials | Exercise session, event, transcript, evaluation, retention, and exact deletion |
 | `storage-local` | `STORAGE_BACKEND=local`, `STORAGE_PATH` | Exercise upload, download, replay, retention, partial failure, and deletion |
 | `browser` | Frontend URL and configured test account | Exercise recruiter and technical journeys using timestamped microphone chunks |
@@ -40,3 +40,8 @@ Run `./scripts/test_phase16.sh` for contract checks plus the live rehearsal. The
 Never put API keys, bearer credentials, service-account files, transcript, resume, or audio in logs or evidence. Local model setup is intentionally manual because model downloads are large and may incur licensing or storage costs. Hosted calls can incur charges and may process sensitive interview context. Delete test users, Firestore documents, and objects after each run and verify provider-side retention terms independently.
 
 Troubleshoot skips by checking environment loading, dependency installation, Firebase credential-path permissions, cloud project and region, Firestore rules, local/NFS storage access, HTTPS/CORS, browser microphone permission, and browser transport reachability. Redacted JSON, Markdown, and HTML reports are written under `.agent_tmp/phase16-evidence/`, which is not versioned.
+
+
+## Phase 16 locked beta decisions
+
+Phase 16 live readiness is measured by a programmatic Interviewer Agent and Interviewee Agent E2E flow, not browser automation. The flow uses real OpenRouter, WhisperX, Kokoro, Firebase Auth/Firestore, Firebase Storage (`gs://the-interviewer-c3a01.firebasestorage.app`), and local/NFS checks. FTP, browser URL, WebRTC, and TURN are deferred. Offline or deterministic runs are not beta evidence.

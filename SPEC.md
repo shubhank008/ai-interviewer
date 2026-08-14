@@ -288,14 +288,14 @@ Phase 16 is the authoritative implementation program for reaching a real beta. T
 
 | Capability | Required first-beta implementation | Abstract boundary |
 |---|---|---|
-| Auth | Firebase Web Auth passwordless email-link Auth with Firebase Admin verification | `AuthProvider` |
+| Auth | Firebase Web Auth email/password and Google Sign-In with Firebase Admin verification | `AuthProvider` |
 | Datastore | EU Firestore | `DataStore` |
-| Storage | Local/NFS for the first live run, with FTP and Firebase Storage adapters | `StorageProvider` |
+| Storage | Firebase Storage bucket `gs://the-interviewer-c3a01.firebasestorage.app`, with local/NFS test storage | `StorageProvider` |
 | Live LLM | OpenRouter using `LLM_API_KEY` and configured `LLM_MODEL` | `LLMProvider` |
-| STT | WhisperX using the `small` model on CPU | `STTProvider` |
-| TTS | Kokoro Python using `TTS_LANGUAGE`, with random per-invocation voice selection | `TTSProvider` |
-| Voice | Browser microphone chunks with timestamps and the selected VAD/streaming-Whisper seam | `AudioTransport` |
-| Evaluation | OpenRouter LLM evaluator after completion | `Evaluator` |
+| STT | WhisperX using the `small` or `small.en` model on CPU | `STTProvider` |
+| TTS | Kokoro 0.9.4 English, `af_bella` or `af_sky`, 24 kHz mono PCM | `TTSProvider` |
+| Voice | Programmatic timestamped audio buffers for the beta rehearsal; browser WebRTC remains a later transport | `AudioTransport` |
+| Evaluation | GPT-5.6 Luna Pro through OpenRouter after completion | `Evaluator` |
 | Workers | CPU-only bounded workers in one initial Docker container | worker boundary |
 | Retention | Resume 14 days, combined audio 7 days, audit/access records 30 days | retention policy |
 
@@ -310,10 +310,10 @@ These decisions are final for Phase 16 and must not be reopened by delegated imp
 - Use `LLM_API_KEY`, not `OPENROUTER_API_KEY`, for the OpenRouter credential.
 - Do not require `STT_MODEL_PATH`, `TTS_MODEL_PATH`, or `TTS_COMMAND`; WhisperX and Kokoro receive provider model/language configuration through `STT_MODEL`, `TTS_MODEL`, and language settings.
 - Use WhisperX `small` on CPU by default, Kokoro English with random supported voice selection, and OpenRouter with the configured model.
-- Use local/NFS storage for the first live run. FTP and Firebase Storage remain supported adapter options; S3 and GCS are out of scope.
-- Use timestamped browser microphone chunks as the initial live audio transport. Full custom WebRTC/TURN is not required to close this phase unless benchmark evidence selects it.
+- Use Firebase Storage as the beta storage provider with bucket `gs://the-interviewer-c3a01.firebasestorage.app`; retain local/NFS storage for deterministic and local integration checks. Ignore FTP for Phase 16. S3 and GCS are out of scope.
+- The Phase 16 live rehearsal is programmatic, not browser-dependent: an Interviewer Agent and an Interviewee Agent exchange timestamped audio buffers through the backend flow. Browser WebRTC, secure WebSocket signaling, and managed STUN/TURN remain implementation requirements for the later browser transport phase, not a Phase 16 beta-evidence gate.
 - Use one Docker container for the initial beta benchmark.
-- Live provider and browser execution is mandatory evidence. Offline tests are contract protection only.
+- Live provider execution is mandatory evidence. Phase 16 uses agent-to-agent programmatic E2E evidence instead of browser execution. Offline tests are contract protection only.
 
 ### 10.2 Required source structure
 
