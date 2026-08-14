@@ -333,7 +333,8 @@ def compose_providers(
                 raise ConfigurationError("configured TTS provider is unavailable") from exc
             tts_backend = None
     if tts_backend is None and settings.tts_provider == "piper":
-        raise ConfigurationError("piper TTS provider requires tts_command and tts_model_path settings not present in RuntimeSettings")
+        if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
+            raise ConfigurationError("piper TTS provider requires tts_command and tts_model_path settings not present in RuntimeSettings")
     if tts_backend is None and settings.tts_provider == "kokoro-onnx":
         if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
             raise ConfigurationError("kokoro-onnx backend is not implemented")

@@ -71,7 +71,7 @@ class ProviderIntegrationContractTests(unittest.TestCase):
                 self.payload = payload
                 return {"choices": [{"message": {"content": json.dumps({
                     "score": 82,
-                    "dimensions": [],
+                    "dimensions": ["Strong ownership"],
                     "summary": "Clear answer.",
                     "strengths": ["Ownership"],
                     "weaknesses": ["Brevity"],
