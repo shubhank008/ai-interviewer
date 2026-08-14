@@ -75,7 +75,7 @@ FastAPI composition root
 Local, self-hosted, and hosted provider adapters
 ```
 
-Provider paths currently include `OpenRouterHTTPTransport`, `FasterWhisperLocalBackend`, `PiperCommandBackend`, `FirebaseAdminAuthBackend`, `FirestoreGoogleBackend`, `Boto3ObjectBackend`, and `FirebaseStorageBackend`. In-memory providers remain available for deterministic tests. Optional SDKs are imported lazily, model weights are never downloaded automatically, and configured providers must not silently fall back to memory.
+Provider paths currently include `OpenRouterHTTPTransport`, `FasterWhisperLocalBackend`, `KokoroTTS`, `FirebaseAdminAuthBackend`, `FirestoreGoogleBackend`, `Boto3ObjectBackend`, and `FirebaseStorageBackend`. In-memory providers remain available for deterministic tests. Optional SDKs are imported lazily, model weights are never downloaded automatically, and configured providers must not silently fall back to memory.
 
 ## Repository layout
 
@@ -98,7 +98,9 @@ docker-compose.yml            Local API container definition
 
 ## Local development
 
-Requirements are Python 3.12+, `pip`, Node.js, npm, and optionally Docker.
+Requirements are exactly Python 3.12, `pip`, Node.js, npm, and optionally Docker. The supported runtime is recorded in [`.python-version`](.python-version), and the API image uses the Python 3.12 slim Bookworm base.
+
+Production Python dependencies in [`requirements.txt`](requirements.txt) are intentionally pinned to exact versions. This prevents an unattended minor or major release from changing the production runtime and protects provider integrations from unreviewed breaking changes. Update them only through a deliberate compatibility test and review. The weekly [major dependency check](.github/workflows/dependency-major-check.yml) reports available major releases by opening or updating a GitHub issue; it never edits requirements or deploys an update.
 
 ### Run the deterministic API
 
@@ -174,8 +176,8 @@ export PHASE15_PROFILES=openrouter,faster-whisper,piper,firebase,firestore,stora
 The current Phase 15 runner validates configuration and writes evidence, but does not automatically execute every selected live operation. Real readiness requires deliberate configured runs with real inputs, safe test accounts or buckets, and recorded evidence.
 
 - **OpenRouter:** set `OPENROUTER_API_KEY`, `LLM_MODEL`, and `LLM_PROVIDER=openrouter`. Review data sharing, retention, region, cost, and rate limits.
-- **Faster-Whisper:** install the optional package and provide an already-downloaded model directory through `STT_MODEL_PATH`. Weights are never downloaded by the application. Set `STT_PROVIDER=faster-whisper`.
-- **Piper or Kokoro:** provide an operator-installed command plus `TTS_MODEL_PATH` and `TTS_COMMAND`. Verify output sample rate, codec, playback, latency, cancellation, and license.
+- **Faster-Whisper:** install the pinned package and provide an already-downloaded model directory through `STT_MODEL`. Weights are never downloaded by the application. Set `STT_PROVIDER=faster-whisper`.
+- **Kokoro:** install the pinned package and configure `TTS_PROVIDER=kokoro`, `TTS_VOICE`, and `TTS_LANGUAGE`. Verify output sample rate, codec, playback, latency, cancellation, and license. The obsolete physical `TTS_MODEL_PATH` setting is not used.
 - **Firebase and Firestore:** provide `FIREBASE_PROJECT_ID` and a protected `FIREBASE_CREDENTIALS_PATH`. Use a non-production project and verify claims, revoked tokens, rules, owner isolation, deletion, and region.
 - **S3-compatible storage:** set `STORAGE_BACKEND`, `STORAGE_BUCKET`, and provider credentials. Use a dedicated test bucket and verify upload, download, prefixes, retries, lifecycle, and deletion.
 - **Browser and WebRTC:** set `PHASE15_BROWSER_URL` to an HTTPS browser environment and configure `WEBRTC_ICE_SERVERS` with deployment STUN/TURN. This repository does not provide a TURN server.
@@ -190,8 +192,8 @@ cp .env.example .env
 |---|---|
 | `APP_PROFILE` | `local` for deterministic development; `production` requires explicit providers |
 | `PHASE15_PROFILES` | Opt-in integration profiles |
-| `STT_PROVIDER`, `STT_MODEL_PATH` | STT selection and local model path |
-| `TTS_PROVIDER`, `TTS_MODEL_PATH`, `TTS_COMMAND` | TTS selection and command |
+| `STT_PROVIDER`, `STT_MODEL`, `STT_CPU`, `STT_LANGUAGE` | STT selection, model identifier/path, device, and language |
+| `TTS_PROVIDER`, `TTS_VOICE`, `TTS_LANGUAGE` | Kokoro provider, voice, and language |
 | `LLM_PROVIDER`, `LLM_MODEL`, `OPENROUTER_API_KEY` | LLM selection and credential |
 | `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH` | Firebase Admin and Firestore |
 | `STORAGE_BACKEND`, `STORAGE_BUCKET` | Durable object storage |

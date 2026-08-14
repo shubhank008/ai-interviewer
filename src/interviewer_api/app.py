@@ -173,7 +173,7 @@ def _tts_chain(chain: tuple[TTSProvider, ...]) -> tuple[StreamingTTSProvider, ..
     """Wrap configured batch TTS providers while retaining fallback ordering."""
     return tuple(_BatchStreamingTTS(provider) for provider in chain)
 settings = RuntimeSettings.from_env()
-runtime_providers = compose_providers(settings)
+runtime_providers = compose_providers(settings, strict=settings.profile.value == "production")
 
 
 class CreateInterviewRequest(BaseModel):
@@ -195,7 +195,9 @@ class InterviewApplication:
                 settings.firebase_credentials_path, settings.firebase_project_id
             )
             firestore_backend = FirestoreGoogleBackend(
-                settings.firebase_project_id or "", settings.firestore_database or "(default)"
+                settings.firebase_project_id or "",
+                settings.firestore_database or "(default)",
+                settings.firebase_credentials_path,
             )
             self.data = FirestoreDataStore(firestore_backend)
             storage: PersistentStorageProvider

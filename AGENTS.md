@@ -77,6 +77,9 @@ place.
 * When `/no-mistakes` reaches a blocking review gate waiting for user input (`ask_user` or `awaiting_approval`), the agent must decide autonomously whether to approve the step or authorize `--action fix`; it must record the one- or two-line rationale in the run intent or handoff summary. Choose `fix` when the finding violates an explicit requirement or correctness boundary, otherwise approve when the finding conflicts with an intentional, documented design choice.
 * Pipeline-generated commits remain part of the feature history and must be synchronized locally before the task is reported complete.
 * Phase 4 optional provider adapters must keep third-party imports, credentials, model downloads, and network calls outside module import and deterministic tests; inject a narrow backend or transport so CPU-only offline validation remains reliable.
+* Runtime configuration changes must update `.env.example` in the same change, and `.env.example` changes must be reconciled with the runtime configuration parser; never leave the template and accepted environment keys out of sync.
+* Production Python dependencies are exact-pinned in `requirements.txt`; dependency updates require deliberate compatibility testing. The weekly major-version workflow may report updates but must never modify production requirements automatically.
+
 
 * The Phase 3 local PDF parser intentionally supports text operators only; scanned or encrypted resumes require a future OCR/parser adapter and must fail safely rather than be guessed.
 * Phase 5 transport tests use local in-memory seams: REST schemas and WebSocket replay are protocol contracts, while WebRTC media is represented only by a separate media-frame buffer. Do not introduce browser automation, network dependencies, or media bytes into WebSocket event payloads for deterministic tests.
