@@ -75,7 +75,7 @@ FastAPI composition root
 Local, self-hosted, and hosted provider adapters
 ```
 
-Provider paths currently include `OpenRouterHTTPTransport`, `FasterWhisperLocalBackend`, `KokoroTTS`, `FirebaseAdminAuthBackend`, `FirestoreGoogleBackend`, `Boto3ObjectBackend`, and `FirebaseStorageBackend`. In-memory providers remain available for deterministic tests. Optional SDKs are imported lazily, model weights are never downloaded automatically, and configured providers must not silently fall back to memory.
+Provider paths currently include `OpenRouterHTTPTransport`, `FasterWhisperLocalBackend`, `KokoroTTS`, `FirebaseAdminAuthBackend`, `FirestoreGoogleBackend`, and `FirebaseStorageBackend`. In-memory providers remain available for deterministic tests. Optional SDKs are imported lazily, model weights are never downloaded automatically, and configured providers must not silently fall back to memory.
 
 ## Repository layout
 
