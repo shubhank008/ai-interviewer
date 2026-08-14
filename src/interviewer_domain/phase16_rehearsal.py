@@ -376,6 +376,7 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
             else InternalRehearsalAuth(rehearsal_uid)
         )
         data = FirestoreDataStore(FirestoreGoogleBackend(project or "", settings.firestore_database or "(default)", credentials))
+        storage: RehearsalStorage
         if settings.storage_backend == "local":
             storage = LocalFilesystemStorage(settings.storage_path)
         elif settings.storage_backend == "gcs":
