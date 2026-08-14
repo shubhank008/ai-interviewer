@@ -1075,8 +1075,8 @@ class ConfigurationEdgeCases(unittest.TestCase):
     def test_skip_reason_all_profiles(self) -> None:
         from interviewer_domain.adapters.integrations import skip_reason
 
-        self.assertIn("STT_MODEL_PATH", skip_reason("faster-whisper", {}))
-        self.assertIn("TTS_MODEL_PATH", skip_reason("piper", {}))
+        self.assertIn("STT_MODEL", skip_reason("faster-whisper", {}))
+        self.assertIn("TTS_MODEL", skip_reason("piper", {}))
         self.assertIn("FIREBASE_PROJECT_ID", skip_reason("firestore", {}))
         self.assertIn("STORAGE_BUCKET", skip_reason("storage", {}))
         self.assertIn("PHASE15_BROWSER_URL", skip_reason("webrtc", {}))

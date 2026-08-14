@@ -1,0 +1,88 @@
+name: Check major dependency updates
+
+on:
+  schedule:
+    - cron: "17 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: Report available major releases
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find newer major releases
+        id: versions
+        shell: python
+        run: |
+          import json
+          import os
+          import re
+          from urllib.request import Request, urlopen
+
+          updates = []
+          for line in open("requirements.txt", encoding="utf-8"):
+              match = re.match(r"^([A-Za-z0-9_.-]+)(?:\\[[^]]+\\])?==([0-9]+(?:\\.[0-9]+)*)$", line.strip())
+              if not match:
+                  continue
+              package, current = match.groups()
+              request = Request(
+                  f"https://pypi.org/pypi/{package}/json",
+                  headers={"User-Agent": "ai-interviewer-major-dependency-check"},
+              )
+              with urlopen(request, timeout=20) as response:
+                  latest = json.load(response)["info"]["version"]
+              current_major = int(current.split(".")[0])
+              latest_major = int(latest.split(".")[0])
+              if latest_major > current_major:
+                  updates.append(f"- `{package}`: `{current}` -> `{latest}`")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write("updates<<EOF\\n")
+              output.write("\\n".join(updates))
+              output.write("\\nEOF\\n")
+
+      - name: Create or update tracking issue
+        if: steps.versions.outputs.updates != ''
+        uses: actions/github-script@v7
+        env:
+          UPDATES: ${{ steps.versions.outputs.updates }}
+        with:
+          script: |
+            const title = "Major Python dependency updates require review";
+            const body = [
+              "The scheduled dependency check found newer major releases.",
+              "",
+              process.env.UPDATES,
+              "",
+              "This issue was created by an AI agent (GitHub Actions automation) on behalf of the repository maintainers.",
+              "Do not update production requirements automatically. Review release notes, run the compatibility and live-provider gates, then update the exact pins manually."
+            ].join("\\n");
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+            });
+            const existing = issues.find((issue) => issue.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              });
+            }

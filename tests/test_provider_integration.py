@@ -29,7 +29,7 @@ class ProviderIntegrationContractTests(unittest.TestCase):
 
     def test_profiles_are_opt_in_and_missing_configuration_is_explicit(self) -> None:
         self.assertEqual(configured_profiles({}), ())
-        self.assertEqual(skip_reason("openrouter", {}), "required configuration absent: OPENROUTER_API_KEY, LLM_MODEL")
+        self.assertEqual(skip_reason("openrouter", {}), "required configuration absent: LLM_API_KEY, LLM_MODEL")
         self.assertEqual(skip_reason("firebase", {}), "required configuration absent: FIREBASE_PROJECT_ID, FIREBASE_CREDENTIALS_PATH")
 
     def test_openrouter_transport_requires_credential_before_network(self) -> None:

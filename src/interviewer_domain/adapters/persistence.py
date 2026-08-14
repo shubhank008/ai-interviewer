@@ -107,6 +107,7 @@ class FirestoreBackend(Protocol):
         self, collection: str, field: str, value: str
     ) -> None: ...
     def delete_collection(self, collection: str) -> None: ...
+    def delete_document(self, collection: str, document_id: str) -> None: ...
 
 
 class ObjectBackend(Protocol):
@@ -412,7 +413,11 @@ class FirestoreDataStore:
         value = self.backend.get(self.collection, str(interview_id))
         if value is None or value.get("user_id") != user_id:
             raise ProviderError(ErrorCode.UNAVAILABLE, "interview not found")
-        self.backend.delete_collection_value(self.collection, "id", str(interview_id))
+        delete_document = getattr(self.backend, "delete_document", None)
+        if delete_document is not None:
+            delete_document(self.collection, str(interview_id))
+        else:
+            self.backend.delete_collection_value(self.collection, "id", str(interview_id))
         self.backend.delete_collection(f"{self.collection}/{interview_id}")
         self.backend.delete_collection(f"{self.collection}/{interview_id}/transcripts")
 

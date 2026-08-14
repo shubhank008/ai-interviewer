@@ -25,6 +25,7 @@ from interviewer_domain.configuration import (
     ProviderReadinessChecker,
     RuntimeSettings,
     compose_providers,
+    validate_beta_composition,
 )
 from interviewer_domain.contracts import ErrorCode, ProviderError
 from interviewer_domain.models import InterviewMode, InterviewSession, Turn, TranscriptSegment, Recording, LifecycleEvent
@@ -172,7 +173,7 @@ def _tts_chain(chain: tuple[TTSProvider, ...]) -> tuple[StreamingTTSProvider, ..
     """Wrap configured batch TTS providers while retaining fallback ordering."""
     return tuple(_BatchStreamingTTS(provider) for provider in chain)
 settings = RuntimeSettings.from_env()
-runtime_providers = compose_providers(settings)
+runtime_providers = compose_providers(settings, strict=settings.profile.value == "production")
 
 
 class CreateInterviewRequest(BaseModel):
@@ -189,11 +190,14 @@ class InterviewApplication:
         self.data: PersistentDataStore
         self.auth: AuthProvider
         if settings.profile.value == "production":
+            validate_beta_composition(settings)
             auth_backend = FirebaseAdminAuthBackend(
                 settings.firebase_credentials_path, settings.firebase_project_id
             )
             firestore_backend = FirestoreGoogleBackend(
-                settings.firebase_project_id or "", settings.firestore_database or "(default)"
+                settings.firebase_project_id or "",
+                settings.firestore_database or "(default)",
+                settings.firebase_credentials_path,
             )
             self.data = FirestoreDataStore(firestore_backend)
             storage: PersistentStorageProvider
