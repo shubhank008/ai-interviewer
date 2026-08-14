@@ -15,7 +15,7 @@ from ..contracts import ErrorCode, ProviderError
 from ..models import Evaluation, InterviewMode, Recording, TranscriptSegment
 
 DEFAULT_RETENTION_DAYS = 14
-MAX_RESUME_BYTES = 5 * 1024 * 1024
+MAX_RESUME_BYTES = 10 * 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -491,7 +491,7 @@ class UploadValidator:
     ) -> Upload:
         """Require a PDF signature, PDF-like name, and the configured size bound."""
         if len(content) > MAX_RESUME_BYTES:
-            raise ProviderError(ErrorCode.INVALID_REQUEST, "resume exceeds 5 MB limit")
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "resume exceeds 10 MB limit")
         if not filename.lower().endswith(".pdf") or not content.startswith(b"%PDF"):
             raise ProviderError(ErrorCode.INVALID_REQUEST, "resume must be a PDF")
         normalized_type = (

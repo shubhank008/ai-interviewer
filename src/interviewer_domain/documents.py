@@ -8,7 +8,7 @@ from dataclasses import replace
 from .contracts import ErrorCode, ProviderError
 from .models import DocumentChunk, DocumentSource
 
-MAX_RESUME_BYTES = 5 * 1024 * 1024
+MAX_RESUME_BYTES = 10 * 1024 * 1024
 MIN_CHUNK_LENGTH = 40
 MAX_CHUNK_LENGTH = 800
 _INSTRUCTION_PATTERN = re.compile(
@@ -27,7 +27,7 @@ class LocalDocumentParser:
         if not content:
             raise ProviderError(ErrorCode.INVALID_REQUEST, "document is empty")
         if document_source is DocumentSource.RESUME and len(content) > MAX_RESUME_BYTES:
-            raise ProviderError(ErrorCode.INVALID_REQUEST, "resume exceeds 5 MB limit")
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "resume exceeds 10 MB limit")
         if document_source is DocumentSource.RESUME:
             if content_type != "application/pdf" or not content.startswith(b"%PDF-"):
                 raise ProviderError(ErrorCode.INVALID_REQUEST, "resume must be a PDF")
