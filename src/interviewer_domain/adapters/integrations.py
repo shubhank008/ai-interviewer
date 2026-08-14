@@ -48,13 +48,13 @@ class LocalWhisperBackend:
                 import whisperx  # type: ignore[import-not-found]
             except ImportError as exc:
                 raise IntegrationSkipped("whisperx package is not installed") from exc
-            self.model = whisperx.load_model(model, device, compute_type="float32" if device != "cpu" else "int8", download_root=model_path)
+            self.model = whisperx.load_model(model, device, compute_type="float32" if device != "cpu" else "int8")
         elif provider == "openai-whisper":
             try:
                 import whisper  # type: ignore[import-not-found]
             except ImportError as exc:
                 raise IntegrationSkipped("openai-whisper package is not installed") from exc
-            self.model = whisper.load_model(model, device=device, download_root=model_path)
+            self.model = whisper.load_model(model, device=device)
         else:
             raise IntegrationSkipped("unsupported local Whisper provider")
 

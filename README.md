@@ -75,7 +75,7 @@ FastAPI composition root
 Local, self-hosted, and hosted provider adapters
 ```
 
-Provider paths currently include `OpenRouterHTTPTransport`, `FasterWhisperLocalBackend`, `KokoroTTS`, `FirebaseAdminAuthBackend`, `FirestoreGoogleBackend`, and `FirebaseStorageBackend`. In-memory providers remain available for deterministic tests. Optional SDKs are imported lazily, model weights are never downloaded automatically, and configured providers must not silently fall back to memory.
+Provider paths currently include `OpenRouterHTTPTransport`, `FasterWhisperLocalBackend`, `KokoroTTS`, `FirebaseAdminAuthBackend`, `FirestoreGoogleBackend`, `Boto3ObjectBackend`, and `FirebaseStorageBackend`. In-memory providers remain available for deterministic tests. Optional SDKs are imported lazily, model weights are never downloaded automatically, and configured providers must not silently fall back to memory.
 
 ## Repository layout
 
@@ -178,7 +178,7 @@ The Phase 16 rehearsal runner must execute every selected live operation with re
 - **WhisperX:** set `STT_PROVIDER=whisperx`, `STT_MODEL=small`, and provision model assets before startup. The application never downloads weights automatically. Benchmark latency, CPU, memory, and failure behavior without setting a release target first.
 - **Kokoro:** set `TTS_PROVIDER=kokoro` and `TTS_LANGUAGE=en`. Select a supported voice randomly per invocation, normalize to a browser-compatible format, and benchmark playback, cancellation, and quality.
 - **Firebase and Firestore:** provide the beta `FIREBASE_PROJECT_ID`, protected `FIREBASE_CREDENTIALS_PATH`, Firebase Web Auth configuration, and EU Firestore. Use passwordless email-link Auth with open signup. Firestore rules remain managed in Firebase; application owner checks remain mandatory.
-- **Storage:** support `STORAGE_BACKEND=local`, `ftp`, or `firebase`. Local storage must work on an NFS-mounted path. The beta Firebase bucket is `gs://the-interviewer-c3a01.firebasestorage.app` in US-EAST1. Exercise every adapter’s upload, replay, retention, partial failure, and deletion behavior. S3/GCS are out of scope.
+- **Storage:** support `STORAGE_BACKEND=local`, `ftp`, or `firebase`. Local storage must work on an NFS-mounted path. The beta Firebase bucket is `gs://the-interviewer-c3a01.firebasestorage.app` in US-EAST1. Exercise every adapter's upload, replay, retention, partial failure, and deletion behavior. S3/GCS are out of scope.
 - **Browser audio:** begin with the simplest reliable timestamped microphone-chunk path. Benchmark Silero VAD, SimulStreaming, or a full WebRTC/TURN path before selecting one. Do not assume custom TURN is required.
 - **Fixtures:** use `tests/resume_demo.pdf` and `tests/job_description.txt`; enforce 10 MB limits for each job description and resume. Show an unlocked-PDF error for protected documents and route scanned PDFs through an explicit extraction pass.
 
