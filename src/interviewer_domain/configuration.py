@@ -133,7 +133,7 @@ class RuntimeSettings:
             llm_provider=values.get("LLM_PROVIDER", "in-memory"),
             llm_fallback_provider=values.get("LLM_FALLBACK_PROVIDER", "in-memory"),
             llm_api_key=_optional(values, "LLM_API_KEY"),
-            llm_model=values.get("LLM_MODEL", "default").lstrip("~"),
+            llm_model=values.get("LLM_MODEL", "default"),
             webrtc_ice_servers=values.get(
                 "WEBRTC_ICE_SERVERS", "stun:stun.l.google.com:19302"
             ),
