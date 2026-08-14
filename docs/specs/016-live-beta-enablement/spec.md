@@ -10,16 +10,18 @@ The beta uses one explicit provider set rather than a collection of unexercised 
 |---|---|---|
 | Authentication | Firebase Auth | `AuthProvider` |
 | Datastore | Firestore | `DataStore` |
-| Storage | Firebase Storage and local filesystem | `StorageProvider` |
-| Live LLM | OpenRouter | `LLMProvider` |
-| STT | Faster-Whisper | `STTProvider` |
-| TTS | Kokoro | `TTSProvider` |
-| Voice service | WebRTC | `AudioTransport` |
-| Evaluation | LLM-based evaluator | `Evaluator` |
-| Workers | CPU-only | worker process boundary |
-| Retention | 14 days | policy service |
+| Storage | Local filesystem, FTP storage, or Firebase Storage | `StorageProvider` |
+| Live LLM | OpenRouter using `LLM_MODEL` | `LLMProvider` |
+| STT | WhisperX using the `small` model | `STTProvider` |
+| TTS | Kokoro using `TTS_LANGUAGE`, with random per-invocation voice selection | `TTSProvider` |
+| Voice input | Browser microphone chunks with timestamped processing; evaluate VAD or streaming Whisper seams before custom WebRTC | `AudioTransport` |
+| Evaluation | OpenRouter LLM evaluator | `Evaluator` |
+| Runtime | One Docker container for the beta benchmark; split workers are a roadmap item | service composition |
+| Resume retention | 14 days | policy service |
+| Combined audio retention | 7 days | policy service |
+| Audit-log retention | 30 days | policy service |
 
-The beta is a real vertical slice. Deterministic providers remain available for offline development, but they cannot satisfy beta acceptance criteria.
+The beta is a live vertical slice. Offline tests and deterministic providers are not release evidence and must never mark beta readiness as passed.
 
 ## Service flow
 
@@ -30,28 +32,30 @@ Firebase Web Auth
   -> Firebase uid and owner scope
 
 React setup
-  -> POST job description and resume metadata
-  -> API validates 5 MB PDF limit
+  -> Firebase passwordless email signup or login
+  -> POST job description and optional resume metadata
+  -> API validates 10 MB job-description and 10 MB resume limits
   -> StorageProvider stores original resume
-  -> DocumentParser extracts text
+  -> DocumentParser extracts text or invokes the approved scanned-PDF extraction pass
   -> RetrievalProvider stores source-linked chunks
 
 POST /sessions
   -> Firestore session record
   -> authorized WebSocket control channel
-  -> WebRTC offer/answer and ICE signaling
-  -> server audio worker receives microphone track
+  -> authenticated browser audio session
+  -> selected microphone chunk transport and timestamp contract
 
 Candidate audio
-  -> WebRTC audio track
-  -> CPU Faster-Whisper worker
+  -> browser microphone chunks with timestamps
+  -> optional VAD or streaming-Whisper seam, selected by benchmark evidence
+  -> CPU WhisperX worker
   -> partial/final transcript events
   -> interview state machine and RAG context
   -> OpenRouter structured streaming response
   -> sentence chunker and Kokoro CPU TTS worker
-  -> WebRTC agent audio track
+  -> browser-compatible compressed audio playback
   -> Firestore transcript/event persistence
-  -> recording storage
+  -> combined interview recording storage for 7 days
 
 POST /sessions/{id}/complete
   -> immutable final transcript
@@ -63,10 +67,73 @@ POST /sessions/{id}/complete
 
 DELETE /sessions/{id}
   -> delete Firestore records
-  -> delete Firebase/local objects
-  -> delete derived chunks and evaluation
-  -> verify no owned artifacts remain
+  -> delete local, FTP, or Firebase objects
+  -> delete derived chunks, cached context, transcript, recording, and evaluation
+  -> verify no owned artifacts remain across every selected backend
 ```
+
+## Service decisions
+
+### Authentication and account policy
+
+- Firebase Web Auth is the only beta browser authentication path.
+- The sign-in method is passwordless email link authentication.
+- Open signup is enabled.
+- The Firebase project and Admin SDK JSON configured in the environment are beta resources. Production may use a different project and credential file without changing this contract.
+- Domain authorization is not a beta requirement for passwordless email sign-in.
+- The current scope does not include an operator or recruiter administration panel. A separate backend or panel will later provide approved system-admin access to interview data.
+
+### Firebase and Firestore
+
+- Firestore is hosted in the EU region.
+- Firestore security rules are managed in Firebase/Firestore rather than this repository.
+- The application must still enforce server-side owner checks for every user-owned resource.
+- Audit logs and access records retain for 30 days.
+- Account deletion removes all user-owned Firestore, storage, transcript, recording, evaluation, cache, and derived data.
+
+### Storage
+
+- Supported beta storage adapters are local filesystem, FTP storage, and Firebase Storage.
+- S3 and GCS adapters are out of scope for this phase and must not be presented as selected beta providers.
+- Local filesystem storage must support an externally mounted filesystem such as NFS.
+- Firebase Storage uses `gs://the-interviewer-c3a01.firebasestorage.app` in the beta configuration and the US-EAST1 region.
+- The live storage rehearsal must switch between local/FTP and Firebase Storage and exercise upload, download, replay, retention, partial failure, and deletion.
+- Resume objects retain for 14 days. Combined interview audio retains for 7 days. Other user-owned artifacts follow the resume policy unless a more restrictive lifecycle is required.
+
+### Inputs and resume processing
+
+- The sample fixtures are `tests/resume_demo.pdf` and `tests/job_description.txt`.
+- Job descriptions and PDF resumes have a 10 MB maximum each, regardless of whether the job description is uploaded, supplied as text, or pasted into the UI.
+- Password-protected PDFs must produce a graceful user-facing error requesting an unlocked PDF.
+- Scanned PDFs are supported through a separate extraction pass that may produce text or Markdown using an approved LLM/parser adapter. OCR or extraction failure must be explicit and must not invent content.
+- Resume content may be sent to the selected LLM or injected into the system context when the interview script is generated. This is disclosed in the privacy notice.
+
+### Speech and audio
+
+- WhisperX is the active STT provider and the active model is `small` from `STT_PROVIDER=whisperx` and `STT_MODEL=small`.
+- No fixed latency or concurrency target is assumed initially. The live benchmark matrix measures provider, model, latency, CPU, memory, and failure behavior using the supplied sample audio and Kokoro-generated test audio.
+- Kokoro uses `TTS_LANGUAGE=en`. Voice selection is randomized per invocation from the supported voices for that language.
+- Browser audio must use the best supported compressed format that preserves intelligibility and playback reliability; WAV remains an allowed fallback for compatibility.
+- The browser microphone flow should prefer a proven chunked capture or VAD/streaming-Whisper approach over a custom full WebRTC media pipeline when benchmark and reliability evidence support it. Silero VAD and SimulStreaming are candidate integrations, not yet selected providers.
+
+### LLM and evaluation
+
+- OpenRouter uses the configured `LLM_MODEL=~deepseek/deepseek-v4-flash-latest`, normalized by configuration as needed.
+- The live benchmark records token usage, elapsed time, provider/model, and cost when available. There is no pre-set maximum cost per interview yet.
+- OpenRouter requests have a 60 second timeout and up to 3 retries. Permanent failures such as insufficient balance, invalid model, or HTTP 404 must not be retried.
+- A permanent or exhausted provider failure fails the interview and presents a safe service-unavailable error to the user. Detailed errors and stack traces are internal-only. No fallback provider is required in this phase.
+- The live E2E benchmark must emit a redacted table of token, time, and cost metrics.
+
+### Deployment and operations
+
+- The beta deployment target is Docker containers, initially tested as a single container on a self-hosted host or Railway profile.
+- The first benchmark measures the single-container resource profile. API, model/audio, and evaluation workers may later be split into separate containers for scaling; that separation is a roadmap item, not a Phase 16 prerequisite.
+- Beta users are real candidates. Privacy and consent must be shown before data collection and must disclose external LLM processing.
+- Only the account owner and the system administrator may access recordings and evaluations. The separate administration surface is out of scope for this repository.
+
+### Privacy and consent placeholder
+
+Before interview setup, the UI must show a placeholder consent notice stating that the service collects job descriptions, resumes, microphone audio, transcripts, recordings, and evaluations; sends resume, transcript, audio-derived content, and evaluation context to OpenRouter or the selected LLM provider; retains resumes for 14 days and combined recordings for 7 days; retains audit/access records for 30 days; and deletes user-owned data when the account is deleted. The final legal text, controller identity, regional disclosures, and provider-specific terms require a later legal review.
 
 ## Normalized schemas
 
@@ -95,7 +162,7 @@ The API stores normalized job-description text, source references, content hashe
   "owner_id": "firebase uid",
   "mode": "recruiter|technical",
   "status": "created|connecting|active|interrupted|completed|failed|deleted",
-  "provider_set": {"stt": "faster-whisper", "tts": "kokoro", "llm": "openrouter"},
+  "provider_set": {"stt": "whisperx-small", "tts": "kokoro", "llm": "openrouter"},
   "created_at": "RFC3339",
   "expires_at": "RFC3339"
 }
@@ -128,7 +195,7 @@ Events are ordered, replayable after acknowledgement, idempotent where applicabl
   "end_ms": 1200,
   "final": true,
   "confidence": 0.0,
-  "source": "faster-whisper|llm|correction"
+  "source": "whisperx|llm|correction"
 }
 ```
 
@@ -164,16 +231,17 @@ The evaluator uses a separate structured schema containing `score`, `summary`, `
 - [ ] A clean deployment starts with the documented CPU-only configuration.
 - [ ] Firebase browser signup, login, logout, refresh, protected routes, and server-side token verification work.
 - [ ] Firestore stores and retrieves owner-scoped setup, sessions, events, transcripts, evaluations, and deletion state.
-- [ ] Firebase Storage and local filesystem adapters both satisfy upload, download, replay, retention, and deletion contracts.
+- [ ] Local/NFS-compatible, FTP, and Firebase Storage adapters each satisfy upload, download, replay, retention, partial-failure, and deletion contracts.
 - [ ] A real PDF resume and job description pass through storage, parsing, source-linked retrieval, and prompt context.
-- [ ] A real browser microphone track reaches Faster-Whisper and produces partial and final timestamped transcript events.
-- [ ] OpenRouter generates validated structured interviewer responses with streaming, cancellation, timeout, cost, and model metadata.
-- [ ] Kokoro produces browser-compatible audio with bounded latency, sequencing, interruption, and cancellation.
-- [ ] WebRTC works over the configured STUN/TURN deployment from an external browser network.
+- [ ] Browser microphone capture reaches WhisperX through the selected chunked, VAD, streaming-Whisper, or WebRTC transport and produces partial and final timestamped transcript events.
+- [ ] OpenRouter generates validated structured interviewer responses with streaming, cancellation, 60 second timeout, up to 3 retries, cost, and model metadata.
+- [ ] Kokoro uses English and randomized per-invocation voices to produce browser-compatible audio with benchmarked sequencing, interruption, and cancellation.
+- [ ] The selected browser audio transport works from the target browser environment; a custom STUN/TURN WebRTC deployment is required only if that transport is selected by the benchmark.
 - [ ] The browser completes at least one recruiter and one technical interview using real providers.
 - [ ] Candidate and interviewer audio, final transcript, events, and evaluation persist and replay from durable storage.
 - [ ] The LLM evaluator runs only after completion and stores validated feedback with score 0 through 100.
 - [ ] Deleting an interview removes raw, derived, cached, transcript, recording, evaluation, and provider-created test artifacts.
 - [ ] The beta reports provider, model, version, device, latency, cost, quality, failure, and limitation metadata without sensitive payloads.
-- [ ] Negative cases cover invalid auth, owner mismatch, malformed PDF/audio, provider timeout, cancellation, quota/rate limit, WebRTC failure, storage failure, and deletion failure.
-- [ ] Offline tests remain credential-free and cannot mark this beta acceptance as passed.
+- [ ] Negative cases cover invalid auth, owner mismatch, malformed PDF/audio, provider timeout, cancellation, quota/rate limit, selected browser-audio transport failure, storage failure, and deletion failure.
+- [ ] Live tests are the only release evidence. Offline tests may protect contracts but cannot mark any Phase 16 acceptance item as passed.
+- [ ] Every live marker is backed by an exercised run, and skipped configuration never passes readiness.

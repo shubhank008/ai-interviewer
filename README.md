@@ -35,8 +35,8 @@ The intended post-interview experience includes replayable audio, a timestamped 
 | STT | In-memory fixture | Faster-Whisper local backend | Phase 15 contract; skipped live |
 | TTS | In-memory fixture | Piper/Kokoro command backend | Phase 15 contract; skipped live |
 | LLM | In-memory fixture | OpenRouter HTTP transport | Phase 15 contract; skipped live |
-| Auth and data | Dev token and memory stores | Firebase Admin, Firestore, S3 seams | Skipped live |
-| Browser media | Local WebSocket/WebRTC boundary | Real microphone and TURN | Skipped live |
+| Auth and data | Dev token and memory stores | Firebase Auth, Firestore, local/FTP/Firebase Storage | Skipped live |
+| Browser media | Local timestamped audio boundary | Selected real browser microphone transport | Skipped live |
 | Evaluation | Deterministic post-interview evaluator | Provider selection is future work | Phase 14 offline |
 
 Requirements are in [`SPEC.md`](SPEC.md), implementation status is in [`PLAN.md`](PLAN.md), and provider operations are in [`docs/provider-readiness.md`](docs/provider-readiness.md).
@@ -46,12 +46,12 @@ Requirements are in [`SPEC.md`](SPEC.md), implementation status is in [`PLAN.md`
 1. The candidate authenticates, enters a text job description, selects a mode, and optionally selects a PDF resume.
 2. Text PDF ingestion validates, parses, normalizes, chunks, and retrieves relevant evidence. Documents are untrusted data, never system instructions.
 3. A session is created through the versioned API and authorized for the current user.
-4. HTTP handles setup and resources, WebSocket handles ordered control and transcript/status events, and WebRTC handles microphone and agent audio. Media frames never enter WebSocket control messages.
+4. HTTP handles setup and resources, WebSocket handles ordered control and transcript/status events, and the selected browser audio transport handles microphone and agent audio. Media frames never enter WebSocket control messages.
 5. `LiveVoiceOrchestrator` coordinates STT, interview state, LLM generation, TTS scheduling, interruption, cancellation, fallback, and timestamped artifacts.
 6. Completion persists transcript, recording metadata, events, and evaluation artifacts. Evaluation runs only after completion from final transcript evidence.
 7. History, replay, transcript, results, retention, and deletion use owner-checked boundaries.
 
-The local profile exercises these contracts without credentials or external network calls. It does not prove speech quality, model quality, Firebase behavior, or production WebRTC connectivity.
+The local profile exercises these contracts without credentials or external network calls. It does not prove speech quality, model quality, Firebase behavior, or production browser-audio connectivity.
 
 ## Architecture
 
@@ -61,7 +61,7 @@ Business logic is provider-neutral. Capability interfaces define normalized payl
 React browser UI
     | HTTP REST: setup, sessions, history, transcript, results
     | WebSocket: control, signaling, transcript, status, replay
-    | WebRTC: microphone and agent audio
+    | Selected browser audio transport: microphone and agent audio
     v
 FastAPI composition root
     | AuthProvider
@@ -75,14 +75,14 @@ FastAPI composition root
 Local, self-hosted, and hosted provider adapters
 ```
 
-Provider paths currently include `OpenRouterHTTPTransport`, `FasterWhisperLocalBackend`, `KokoroTTS`, `FirebaseAdminAuthBackend`, `FirestoreGoogleBackend`, `Boto3ObjectBackend`, and `FirebaseStorageBackend`. In-memory providers remain available for deterministic tests. Optional SDKs are imported lazily, model weights are never downloaded automatically, and configured providers must not silently fall back to memory.
+Provider paths currently include `OpenRouterHTTPTransport`, `FasterWhisperLocalBackend`, `KokoroTTS`, `FirebaseAdminAuthBackend`, `FirestoreGoogleBackend`, and `FirebaseStorageBackend`. In-memory providers remain available for deterministic tests. Optional SDKs are imported lazily, model weights are never downloaded automatically, and configured providers must not silently fall back to memory.
 
 ## Repository layout
 
 ```text
 src/interviewer_domain/       Domain models, contracts, routing, orchestration
   capabilities/               Protocols, normalized DTOs, provider errors
-  adapters/                   Firebase, Firestore, storage, OpenRouter, STT, TTS, WebRTC adapters
+  adapters/                   Firebase, Firestore, storage, OpenRouter, STT, TTS, browser-audio adapters
   providers/in_memory/        Deterministic local implementations
 src/interviewer_api/          FastAPI REST, WebSocket, and composition root
 frontend/src/                 React UI, API clients, auth, media, transport
@@ -125,7 +125,7 @@ npm ci
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Open <http://127.0.0.1:5173>. The current frontend uses local identity and a development token. A reverse proxy must route `/api` and WebSocket upgrades to the API. Real microphone/WebRTC use requires HTTPS.
+Open <http://127.0.0.1:5173>. The current frontend uses local identity and a development token. A reverse proxy must route `/api` and WebSocket upgrades to the API. Real microphone/browser-audio use requires HTTPS.
 
 ```bash
 npm run lint
@@ -136,7 +136,7 @@ npm run build
 
 ### Run with Docker
 
-The supplied Compose file runs the API only. It does not serve React, provide Firebase, start model workers, provide TURN, or provision durable storage.
+The supplied Compose file runs the API only. It does not serve React, provide Firebase, start model workers, or provision durable storage.
 
 ```bash
 docker compose up --build
@@ -161,27 +161,26 @@ Run the frontend separately or serve its built `frontend/dist` through an HTTPS 
 | WS | `/ws/v1/sessions/{id}/media` | Authenticated microphone frame channel |
 | WS | `/ws/v1/sessions/{id}/signaling` | Authenticated signaling channel |
 
-The FastAPI composition root is still development-oriented: it creates in-memory auth, persistence, and storage at startup. Concrete production provider classes exist, but complete production composition and verification remain outstanding.
+The FastAPI composition root is being moved to the Phase 16 live beta configuration: Firebase passwordless email-link Auth, Firestore, local/NFS-compatible or FTP or Firebase Storage, WhisperX small, OpenRouter, and Kokoro. The single Docker container is the initial self-hosted/Railway benchmark target. The live composition and browser rehearsal remain outstanding until the Phase 16 markers are exercised.
 
 ## Provider integrations
 
-Phase 15 profiles distinguish `exercised`, `skipped`, and `failed`. Missing configuration is a skip, not a readiness pass. A selected profile that fails is a failure.
+Phase 16 is live-first. Live provider runs distinguish `exercised`, `skipped`, and `failed`; missing configuration is a skip, not a readiness pass, and a selected provider failure is a failure. Offline tests may protect contracts but cannot pass beta readiness.
 
 ```bash
 export PYTHONPATH="$PWD/src"
-./scripts/test_phase15.sh
-export PHASE15_PROFILES=openrouter,faster-whisper,piper,firebase,firestore,storage,webrtc
-./scripts/test_phase15.sh
+./scripts/test_phase16.sh
 ```
 
-The current Phase 15 runner validates configuration and writes evidence, but does not automatically execute every selected live operation. Real readiness requires deliberate configured runs with real inputs, safe test accounts or buckets, and recorded evidence.
+The Phase 16 rehearsal runner must execute every selected live operation with real test accounts, fixtures, providers, and browser media. It must write only redacted evidence and benchmark metadata.
 
-- **OpenRouter:** set `OPENROUTER_API_KEY`, `LLM_MODEL`, and `LLM_PROVIDER=openrouter`. Review data sharing, retention, region, cost, and rate limits.
-- **Faster-Whisper:** install the pinned package and provide an already-downloaded model directory through `STT_MODEL`. Weights are never downloaded by the application. Set `STT_PROVIDER=faster-whisper`.
-- **Kokoro:** install the pinned package and configure `TTS_PROVIDER=kokoro`, `TTS_VOICE`, and `TTS_LANGUAGE`. Verify output sample rate, codec, playback, latency, cancellation, and license. The obsolete physical `TTS_MODEL_PATH` setting is not used.
-- **Firebase and Firestore:** provide `FIREBASE_PROJECT_ID` and a protected `FIREBASE_CREDENTIALS_PATH`. Use a non-production project and verify claims, revoked tokens, rules, owner isolation, deletion, and region.
-- **S3-compatible storage:** set `STORAGE_BACKEND`, `STORAGE_BUCKET`, and provider credentials. Use a dedicated test bucket and verify upload, download, prefixes, retries, lifecycle, and deletion.
-- **Browser and WebRTC:** set `PHASE15_BROWSER_URL` to an HTTPS browser environment and configure `WEBRTC_ICE_SERVERS` with deployment STUN/TURN. This repository does not provide a TURN server.
+- **OpenRouter:** set `OPENROUTER_API_KEY`, `LLM_MODEL=~deepseek/deepseek-v4-flash-latest`, and `LLM_PROVIDER=openrouter`. Requests use a 60-second timeout and up to three transient retries; permanent errors fail without retry. Record redacted token, time, and cost metrics. Review external LLM data sharing.
+- **WhisperX:** set `STT_PROVIDER=whisperx`, `STT_MODEL=small`, and provision model assets before startup. The application never downloads weights automatically. Benchmark latency, CPU, memory, and failure behavior without setting a release target first.
+- **Kokoro:** set `TTS_PROVIDER=kokoro` and `TTS_LANGUAGE=en`. Select a supported voice randomly per invocation, normalize to a browser-compatible format, and benchmark playback, cancellation, and quality.
+- **Firebase and Firestore:** provide the beta `FIREBASE_PROJECT_ID`, protected `FIREBASE_CREDENTIALS_PATH`, Firebase Web Auth configuration, and EU Firestore. Use passwordless email-link Auth with open signup. Firestore rules remain managed in Firebase; application owner checks remain mandatory.
+- **Storage:** support `STORAGE_BACKEND=local`, `ftp`, or `firebase`. Local storage must work on an NFS-mounted path. The beta Firebase bucket is `gs://the-interviewer-c3a01.firebasestorage.app` in US-EAST1. Exercise every adapter’s upload, replay, retention, partial failure, and deletion behavior. S3/GCS are out of scope.
+- **Browser audio:** begin with the simplest reliable timestamped microphone-chunk path. Benchmark Silero VAD, SimulStreaming, or a full WebRTC/TURN path before selecting one. Do not assume custom TURN is required.
+- **Fixtures:** use `tests/resume_demo.pdf` and `tests/job_description.txt`; enforce 10 MB limits for each job description and resume. Show an unlocked-PDF error for protected documents and route scanned PDFs through an explicit extraction pass.
 
 ## Configuration
 
@@ -192,15 +191,17 @@ cp .env.example .env
 | Variable | Purpose |
 |---|---|
 | `APP_PROFILE` | `local` for deterministic development; `production` requires explicit providers |
-| `PHASE15_PROFILES` | Opt-in integration profiles |
-| `STT_PROVIDER`, `STT_MODEL`, `STT_CPU`, `STT_LANGUAGE` | STT selection, model identifier/path, device, and language |
-| `TTS_PROVIDER`, `TTS_VOICE`, `TTS_LANGUAGE` | Kokoro provider, voice, and language |
-| `LLM_PROVIDER`, `LLM_MODEL`, `OPENROUTER_API_KEY` | LLM selection and credential |
-| `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH` | Firebase Admin and Firestore |
-| `STORAGE_BACKEND`, `STORAGE_BUCKET` | Durable object storage |
-| `PHASE15_BROWSER_URL` | Browser integration target |
-| `WEBRTC_ICE_SERVERS` | STUN/TURN list |
-| `RETENTION_DAYS` | Default retention, currently 14 days |
+| `PHASE15_PROFILES` | Legacy opt-in integration profiles; Phase 16 uses the live rehearsal runner |
+| `STT_PROVIDER`, `STT_MODEL`, `STT_CPU`, `STT_LANGUAGE` | WhisperX selection, model identifier/path, device, and language; beta uses `whisperx` and `small` |
+| `TTS_PROVIDER`, `TTS_VOICE`, `TTS_LANGUAGE` | Kokoro provider, optional voice pool, and language; beta uses English with random per-call voice selection |
+| `LLM_PROVIDER`, `LLM_MODEL`, `OPENROUTER_API_KEY` | OpenRouter selection, beta model, and credential |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH`, Firebase Web Auth settings | Beta Firebase Admin/Web Auth and EU Firestore |
+| `STORAGE_BACKEND`, `STORAGE_PATH`, `STORAGE_BUCKET`, FTP settings | Local/NFS, FTP, or Firebase Storage |
+| `PHASE15_BROWSER_URL` | Legacy browser integration target; Phase 16 runner owns live browser rehearsal |
+| `WEBRTC_ICE_SERVERS` | Used only if benchmark selects a WebRTC transport |
+| `RETENTION_DAYS` | Resume and default artifact retention, 14 days |
+| `AUDIO_RETENTION_DAYS` | Combined interview recording retention, 7 days |
+| `AUDIT_RETENTION_DAYS` | Audit/access record retention, 30 days |
 | `RATE_LIMIT`, `RATE_WINDOW_SECONDS` | Rate limiting |
 | `CORS_ORIGINS` | Allowed browser origins |
 
@@ -208,35 +209,28 @@ Never put credentials in `.env.example`, source, Git history, screenshots, logs,
 
 ## Testing and evidence
 
-Default gates are credential-free:
+Offline checks protect contracts only. They are not Phase 16 release evidence. The release gate is the configured live rehearsal runner, which writes redacted evidence under `.agent_tmp/` and distinguishes exercised, skipped, and failed providers.
 
 ```bash
 export PYTHONPATH="$PWD/src"
-./scripts/lint_and_typecheck.sh
-./scripts/test_backend.sh
-./scripts/test_frontend.sh
-./scripts/test_phase11.sh
-./scripts/test_phase13.sh
-./scripts/test_phase14.sh
-./scripts/test_phase15.sh
+./scripts/test_phase16.sh
 ```
 
-Evidence is written under `.agent_tmp/` and ignored by Git. Offline evidence proves application contracts, not external availability, speech quality, LLM quality, Firebase rules, TURN connectivity, or production security.
+The live runner must use safe beta accounts and fixtures, exercise both recruiter and technical journeys, switch storage adapters, execute negative cases, and emit the required markers without credentials, personal data, raw provider payloads, transcript text, resume text, or audio bytes.
 
 ## Production deployment
 
 Production is not yet a supported one-command deployment. Before accepting real candidate data:
 
-1. Replace development auth, in-memory persistence, and in-memory storage with Firebase/Auth, Firestore or another reviewed datastore, and durable object storage.
-2. Implement browser Firebase sign-in/session restoration and server-side ID-token verification. Remove `dev-token` from production composition.
-3. Benchmark STT, TTS, and LLM providers for first-audio latency, turn latency, interruption, cancellation, retries, rate limits, cost, quality, and fallback.
-4. Deploy HTTPS, secure WebSocket origin checks, STUN/TURN, microphone permissions, compatible codecs and sample rates, and browser-to-server media verification.
-5. Add encryption, owner-scoped keys, retention jobs, deletion verification, backups, restore tests, and provider-side deletion review.
-6. Add secrets management, redacted logs, metrics, traces, alerts, readiness probes, abuse controls, patching, rollback, and incident procedures.
-7. Build the frontend with `npm run build`, serve it over HTTPS, and route `/api` plus WebSocket upgrades to the API.
-8. Run configured Phase 15 integrations with test accounts and real browser media, then complete the Phase 16 coverage and live-demo gate.
+1. Implement Firebase passwordless email-link signup/login, open signup, session restoration, server-side ID-token verification, and remove `dev-token` from the production path.
+2. Compose Firebase Auth, EU Firestore, local/NFS or FTP or Firebase Storage, WhisperX small, OpenRouter, and Kokoro in one Docker container for the beta benchmark.
+3. Implement 10 MB input limits, protected-PDF UI errors, scanned-PDF extraction, consent, 14-day resume retention, 7-day combined-audio retention, 30-day audit/access retention, and complete account deletion.
+4. Benchmark the selected browser microphone transport and STT/TTS/LLM behavior for latency, CPU, memory, interruption, cancellation, retries, cost, and quality. Do not impose a latency or concurrency target until measured.
+5. Add redacted logs, metrics, traces, alerts, readiness probes, abuse controls, patching, rollback, and incident procedures.
+6. Build the frontend with `npm run build`, serve it over HTTPS, and route API and WebSocket traffic to the single container.
+7. Run the full live Phase 16 rehearsal with both browser journeys, storage switching, negative cases, retention, deletion, and all required markers.
 
-Use separate frontend, API, model/audio worker, and asynchronous evaluation services as load requires. The current Compose file is a local API definition, not a production topology.
+After the single-container benchmark, split frontend, API, model/audio worker, and asynchronous evaluation services into separate Docker containers if resource measurements require it. Railway profiles and self-hosted Docker are the initial deployment targets.
 
 ## Security and privacy
 
@@ -249,25 +243,26 @@ Resumes, job descriptions, voice recordings, transcripts, and evaluations may co
 - Redact credentials, prompts, transcript text, audio, and personal data from logs and evidence.
 - Enforce owner checks on sessions, transcripts, recordings, evaluations, and deletion.
 - Use HTTPS and secure WebSocket origins in production.
-- Keep the default retention decision at 14 days unless a reviewed deployment policy changes it.
-- Verify deletion in every durable store and external provider that received the data.
+- Retain resumes for 14 days, combined interview recordings for 7 days, and audit/access records for 30 days.
+- Show placeholder consent before collection. Disclose that resume, transcript, audio-derived content, and evaluation context are sent to OpenRouter or the selected LLM provider.
+- Beta users are real candidates. Only the account owner and system administrator may access recordings and evaluations; the administration surface is out of scope for this repository.
+- Account deletion must remove all user-owned data from every selected durable store and external provider that received it.
 
 ## Roadmap and readiness
 
 Phases 1 through 15 establish product specifications, capability contracts, local PDF/RAG, live voice orchestration, persistence/evaluation boundaries, browser transport, offline acceptance, and concrete opt-in provider transports.
 
-Phase 15 is merged, but its real-provider execution checkbox remains incomplete. The latest evidence says OpenRouter, Faster-Whisper, Piper/Kokoro, Firebase, Firestore, storage, and WebRTC were skipped because required configuration was absent. The project is therefore **not ready to claim a live production interview**.
+Phase 15 is merged, but its real-provider execution checkbox remains incomplete. The latest evidence says OpenRouter, Faster-Whisper, Piper/Kokoro, Firebase, Firestore, storage, and browser audio were skipped because required configuration was absent. The project is therefore **not ready to claim a live production interview**.
 
-Phase 16 must not be closed until it has separate backend/frontend/browser/provider coverage, a clean Docker release candidate, real authentication and owner isolation, real STT/TTS/LLM voice turns, durable artifact and deletion verification, HTTPS/CORS/WebSocket/TURN security, operations procedures, and a scripted live-browser rehearsal recording provider/model, latency, cost, quality, and limitations.
+Phase 16 must not be closed until it has backend/frontend/browser/provider coverage, a clean Docker release candidate, real authentication and owner isolation, real STT/TTS/LLM voice turns, durable artifact and deletion verification, HTTPS/CORS/WebSocket security, operations procedures, and a scripted live-browser rehearsal recording provider/model, latency, cost, quality, and limitations.
 
 ## Known limitations
 
-- Text PDFs are supported; scanned or encrypted PDFs need a future OCR adapter.
-- The default frontend uses local identity and a development bearer token.
-- The API composition uses in-memory auth, persistence, and storage locally.
-- Docker Compose does not include the frontend, model workers, durable stores, or TURN.
-- Browser media is a provider-neutral seam, not proof of microphone, codec, playback, or TURN behavior.
-- Phase 15 transports exist, but the repository contains no model weights, Firebase credentials, TURN service, or production secrets.
+- Full live provider execution and browser journeys remain to be exercised with configured deployment accounts.
+- Password-protected PDFs require a graceful unlocked-PDF error; scanned PDFs require an explicit OCR/LLM extraction pass.
+- The initial deployment is a single Docker container; separate worker containers are a roadmap item.
+- Browser audio transport remains selected by the Phase 16 deployment configuration; benchmark evidence must document latency, quality, and limitations.
+- The repository contains no model weights, Firebase credentials, FTP credentials, or production secrets.
 - Phase 15 evidence is not live readiness. A profile must produce an `exercised` result from a deliberate real run.
 
 ## Contributing
