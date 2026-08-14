@@ -284,6 +284,18 @@ def compose_providers(
     injected = backends or ProviderBackends()
     if settings.profile is RuntimeProfile.LOCAL:
         return RuntimeProviders((InMemorySTT(),), (InMemoryTTS(),), (InMemoryLLM(),))
+    if strict:
+        fallback_names = {
+            "STT_FALLBACK_PROVIDER": settings.stt_fallback_provider,
+            "TTS_FALLBACK_PROVIDER": settings.tts_fallback_provider,
+            "LLM_FALLBACK_PROVIDER": settings.llm_fallback_provider,
+        }
+        unsafe_fallbacks = [name for name, value in fallback_names.items() if value == "in-memory"]
+        if unsafe_fallbacks:
+            raise ConfigurationError(
+                "production composition cannot use deterministic fallbacks: "
+                + ", ".join(unsafe_fallbacks)
+            )
     stt_backend: WhisperBackend | None = injected.stt
     if stt_backend is None and settings.stt_provider == "faster-whisper":
         try:

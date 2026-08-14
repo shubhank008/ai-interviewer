@@ -32,7 +32,7 @@ These Phase 16 decisions are final and must be taken from the main `SPEC.md` wit
 - Use `LLM_API_KEY`, not `OPENROUTER_API_KEY`.
 - Use WhisperX `small` on CPU by default. Do not require `STT_MODEL_PATH`.
 - Use Kokoro Python with `TTS_LANGUAGE=en` and random supported voice selection. Do not require `TTS_MODEL_PATH` or `TTS_COMMAND`.
-- Use Firebase Storage `gs://the-interviewer-c3a01.firebasestorage.app` and local/NFS. Ignore FTP for Phase 16; S3/GCS are out of scope.
+- Use Firebase Storage `gs://the-interviewer-c3a01.firebasestorage.app`, selected by `STORAGE_BACKEND=gcs`; use `STORAGE_BACKEND=local` only for development and deterministic checks. Ignore FTP and S3 for Phase 16.
 - Use timestamped audio buffers between the Interviewer Agent and Interviewee Agent. Browser URL, browser automation, WebRTC, and TURN are not Phase 16 prerequisites.
 - Use one Docker container for the initial beta benchmark.
 - Live provider and agent-to-agent execution is mandatory evidence. Offline tests protect contracts only.

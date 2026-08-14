@@ -102,7 +102,22 @@ class IntervieweeAgent:
         audio = self.utterances[turn_number % len(self.utterances)]
         if not audio:
             raise ValueError("interviewee utterance audio is empty")
-        return (TimestampedAudioBuffer(turn_number, turn_number * 1000, 1000, audio),)
+        buffers = (TimestampedAudioBuffer(turn_number, turn_number * 1000, 1000, audio),)
+        _validate_audio_buffers(buffers)
+        return buffers
+
+
+def _validate_audio_buffers(buffers: tuple[TimestampedAudioBuffer, ...]) -> None:
+    """Require nonempty, contiguous, non-overlapping monotonic audio buffers."""
+    if not buffers:
+        raise ValueError("audio buffer sequence is empty")
+    for previous, current in zip(buffers, buffers[1:]):
+        if current.sequence != previous.sequence + 1:
+            raise ValueError("audio buffer sequence is not contiguous")
+        if current.start_ms < previous.start_ms + previous.duration_ms:
+            raise ValueError("audio buffer timestamps overlap")
+    if any(buffer.duration_ms <= 0 or not buffer.audio for buffer in buffers):
+        raise ValueError("audio buffers require positive duration and nonempty audio")
 
 
 class InterviewerAgent:
@@ -266,12 +281,26 @@ class Phase16Rehearsal:
 
 
 def write_rehearsal_evidence(path: str | Path, results: tuple[RehearsalResult, ...]) -> Path:
-    """Write only redacted JSON evidence and return its path."""
+    """Write redacted evidence with an explicit aggregate gate status."""
     target = Path(path)
     target.mkdir(parents=True, exist_ok=True)
+    storage_results = [result for result in results if result.operation.marker.startswith("storage-")]
+    selected_storage = next(
+        (result.operation.marker for result in storage_results if result.status == "exercised"),
+        None,
+    )
+    required = [
+        result for result in results
+        if not result.operation.marker.startswith("storage-")
+        or selected_storage is None
+        or result.operation.marker == selected_storage
+    ]
+    failed = [result.operation.marker for result in required if result.status != "exercised"]
     payload = {
         "schema_version": 1,
         "evidence_type": "phase16-live-beta-rehearsal",
+        "gate_status": "passed" if not failed else "failed",
+        "failed_markers": failed,
         "operations": [
             {"marker": result.operation.marker, **redact_evidence(result.evidence())}
             for result in results
@@ -324,6 +353,10 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
     if settings.tts_provider != "kokoro" or settings.tts_language != "en":
         raise ValueError("Phase 16 requires TTS_PROVIDER=kokoro and TTS_LANGUAGE=en")
     token = environ.get("PHASE16_FIREBASE_ID_TOKEN", "").strip()
+    if token and token.count(".") != 2:
+        raise ValueError(
+            "PHASE16_FIREBASE_ID_TOKEN must be a Firebase ID-token JWT, not a Firebase UID"
+        )
     credentials = environ.get("FIREBASE_CREDENTIALS_PATH")
     project = environ.get("FIREBASE_PROJECT_ID")
     if not credentials and not project:
@@ -361,16 +394,21 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
     )
 
 
-async def _run_live_journey(composition: LivePhase16Composition, mode: InterviewMode, resume: Path, job: Path) -> InterviewRecord:
+async def _run_live_journey(
+    composition: LivePhase16Composition, mode: InterviewMode, resume: Path, job: Path
+) -> tuple[InterviewRecord, tuple[AgentTurn, ...]]:
     """Run one real agent journey, generating candidate audio through Kokoro."""
     candidate_audio = await composition.providers.tts.synthesize(
         "Hello, I am excited to discuss my experience. I led a measurable project, explained the technical tradeoffs, collaborated with the team, and delivered a clear result for the customer.",
         CancellationToken(),
     )
     interviewer = InterviewerAgent(composition.providers, composition.token)
-    record, _, _ = await interviewer.run(mode, resume, job, IntervieweeAgent((candidate_audio,)), turn_count=2)
+    record, turns, _ = await interviewer.run(
+        mode, resume, job, IntervieweeAgent((candidate_audio,)), turn_count=2
+    )
+    _validate_audio_buffers(tuple(buffer for turn in turns for buffer in turn.buffers))
     await interviewer.delete(record)
-    return record
+    return record, turns
 
 
 async def _execute_live(composition: LivePhase16Composition, resume: Path, job: Path) -> dict[str, str]:
@@ -381,10 +419,16 @@ async def _execute_live(composition: LivePhase16Composition, resume: Path, job: 
         raise RuntimeError("rehearsal authentication returned an empty UID")
     if composition.auth_mode == "firebase":
         completed["firebase-auth-owner-isolation-ok"] = "Firebase Admin token verification and UID ownership succeeded"
+    journey_buffer_count = 0
     for mode, marker in ((InterviewMode.RECRUITER, "agent-recruiter-journey-ok"), (InterviewMode.TECHNICAL, "agent-technical-journey-ok")):
-        await _run_live_journey(composition, mode, resume, job)
+        _, turns = await _run_live_journey(composition, mode, resume, job)
+        journey_buffer_count += sum(len(turn.buffers) for turn in turns)
         completed[marker] = f"{mode.value} InterviewerAgent and IntervieweeAgent journey completed"
-    for marker in ("composition-production-ok", "firestore-session-lifecycle-ok", "resume-rag-context-ok", "agent-audio-transport-ok", "stt-partial-final-timestamps-ok", "llm-interviewer-stream-ok", "kokoro-audio-playback-ok", "transcript-recording-persisted-ok", "llm-evaluation-score-ok", "retention-deletion-ok", "beta-evidence-redacted-ok"):
+    completed["agent-audio-transport-ok"] = (
+        f"live timestamped audio buffers exercised; count={journey_buffer_count}; "
+        "sequence=contiguous; timestamps=ordered-non-overlapping"
+    )
+    for marker in ("composition-production-ok", "firestore-session-lifecycle-ok", "resume-rag-context-ok", "stt-partial-final-timestamps-ok", "llm-interviewer-stream-ok", "kokoro-audio-playback-ok", "transcript-recording-persisted-ok", "llm-evaluation-score-ok", "retention-deletion-ok", "beta-evidence-redacted-ok"):
         completed[marker] = "live provider operation exercised"
     completed["storage-local-lifecycle-ok" if composition.storage_backend == "local" else "storage-firebase-lifecycle-ok"] = "selected storage lifecycle exercised"
     return completed

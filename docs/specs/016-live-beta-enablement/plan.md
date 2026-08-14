@@ -3,7 +3,7 @@
 ## Global Constraints
 
 - Abstract interfaces precede concrete adapters and business logic remains vendor-neutral.
-- The explicit beta provider set is Firebase Auth, EU Firestore, Firebase Storage plus local/NFS checks, OpenRouter, WhisperX small/small.en on CPU, Kokoro 0.9.4 English, timestamped agent audio buffers, and an OpenRouter-based evaluator.
+- The explicit beta provider set is Firebase Auth, EU Firestore, Firebase Storage selected by `STORAGE_BACKEND=gcs` plus local checks, OpenRouter, WhisperX small/small.en on CPU, Kokoro 0.9.4 English, timestamped agent audio buffers, and an OpenRouter-based evaluator.
 - CPU-only workers are required; no model downloads happen automatically.
 - Phase 16 is live-mandatory. Live provider and agent-to-agent rehearsal tests are the only release evidence. Offline tests protect contracts only and cannot justify stopping implementation or pass beta readiness.
 - Delegated implementation must complete configured provider execution and agent-to-agent acceptance. It may stop only for a genuine external authorization, security, or infrastructure blocker that is recorded precisely.
@@ -14,10 +14,10 @@
 ## Work order
 
 1. Keep capability boundaries provider-neutral while treating live execution, not offline execution, as the release gate.
-2. Implement the production composition root for Firebase Auth, Firestore, Firebase Storage plus local/NFS, WhisperX small, OpenRouter, and Kokoro; reject accidental in-memory services in production.
+2. Implement the production composition root for Firebase Auth, Firestore, Firebase Storage selected by `STORAGE_BACKEND=gcs`, WhisperX small, OpenRouter, and Kokoro; reject accidental in-memory services in production.
 3. Implement Firebase Web Auth email/password and Google Sign-In signup/login, open signup, session restoration, and Firebase Admin token verification.
 4. Implement Firestore repositories for owner-scoped sessions, events, transcripts, evaluations, users, deletion state, and 30-day audit/access records.
-5. Implement local/NFS-compatible and Firebase Storage artifact repositories with upload, download, replay, retention, partial-failure, and deletion verification. Do not add S3/GCS in this phase.
+5. Implement Firebase Storage artifact repositories with upload, download, replay, retention, partial-failure, and deletion verification; retain local storage only for development and deterministic checks. Do not add S3.
 6. Implement 10 MB job-description/resume validation, password-protected PDF errors, text-only PDF parsing with graceful scanned/encrypted failure, source-linked retrieval, LLM context injection, and deletion.
 7. Keep browser microphone, browser URL, browser automation, WebRTC, STUN, and TURN outside Phase 16 acceptance; the live rehearsal uses timestamped buffers exchanged by the two agents.
 8. Implement WhisperX `small` chunked transcription and CPU worker lifecycle, plus a provider/model benchmark matrix using fixture audio and Kokoro-generated test audio.
@@ -31,7 +31,7 @@
 
 - Live provider tests for every selected adapter and failure mode are the release gate.
 - Agent-to-agent live E2E tests cover Firebase-authenticated ownership, setup, resume/job fixtures, recruiter and technical interview turns, audio buffers, evaluation, replay, retention, and deletion. Browser tests are deferred from Phase 16.
-- Storage tests switch between local/NFS and Firebase Storage bucket `gs://the-interviewer-c3a01.firebasestorage.app`; FTP is deferred.
+- Storage tests cover Firebase Storage bucket `gs://the-interviewer-c3a01.firebasestorage.app` via `STORAGE_BACKEND=gcs`; local storage remains a separate development/deterministic check. FTP is deferred.
 - Resume tests use `tests/demo_resume.pdf` and `tests/demo_jobdescription.txt`, plus protected/scanned PDF cases.
 - Benchmark tables report STT/TTS/LLM provider, model, version, device, latency, CPU, memory, tokens, cost, quality, failures, and limitations without sensitive payloads.
 - Evidence must distinguish exercised, skipped, and failed; skipped never passes beta readiness.

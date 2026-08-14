@@ -310,7 +310,7 @@ These decisions are final for Phase 16 and must not be reopened by delegated imp
 - Use `LLM_API_KEY`, not `OPENROUTER_API_KEY`, for the OpenRouter credential.
 - Do not require `STT_MODEL_PATH`, `TTS_MODEL_PATH`, or `TTS_COMMAND`; WhisperX and Kokoro receive provider model/language configuration through `STT_MODEL`, `TTS_MODEL`, and language settings.
 - Use WhisperX `small` on CPU by default, Kokoro English with random supported voice selection, and OpenRouter with the configured model.
-- Use Firebase Storage as the beta storage provider with bucket `gs://the-interviewer-c3a01.firebasestorage.app`; retain local/NFS storage for deterministic and local integration checks. Ignore FTP for Phase 16. S3 and GCS are out of scope.
+- Use Firebase Storage as the beta storage provider with bucket `gs://the-interviewer-c3a01.firebasestorage.app`; select it with `STORAGE_BACKEND=gcs`. Retain `STORAGE_BACKEND=local` only for development and deterministic/local integration checks. Ignore FTP and S3 for Phase 16.
 - The Phase 16 live rehearsal is programmatic, not browser-dependent: an Interviewer Agent and an Interviewee Agent exchange timestamped audio buffers through the backend flow. Browser WebRTC, secure WebSocket signaling, and managed STUN/TURN remain implementation requirements for the later browser transport phase, not a Phase 16 beta-evidence gate.
 - Use one Docker container for the initial beta benchmark.
 - Live provider execution is mandatory evidence. Phase 16 uses agent-to-agent programmatic E2E evidence instead of browser execution. Offline tests are contract protection only.
