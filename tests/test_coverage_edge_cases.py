@@ -6,6 +6,7 @@ services using injected fixtures and mocked third-party dependencies.
 """
 
 import asyncio
+import json
 import subprocess
 import sys
 import tempfile
@@ -19,7 +20,7 @@ from interviewer_domain.contracts import (
     ErrorCode,
     ProviderError,
 )
-from interviewer_domain.models import Evaluation, InterviewMode
+from interviewer_domain.models import Evaluation, InterviewMode, TranscriptSegment
 
 
 class VoiceAdapterEdgeCases(unittest.TestCase):
@@ -728,6 +729,553 @@ class AsyncTransportEdgeCases(unittest.TestCase):
             with patch("httpx.AsyncClient", side_effect=lambda **kw: FakeClient()):
                 result = await transport.complete({"model": "m"}, "test-key")
             self.assertEqual(result, expected)
+
+        asyncio.run(call())
+
+
+class OpenRouterEvaluatorEdgeCases(unittest.TestCase):
+    """Behavioral edge cases for the OpenRouterEvaluator adapter."""
+
+    def test_evaluate_empty_api_key_raises_invalid_request(self) -> None:
+        from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+        from interviewer_domain.evaluation import InterviewContext
+
+        transport = MagicMock()
+        evaluator = OpenRouterEvaluator(transport, api_key="", model="gpt-4")
+        context = InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid")
+        transcript = (TranscriptSegment(uuid4(), "candidate", "Hello"),)
+        with self.assertRaises(ProviderError) as ctx:
+            evaluator.evaluate(context, transcript)
+        self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+    def test_evaluate_empty_model_raises_invalid_request(self) -> None:
+        from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+        from interviewer_domain.evaluation import InterviewContext
+
+        transport = MagicMock()
+        evaluator = OpenRouterEvaluator(transport, api_key="key", model="")
+        context = InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid")
+        transcript = (TranscriptSegment(uuid4(), "candidate", "Hello"),)
+        with self.assertRaises(ProviderError) as ctx:
+            evaluator.evaluate(context, transcript)
+        self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+    def test_evaluate_empty_transcript_raises_invalid_request(self) -> None:
+        from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+        from interviewer_domain.evaluation import InterviewContext
+
+        transport = MagicMock()
+        evaluator = OpenRouterEvaluator(transport, api_key="key", model="gpt-4")
+        context = InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid")
+        with self.assertRaises(ProviderError) as ctx:
+            evaluator.evaluate(context, ())
+        self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+    def test_evaluate_malformed_response_raises_internal(self) -> None:
+        from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+        from interviewer_domain.evaluation import InterviewContext
+
+        transport = MagicMock()
+        transport.complete.return_value = {}
+        evaluator = OpenRouterEvaluator(transport, api_key="key", model="gpt-4")
+        context = InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid")
+        transcript = (TranscriptSegment(uuid4(), "candidate", "Hello"),)
+        with self.assertRaises(ProviderError) as ctx:
+            evaluator.evaluate(context, transcript)
+        self.assertEqual(ctx.exception.code, ErrorCode.INTERNAL)
+
+    def test_evaluate_non_dict_response_raises_internal(self) -> None:
+        from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+        from interviewer_domain.evaluation import InterviewContext
+
+        transport = MagicMock()
+        transport.complete.return_value = {"choices": [{"message": {"content": 42}}]}
+        evaluator = OpenRouterEvaluator(transport, api_key="key", model="gpt-4")
+        context = InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid")
+        transcript = (TranscriptSegment(uuid4(), "candidate", "Hello"),)
+        with self.assertRaises(ProviderError) as ctx:
+            evaluator.evaluate(context, transcript)
+        self.assertEqual(ctx.exception.code, ErrorCode.INTERNAL)
+
+    def test_evaluate_dict_dimensions_normalizes(self) -> None:
+        from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+        from interviewer_domain.evaluation import InterviewContext
+
+        response_payload = {
+            "choices": [{"message": {"content": json.dumps({
+                "score": 80,
+                "dimensions": {"communication": "clear", "technical": "solid"},
+                "summary": "Good",
+                "strengths": ["clear"],
+                "weaknesses": [],
+                "recommendations": [],
+            })}}]
+        }
+        transport = MagicMock()
+        transport.complete.return_value = response_payload
+        evaluator = OpenRouterEvaluator(transport, api_key="key", model="gpt-4")
+        context = InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid")
+        transcript = (TranscriptSegment(uuid4(), "candidate", "Hello"),)
+        result = evaluator.evaluate(context, transcript)
+        self.assertEqual(result.score, 80)
+        self.assertEqual(len(result.dimensions), 2)
+
+    def test_evaluate_list_dimensions_with_strings_normalizes(self) -> None:
+        from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+        from interviewer_domain.evaluation import InterviewContext
+
+        response_payload = {
+            "choices": [{"message": {"content": json.dumps({
+                "score": 70,
+                "dimensions": ["good communication", "solid technical"],
+                "summary": "Good",
+                "strengths": [],
+                "weaknesses": [],
+                "recommendations": [],
+            })}}]
+        }
+        transport = MagicMock()
+        transport.complete.return_value = response_payload
+        evaluator = OpenRouterEvaluator(transport, api_key="key", model="gpt-4")
+        context = InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid")
+        transcript = (TranscriptSegment(uuid4(), "candidate", "Hello"),)
+        result = evaluator.evaluate(context, transcript)
+        self.assertEqual(result.score, 70)
+        self.assertEqual(len(result.dimensions), 2)
+
+    def test_evaluate_empty_dimensions_raises_internal(self) -> None:
+        from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+        from interviewer_domain.evaluation import InterviewContext
+
+        response_payload = {
+            "choices": [{"message": {"content": json.dumps({
+                "score": 70,
+                "dimensions": [],
+                "summary": "Good",
+            })}}]
+        }
+        transport = MagicMock()
+        transport.complete.return_value = response_payload
+        evaluator = OpenRouterEvaluator(transport, api_key="key", model="gpt-4")
+        context = InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid")
+        transcript = (TranscriptSegment(uuid4(), "candidate", "Hello"),)
+        with self.assertRaises(ProviderError) as ctx:
+            evaluator.evaluate(context, transcript)
+        self.assertEqual(ctx.exception.code, ErrorCode.INTERNAL)
+
+    def test_evaluate_string_dimensions_raises_internal(self) -> None:
+        from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+        from interviewer_domain.evaluation import InterviewContext
+
+        response_payload = {
+            "choices": [{"message": {"content": json.dumps({
+                "score": 70,
+                "dimensions": "not a list or dict",
+                "summary": "Good",
+            })}}]
+        }
+        transport = MagicMock()
+        transport.complete.return_value = response_payload
+        evaluator = OpenRouterEvaluator(transport, api_key="key", model="gpt-4")
+        context = InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid")
+        transcript = (TranscriptSegment(uuid4(), "candidate", "Hello"),)
+        with self.assertRaises(ProviderError) as ctx:
+            evaluator.evaluate(context, transcript)
+        self.assertEqual(ctx.exception.code, ErrorCode.INTERNAL)
+
+
+class DocumentParserEdgeCases(unittest.TestCase):
+    """Behavioral edge cases for LocalDocumentParser missing paths."""
+
+    def test_parse_empty_content_raises_invalid_request(self) -> None:
+        from interviewer_domain.documents import LocalDocumentParser
+
+        parser = LocalDocumentParser()
+        with self.assertRaises(ProviderError) as ctx:
+            parser.parse(b"", "text/plain", "job_description")
+        self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+    def test_parse_resume_non_pdf_raises_invalid_request(self) -> None:
+        from interviewer_domain.documents import LocalDocumentParser
+
+        parser = LocalDocumentParser()
+        with self.assertRaises(ProviderError) as ctx:
+            parser.parse(b"not a pdf", "application/pdf", "resume")
+        self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+    def test_parse_resume_wrong_content_type_raises_invalid_request(self) -> None:
+        from interviewer_domain.documents import LocalDocumentParser
+
+        parser = LocalDocumentParser()
+        with self.assertRaises(ProviderError) as ctx:
+            parser.parse(b"some content", "text/plain", "resume")
+        self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+    def test_parse_jd_non_text_content_type_raises_invalid_request(self) -> None:
+        from interviewer_domain.documents import LocalDocumentParser
+
+        parser = LocalDocumentParser()
+        with self.assertRaises(ProviderError) as ctx:
+            parser.parse(b"some content", "application/octet-stream", "job_description")
+        self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+    def test_parse_unsupported_source_raises_invalid_request(self) -> None:
+        from interviewer_domain.documents import LocalDocumentParser
+
+        parser = LocalDocumentParser()
+        with self.assertRaises(ProviderError) as ctx:
+            parser.parse(b"some content", "text/plain", "unsupported_source")
+        self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+    def test_parse_pdf_no_extractable_text_raises_invalid_request(self) -> None:
+        from interviewer_domain.documents import LocalDocumentParser
+
+        parser = LocalDocumentParser()
+        with self.assertRaises(ProviderError) as ctx:
+            parser.parse(b"%PDF-1.7\nno text here\n%%EOF", "application/pdf", "resume")
+        self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+    def test_replace_chunk_text_truncates_to_max_length(self) -> None:
+        from interviewer_domain.documents import MAX_CHUNK_LENGTH, replace_chunk_text
+        from interviewer_domain.models import DocumentChunk, DocumentSource
+
+        chunk = DocumentChunk(DocumentSource.RESUME, "section", "original", "line:1")
+        long_text = "x" * (MAX_CHUNK_LENGTH + 100)
+        result = replace_chunk_text(chunk, long_text)
+        self.assertEqual(len(result.text), MAX_CHUNK_LENGTH)
+
+
+class ModelsEdgeCases(unittest.TestCase):
+    """Behavioral edge cases for model validation."""
+
+    def test_turn_invalid_speaker_raises_value_error(self) -> None:
+        from interviewer_domain.models import Turn
+
+        with self.assertRaises(ValueError) as ctx:
+            Turn(session_id=uuid4(), sequence=1, speaker="invalid")
+        self.assertIn("speaker", str(ctx.exception))
+
+    def test_turn_invalid_sequence_raises_value_error(self) -> None:
+        from interviewer_domain.models import Turn
+
+        with self.assertRaises(ValueError) as ctx:
+            Turn(session_id=uuid4(), sequence=0, speaker="candidate")
+        self.assertIn("sequence", str(ctx.exception))
+
+    def test_evaluation_score_out_of_range_raises_value_error(self) -> None:
+        from interviewer_domain.models import Evaluation
+
+        with self.assertRaises(ValueError) as ctx:
+            Evaluation(session_id=uuid4(), rubric_version="v1", score=150)
+        self.assertIn("score", str(ctx.exception))
+
+    def test_evaluation_negative_score_raises_value_error(self) -> None:
+        from interviewer_domain.models import Evaluation
+
+        with self.assertRaises(ValueError) as ctx:
+            Evaluation(session_id=uuid4(), rubric_version="v1", score=-10)
+        self.assertIn("score", str(ctx.exception))
+
+    def test_evaluation_weights_not_summing_to_one_raises_value_error(self) -> None:
+        from interviewer_domain.models import Evaluation
+
+        with self.assertRaises(ValueError) as ctx:
+            Evaluation(
+                session_id=uuid4(),
+                rubric_version="v1",
+                score=80,
+                dimensions=({"weight": 0.5}, {"weight": 0.7}),
+            )
+        self.assertIn("weights", str(ctx.exception))
+
+    def test_evaluation_dimension_score_out_of_range_raises_value_error(self) -> None:
+        from interviewer_domain.models import Evaluation
+
+        with self.assertRaises(ValueError) as ctx:
+            Evaluation(
+                session_id=uuid4(),
+                rubric_version="v1",
+                score=80,
+                dimensions=({"score": 150},),
+            )
+        self.assertIn("scores", str(ctx.exception))
+
+
+class SessionEdgeCases(unittest.TestCase):
+    """Behavioral edge cases for session engine error paths."""
+
+    def test_cancel_active_session(self) -> None:
+        from interviewer_domain.session import InterviewSessionEngine, QuestionPlanner
+        from interviewer_domain.models import InterviewSession, InterviewMode
+
+        session = InterviewSession(user_id="alice", mode=InterviewMode.RECRUITER)
+
+        class FakeSTT:
+            def capabilities(self):
+                from interviewer_domain.contracts import CapabilityDescriptor
+                return CapabilityDescriptor("stt", False, False)
+            async def health(self):
+                from interviewer_domain.contracts import HealthStatus
+                return HealthStatus(True)
+            async def transcribe(self, audio, turn_id, token):
+                pass
+
+        class FakeLLM:
+            def capabilities(self):
+                from interviewer_domain.contracts import CapabilityDescriptor
+                return CapabilityDescriptor("llm", False, False)
+            async def health(self):
+                from interviewer_domain.contracts import HealthStatus
+                return HealthStatus(True)
+            async def generate(self, prompt, token):
+                return "response"
+
+        class FakeTTS:
+            def capabilities(self):
+                from interviewer_domain.contracts import CapabilityDescriptor
+                return CapabilityDescriptor("tts", False, False)
+            async def health(self):
+                from interviewer_domain.contracts import HealthStatus
+                return HealthStatus(True)
+            async def synthesize(self, text, token):
+                return b"audio"
+
+        class FakeDataStore:
+            def link_turn_session(self, turn_id, session_id):
+                pass
+            def save_transcript(self, segment):
+                pass
+            def save_recording(self, recording):
+                pass
+            def list_transcript(self, session_id):
+                return []
+
+        class FakeEventBus:
+            async def publish(self, event):
+                pass
+
+        engine = InterviewSessionEngine(session, FakeSTT(), FakeLLM(), FakeTTS(), FakeDataStore(), FakeEventBus())
+
+        async def call() -> None:
+            await engine.start()
+            self.assertEqual(engine.session.status, "active")
+            await engine.cancel()
+            self.assertEqual(engine.session.status, "cancelled")
+
+        asyncio.run(call())
+
+    def test_process_turn_wrong_session_raises_state_error(self) -> None:
+        from interviewer_domain.session import InterviewSessionEngine, SessionStateError
+        from interviewer_domain.models import InterviewSession, InterviewMode, Turn
+
+        session = InterviewSession(user_id="alice", mode=InterviewMode.RECRUITER)
+
+        class FakeSTT:
+            def capabilities(self):
+                from interviewer_domain.contracts import CapabilityDescriptor
+                return CapabilityDescriptor("stt", False, False)
+            async def health(self):
+                from interviewer_domain.contracts import HealthStatus
+                return HealthStatus(True)
+            async def transcribe(self, audio, turn_id, token):
+                pass
+
+        class FakeLLM:
+            def capabilities(self):
+                from interviewer_domain.contracts import CapabilityDescriptor
+                return CapabilityDescriptor("llm", False, False)
+            async def health(self):
+                from interviewer_domain.contracts import HealthStatus
+                return HealthStatus(True)
+            async def generate(self, prompt, token):
+                return "response"
+
+        class FakeTTS:
+            def capabilities(self):
+                from interviewer_domain.contracts import CapabilityDescriptor
+                return CapabilityDescriptor("tts", False, False)
+            async def health(self):
+                from interviewer_domain.contracts import HealthStatus
+                return HealthStatus(True)
+            async def synthesize(self, text, token):
+                return b"audio"
+
+        class FakeDataStore:
+            def link_turn_session(self, turn_id, session_id):
+                pass
+            def save_transcript(self, segment):
+                pass
+            def save_recording(self, recording):
+                pass
+            def list_transcript(self, session_id):
+                return []
+
+        class FakeEventBus:
+            async def publish(self, event):
+                pass
+
+        engine = InterviewSessionEngine(session, FakeSTT(), FakeLLM(), FakeTTS(), FakeDataStore(), FakeEventBus())
+
+        async def call() -> None:
+            await engine.start()
+            wrong_turn = Turn(session_id=uuid4(), sequence=1, speaker="candidate", input_audio=b"audio")
+            with self.assertRaises(SessionStateError):
+                await engine.process_turn(wrong_turn)
+
+        asyncio.run(call())
+
+    def test_process_turn_wrong_speaker_raises_state_error(self) -> None:
+        from interviewer_domain.session import InterviewSessionEngine, SessionStateError
+        from interviewer_domain.models import InterviewSession, InterviewMode, Turn
+
+        session = InterviewSession(user_id="alice", mode=InterviewMode.RECRUITER)
+
+        class FakeSTT:
+            def capabilities(self):
+                from interviewer_domain.contracts import CapabilityDescriptor
+                return CapabilityDescriptor("stt", False, False)
+            async def health(self):
+                from interviewer_domain.contracts import HealthStatus
+                return HealthStatus(True)
+            async def transcribe(self, audio, turn_id, token):
+                pass
+
+        class FakeLLM:
+            def capabilities(self):
+                from interviewer_domain.contracts import CapabilityDescriptor
+                return CapabilityDescriptor("llm", False, False)
+            async def health(self):
+                from interviewer_domain.contracts import HealthStatus
+                return HealthStatus(True)
+            async def generate(self, prompt, token):
+                return "response"
+
+        class FakeTTS:
+            def capabilities(self):
+                from interviewer_domain.contracts import CapabilityDescriptor
+                return CapabilityDescriptor("tts", False, False)
+            async def health(self):
+                from interviewer_domain.contracts import HealthStatus
+                return HealthStatus(True)
+            async def synthesize(self, text, token):
+                return b"audio"
+
+        class FakeDataStore:
+            def link_turn_session(self, turn_id, session_id):
+                pass
+            def save_transcript(self, segment):
+                pass
+            def save_recording(self, recording):
+                pass
+            def list_transcript(self, session_id):
+                return []
+
+        class FakeEventBus:
+            async def publish(self, event):
+                pass
+
+        engine = InterviewSessionEngine(session, FakeSTT(), FakeLLM(), FakeTTS(), FakeDataStore(), FakeEventBus())
+
+        async def call() -> None:
+            await engine.start()
+            wrong_turn = Turn(session_id=session.id, sequence=1, speaker="interviewer", input_audio=b"audio")
+            with self.assertRaises(SessionStateError):
+                await engine.process_turn(wrong_turn)
+
+        asyncio.run(call())
+
+
+class InMemoryProviderEdgeCases(unittest.TestCase):
+    """Behavioral edge cases for in-memory provider error paths."""
+
+    def test_in_memory_llm_empty_prompt_raises_invalid_request(self) -> None:
+        from interviewer_domain.providers import InMemoryLLM
+
+        llm = InMemoryLLM()
+
+        async def call() -> None:
+            with self.assertRaises(ProviderError) as ctx:
+                await llm.generate("", CancellationToken())
+            self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+        asyncio.run(call())
+
+    def test_in_memory_tts_empty_text_raises_invalid_request(self) -> None:
+        from interviewer_domain.providers import InMemoryTTS
+
+        tts = InMemoryTTS()
+
+        async def call() -> None:
+            with self.assertRaises(ProviderError) as ctx:
+                await tts.synthesize("", CancellationToken())
+            self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+        asyncio.run(call())
+
+    def test_in_memory_storage_get_missing_key(self) -> None:
+        from interviewer_domain.providers import InMemoryStorage
+
+        storage = InMemoryStorage()
+        with self.assertRaises(ProviderError) as ctx:
+            storage.get("nonexistent")
+        self.assertEqual(ctx.exception.code, ErrorCode.UNAVAILABLE)
+
+    def test_in_memory_storage_delete_prefix_with_non_matching_key(self) -> None:
+        from interviewer_domain.providers import InMemoryStorage
+
+        storage = InMemoryStorage()
+        storage.put("other/something", b"data", "text/plain")
+        storage.delete_prefix("nonexistent/")
+        self.assertIn("other/something", storage.files)
+
+    def test_in_memory_streaming_stt_empty_audio(self) -> None:
+        from interviewer_domain.providers import InMemoryStreamingSTT
+
+        stt = InMemoryStreamingSTT()
+
+        async def call() -> None:
+            with self.assertRaises(ProviderError) as ctx:
+                async for _ in stt.transcribe_stream(b"", uuid4(), CancellationToken()):
+                    pass
+            self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+        asyncio.run(call())
+
+    def test_in_memory_streaming_llm_empty_prompt(self) -> None:
+        from interviewer_domain.providers import InMemoryStreamingLLM
+
+        llm = InMemoryStreamingLLM()
+
+        async def call() -> None:
+            with self.assertRaises(ProviderError) as ctx:
+                async for _ in llm.generate_stream("", CancellationToken()):
+                    pass
+            self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+        asyncio.run(call())
+
+    def test_in_memory_secondary_response_empty_answer(self) -> None:
+        from interviewer_domain.providers import InMemorySecondaryResponse
+
+        secondary = InMemorySecondaryResponse()
+
+        async def call() -> None:
+            with self.assertRaises(ProviderError) as ctx:
+                await secondary.generate_secondary("", CancellationToken())
+            self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+        asyncio.run(call())
+
+    def test_in_memory_streaming_tts_empty_text(self) -> None:
+        from interviewer_domain.providers import InMemoryStreamingTTS
+
+        tts = InMemoryStreamingTTS()
+
+        async def call() -> None:
+            with self.assertRaises(ProviderError) as ctx:
+                async for _ in tts.synthesize_stream("", CancellationToken()):
+                    pass
+            self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
 
         asyncio.run(call())
 
