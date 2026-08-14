@@ -3,10 +3,10 @@
 ## Global Constraints
 
 - Abstract interfaces precede concrete adapters and business logic remains vendor-neutral.
-- The explicit beta provider set is Firebase Auth, Firestore, Firebase Storage plus local/NFS, OpenRouter, WhisperX small, Kokoro, a benchmark-selected browser audio transport, and an OpenRouter-based evaluator.
+- The explicit beta provider set is Firebase Auth, EU Firestore, Firebase Storage plus local/NFS checks, OpenRouter, WhisperX small/small.en on CPU, Kokoro 0.9.4 English, timestamped agent audio buffers, and an OpenRouter-based evaluator.
 - CPU-only workers are required; no model downloads happen automatically.
-- Phase 16 is live-mandatory. Live provider and browser tests are the only release evidence. Offline tests protect contracts only and cannot justify stopping implementation or pass beta readiness.
-- Delegated implementation must not use a `where feasible`, `safest coherent vertical slice`, or deterministic-only escape hatch. It must continue through configured provider execution and agent-to-agent acceptance unless a genuine external authorization, security, or infrastructure blocker is recorded.
+- Phase 16 is live-mandatory. Live provider and agent-to-agent rehearsal tests are the only release evidence. Offline tests protect contracts only and cannot justify stopping implementation or pass beta readiness.
+- Delegated implementation must complete configured provider execution and agent-to-agent acceptance. It may stop only for a genuine external authorization, security, or infrastructure blocker that is recorded precisely.
 - Never log or store credentials, raw provider payloads, resume text, transcript text, or audio in evidence.
 - Preserve owner isolation, 10 MB job-description and resume limits, 14-day resume retention, 7-day combined-audio retention, 30-day audit/access retention, deletion, cancellation, retries, timeouts, and redacted readiness.
 - Phase 16 live rehearsal uses timestamped in-memory audio buffers between Interviewer and Interviewee agents; browser URL, browser automation, WebRTC, and TURN are deferred. Media bytes never enter control events.
@@ -18,8 +18,8 @@
 3. Implement Firebase Web Auth email/password and Google Sign-In signup/login, open signup, session restoration, and Firebase Admin token verification.
 4. Implement Firestore repositories for owner-scoped sessions, events, transcripts, evaluations, users, deletion state, and 30-day audit/access records.
 5. Implement local/NFS-compatible and Firebase Storage artifact repositories with upload, download, replay, retention, partial-failure, and deletion verification. Do not add S3/GCS in this phase.
-6. Implement 10 MB job-description/resume validation, password-protected PDF UI errors, text PDF parsing, scanned-PDF extraction through an explicit OCR/LLM adapter, source-linked retrieval, LLM context injection, and deletion.
-7. Implement the simplest benchmark-selected browser microphone transport, initially timestamped chunks with a VAD or streaming-Whisper evaluation seam; defer custom WebRTC/TURN unless evidence selects it.
+6. Implement 10 MB job-description/resume validation, password-protected PDF errors, text-only PDF parsing with graceful scanned/encrypted failure, source-linked retrieval, LLM context injection, and deletion.
+7. Keep browser microphone, browser URL, browser automation, WebRTC, STUN, and TURN outside Phase 16 acceptance; the live rehearsal uses timestamped buffers exchanged by the two agents.
 8. Implement WhisperX `small` chunked transcription and CPU worker lifecycle, plus a provider/model benchmark matrix using fixture audio and Kokoro-generated test audio.
 9. Implement OpenRouter streaming structured interviewer responses and evaluation with the configured model, 60-second timeout, three retries, permanent-error classification, and redacted token/time/cost metrics.
 10. Implement Kokoro English synthesis with random per-invocation voice selection, browser-compatible audio normalization, playback sequencing, interruption, and cancellation.

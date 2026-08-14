@@ -251,11 +251,11 @@ The evaluator uses a separate structured schema containing `score`, `summary`, `
 - [ ] OpenRouter generates validated structured interviewer responses with streaming, cancellation, 60 second timeout, up to 3 retries, cost, and model metadata.
 - [ ] Kokoro uses English and randomized per-invocation voices to produce browser-compatible audio with benchmarked sequencing, interruption, and cancellation.
 - [ ] Interviewer and Interviewee agents complete recruiter and technical interviews through the backend using real providers.
-- [ ] Browser/WebRTC/STUN/TURN are explicitly deferred from Phase 16 acceptance.
+- [ ] Browser URL, browser automation, WebRTC, STUN, and TURN are explicitly deferred from Phase 16 acceptance; agent-to-agent live rehearsal is required.
 - [ ] Candidate and interviewer audio, final transcript, events, and evaluation persist and replay from durable storage.
 - [ ] The LLM evaluator runs only after completion and stores validated feedback with score 0 through 100.
 - [ ] Deleting an interview removes raw, derived, cached, transcript, recording, evaluation, and provider-created test artifacts.
 - [ ] The beta reports provider, model, version, device, latency, cost, quality, failure, and limitation metadata without sensitive payloads.
-- [ ] Negative cases cover invalid auth, owner mismatch, malformed PDF/audio, provider timeout, cancellation, quota/rate limit, selected browser-audio transport failure, storage failure, and deletion failure.
+- [ ] Negative cases cover invalid auth, owner mismatch, malformed or scanned/encrypted PDF/audio, provider timeout, cancellation, quota/rate limit, storage failure, and deletion failure.
 - [ ] Live tests are the only release evidence. Offline tests may protect contracts but cannot mark any Phase 16 acceptance item as passed.
 - [ ] Every live marker is backed by an exercised run, and skipped configuration never passes readiness.

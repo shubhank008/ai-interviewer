@@ -1,19 +1,188 @@
-"""Redacted Phase 16 live-beta rehearsal planning and evidence.
+"""Programmatic Phase 16 live rehearsal and redacted evidence.
 
-The runner deliberately does not treat deterministic providers as live evidence.
-Concrete live executors can be registered by the deployment harness without
-putting credentials, payloads, or personal data into the domain module.
+The rehearsal uses two explicit agent roles and injected provider interfaces.
+No deterministic provider is accepted as beta evidence, and this module never
+prints credentials, document text, transcript text, or audio bytes.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Mapping
+from typing import Callable, Mapping, Protocol
+from uuid import UUID, uuid4
 
 from .adapters.integrations import IntegrationEvidence, ProviderMetadata, redact_evidence
+from .adapters.persistence import InterviewRecord, PersistentDataStore
+from .capabilities.contracts import CancellationToken
+from .documents import LocalDocumentParser
+from .evaluation import Evaluation, Evaluator, InterviewContext
+from .models import InterviewMode, Recording, TranscriptSegment
+
+
+class RehearsalAuth(Protocol):
+    """Validate a real Firebase-authenticated token."""
+
+    async def validate(self, token: str) -> str: ...
+
+
+class RehearsalSTT(Protocol):
+    """Transcribe audio through the selected live WhisperX provider."""
+
+    async def transcribe(self, audio: bytes, turn_id: UUID, token: CancellationToken) -> TranscriptSegment: ...
+
+
+class RehearsalLLM(Protocol):
+    """Generate interviewer text through the selected live OpenRouter provider."""
+
+    async def generate(self, prompt: str, token: CancellationToken) -> str: ...
+
+
+class RehearsalTTS(Protocol):
+    """Synthesize Kokoro English 24 kHz mono PCM output."""
+
+    async def synthesize(self, text: str, token: CancellationToken) -> bytes: ...
+
+
+class RehearsalStorage(Protocol):
+    """Store and replay opaque artifacts behind the selected storage adapter."""
+
+    def put(self, key: str, content: bytes, content_type: str) -> None: ...
+    def get(self, key: str) -> bytes: ...
+    def delete_prefix(self, prefix: str) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class TimestampedAudioBuffer:
+    """One agent-to-agent audio buffer with monotonic ordering metadata."""
+
+    sequence: int
+    start_ms: int
+    duration_ms: int
+    audio: bytes
+
+
+@dataclass(frozen=True, slots=True)
+class RehearsalProviders:
+    """All provider capabilities required by a real rehearsal journey."""
+
+    auth: RehearsalAuth
+    stt: RehearsalSTT
+    llm: RehearsalLLM
+    tts: RehearsalTTS
+    data: PersistentDataStore
+    storage: RehearsalStorage
+    evaluator: Evaluator
+    parser: LocalDocumentParser = field(default_factory=LocalDocumentParser)
+
+
+@dataclass(frozen=True, slots=True)
+class AgentTurn:
+    """Redacted lifecycle result for one candidate turn."""
+
+    turn_id: UUID
+    buffers: tuple[TimestampedAudioBuffer, ...]
+    partial: TranscriptSegment
+    final: TranscriptSegment
+    interviewer_text: str
+    interviewer_audio_bytes: int
+
+
+class IntervieweeAgent:
+    """Supply candidate utterances as timestamped in-memory audio buffers."""
+
+    def __init__(self, utterances: tuple[bytes, ...]) -> None:
+        self.utterances = utterances
+
+    def buffers(self, turn_number: int) -> tuple[TimestampedAudioBuffer, ...]:
+        """Return ordered buffers for one utterance without mutating audio bytes."""
+        audio = self.utterances[turn_number % len(self.utterances)]
+        if not audio:
+            raise ValueError("interviewee utterance audio is empty")
+        return (TimestampedAudioBuffer(turn_number, turn_number * 1000, 1000, audio),)
+
+
+class InterviewerAgent:
+    """Drive setup, live voice turns, persistence, evaluation, and deletion."""
+
+    def __init__(self, providers: RehearsalProviders, token: str) -> None:
+        self.providers = providers
+        self.token = token
+
+    async def run(
+        self,
+        mode: InterviewMode,
+        resume_path: Path,
+        job_path: Path,
+        interviewee: IntervieweeAgent,
+        turn_count: int = 2,
+    ) -> tuple[InterviewRecord, tuple[AgentTurn, ...], Evaluation]:
+        """Execute one complete provider-backed journey with owned persistence."""
+        user_id = await self.providers.auth.validate(self.token)
+        resume = resume_path.read_bytes()
+        job_description = job_path.read_bytes()
+        resume_chunks = self.providers.parser.parse(resume, "application/pdf", "resume")
+        job_chunks = self.providers.parser.parse(job_description, "text/plain", "job_description")
+        record = InterviewRecord(user_id, mode).with_retention()
+        self.providers.data.save_interview(record)
+        prefix = f"users/{user_id}/interviews/{record.id}/"
+        self.providers.storage.put(prefix + "resume.pdf", resume, "application/pdf")
+        self.providers.data.save_document_reference(user_id, record.id, prefix + "resume.pdf")
+        context_text = " ".join(chunk.text for chunk in (*resume_chunks, *job_chunks))
+        turns: list[AgentTurn] = []
+        token = CancellationToken()
+        for sequence in range(turn_count):
+            buffers = interviewee.buffers(sequence)
+            audio = b"".join(buffer.audio for buffer in buffers)
+            turn_id = uuid4()
+            final = await self.providers.stt.transcribe(audio, turn_id, token)
+            partial_text = final.text[: max(1, len(final.text) // 2)]
+            partial = TranscriptSegment(turn_id, "candidate", partial_text, False, buffers[0].start_ms, buffers[-1].start_ms + buffers[-1].duration_ms)
+            final = TranscriptSegment(turn_id, "candidate", final.text, True, partial.start_ms, partial.end_ms)
+            self.providers.data.save_transcript(user_id, record.id, partial)
+            self.providers.data.save_transcript(user_id, record.id, final)
+            prompt = f"Ask the next {mode.value} interview question using this context: {context_text[:2000]} Answer evidence: {final.text}"
+            interviewer_text = await self.providers.llm.generate(prompt, token)
+            interviewer_audio = await self.providers.tts.synthesize(interviewer_text, token)
+            self.providers.storage.put(prefix + f"turn-{sequence}.pcm", interviewer_audio, "audio/pcm;rate=24000;channels=1")
+            turns.append(AgentTurn(turn_id, buffers, partial, final, interviewer_text, len(interviewer_audio)))
+        completed = InterviewRecord(record.user_id, record.mode, record.id, record.created_at, record.expires_at, "completed")
+        self.providers.data.save_interview(completed)
+        recording_key = prefix + "combined.pcm"
+        combined_audio = b"".join(
+            turn_audio
+            for sequence in range(len(turns))
+            for turn_audio in (self.providers.storage.get(prefix + f"turn-{sequence}.pcm"),)
+        )
+        self.providers.storage.put(recording_key, combined_audio, "audio/pcm;rate=24000;channels=1")
+        self.providers.data.save_recording(user_id, record.id, Recording(record.id, recording_key, "audio/pcm;rate=24000;channels=1"))
+        transcript = tuple(self.providers.data.list_transcripts(user_id, record.id))
+        evaluation = self.providers.evaluator.evaluate(InterviewContext(mode, "demo role", "senior", job_description.decode("utf-8", "replace"), "fixture resume"), transcript)
+        self.providers.data.save_evaluation(user_id, record.id, evaluation)
+        if not self.providers.storage.get(recording_key):
+            raise ValueError("stored replay audio is empty")
+        return completed, tuple(turns), evaluation
+
+    async def delete(self, record: InterviewRecord) -> None:
+        """Delete owned durable records and all owner-scoped rehearsal artifacts."""
+        self.providers.data.delete_interview(record.user_id, record.id)
+        self.providers.storage.delete_prefix(f"users/{record.user_id}/interviews/{record.id}/")
+
+
+def load_dotenv(path: str | Path = ".env", environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Load simple dotenv keys without printing or returning secret values to logs."""
+    values = dict(os.environ if environ is None else environ)
+    source = Path(path)
+    if not source.is_file():
+        return values
+    for line in source.read_text(encoding="utf-8").splitlines():
+        match = re.match(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$", line)
+        if match and match.group(1) not in values:
+            values[match.group(1)] = match.group(2).strip().strip('"').strip("'")
+    return values
 
 
 @dataclass(frozen=True, slots=True)

@@ -161,7 +161,7 @@ Run the frontend separately or serve its built `frontend/dist` through an HTTPS 
 | WS | `/ws/v1/sessions/{id}/media` | Authenticated microphone frame channel |
 | WS | `/ws/v1/sessions/{id}/signaling` | Authenticated signaling channel |
 
-The FastAPI composition root targets the Phase 16 live beta configuration: Firebase email/password and Google Sign-In Auth, Firestore, Firebase Storage with local/NFS checks, WhisperX small on CPU, OpenRouter through `LLM_API_KEY`, and Kokoro. The single Docker container is the initial self-hosted/Railway benchmark target. Offline tests protect contracts only; live composition and browser rehearsal are required before beta readiness.
+The FastAPI composition root targets the Phase 16 live beta configuration: Firebase email/password and Google Sign-In Auth, Firestore, Firebase Storage with local/NFS checks, WhisperX small on CPU, OpenRouter through `LLM_API_KEY`, and Kokoro. The single Docker container is the initial self-hosted/Railway benchmark target. Offline tests protect contracts only; live composition and agent-to-agent rehearsal are required before beta readiness.
 
 ## Provider integrations
 
@@ -179,8 +179,8 @@ The Phase 16 rehearsal runner must execute every selected live operation with re
 - **Kokoro:** set `TTS_PROVIDER=kokoro`, `TTS_MODEL`, and `TTS_LANGUAGE=en`. The Python adapter resolves its runtime from the model/language configuration. `TTS_MODEL_PATH` and `TTS_COMMAND` are obsolete. Select a supported voice randomly per invocation, normalize browser-compatible audio, and benchmark playback, cancellation, and quality.
 - **Firebase and Firestore:** provide `FIREBASE_PROJECT_ID`, protected `FIREBASE_CREDENTIALS_PATH`, Firebase Web Auth configuration, and EU Firestore. Use email/password and Google Sign-In Auth with open signup. Firestore rules remain managed in Firebase; application owner checks remain mandatory.
 - **Storage:** the first live run uses `STORAGE_BACKEND=local` with a local/NFS-compatible path. FTP is deferred; Firebase Storage is the selected provider. S3/GCS are out of scope. Exercise upload, replay, retention, partial failure, and deletion for the selected backend.
-- **Browser audio:** use timestamped microphone chunks with the selected VAD/streaming-Whisper seam. Full custom WebRTC/TURN is not a prerequisite for this phase unless benchmark evidence selects it.
-- **Fixtures:** use `tests/demo_resume.pdf` and `tests/demo_jobdescription.txt`; enforce 10 MB limits for each job description and resume. Show an unlocked-PDF error for protected documents and route scanned PDFs through an explicit extraction pass.
+- **Agent audio:** the Phase 16 rehearsal exchanges timestamped in-memory audio buffers between Interviewer and Interviewee Agents. Browser audio and WebRTC/TURN are deferred to the browser transport phase.
+- **Fixtures:** use `tests/demo_resume.pdf` and `tests/demo_jobdescription.txt`; enforce 10 MB limits for each job description and resume. Text-only PDF parsing must fail gracefully for scanned or encrypted documents.
 
 ## Configuration
 
@@ -252,12 +252,12 @@ Phases 1 through 15 establish product specifications, capability contracts, loca
 
 Phase 15 is merged, but its real-provider execution checkbox remains incomplete. The latest evidence says OpenRouter, Faster-Whisper, Piper/Kokoro, Firebase, Firestore, storage, and browser audio were skipped because required configuration was absent. The project is therefore **not ready to claim a live production interview**.
 
-Phase 16 must not be closed until it has backend/frontend/browser/provider coverage, a clean Docker release candidate, real authentication and owner isolation, real STT/TTS/LLM voice turns, durable artifact and deletion verification, HTTPS/CORS/WebSocket security, operations procedures, and a scripted live-browser rehearsal recording provider/model, latency, cost, quality, and limitations.
+Phase 16 must not be closed until it has backend/provider coverage, a clean Docker release candidate, real authentication and owner isolation, real STT/TTS/LLM voice turns, durable artifact and deletion verification, operations procedures, and a scripted live agent-to-agent rehearsal recording provider/model, latency, cost, quality, and limitations.
 
 ## Known limitations
 
 - Full live provider execution and agent-to-agent journeys remain to be exercised with configured deployment accounts.
-- Password-protected PDFs require a graceful unlocked-PDF error; scanned PDFs require an explicit OCR/LLM extraction pass.
+- Password-protected, scanned, or encrypted PDFs require a graceful text-only parser error in Phase 16; OCR is deferred.
 - The initial deployment is a single Docker container; separate worker containers are a roadmap item.
 - Browser audio transport remains selected by the Phase 16 deployment configuration; benchmark evidence must document latency, quality, and limitations.
 - The repository contains no model weights, Firebase credentials, FTP credentials, or production secrets.

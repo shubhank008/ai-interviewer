@@ -18,16 +18,10 @@ mkdir -p "$output_dir"
 "$PWD/.venv/bin/python" -m unittest tests.test_phase16_beta tests.test_phase16_rehearsal -v >"$output_dir/test.log"
 "$PWD/.venv/bin/python" - <<'PY' >"$output_dir/markers.log"
 import os
-import re
-from pathlib import Path
-from interviewer_domain.phase16_rehearsal import Phase16Rehearsal, write_rehearsal_evidence
+from interviewer_domain.phase16_rehearsal import Phase16Rehearsal, load_dotenv, write_rehearsal_evidence
 
-if Path(".env").is_file():
-    for line in Path(".env").read_text(encoding="utf-8").splitlines():
-        match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", line)
-        if match:
-            os.environ.setdefault(match.group(1), match.group(2).strip().strip("\""))
-results = Phase16Rehearsal(environ=os.environ).run()
+environ = load_dotenv(".env", os.environ)
+results = Phase16Rehearsal(environ=environ).run()
 for result in results:
     print(f"[BETA16] {result.operation.marker} status={result.status} reason={result.reason}")
 path = write_rehearsal_evidence(os.environ.get("PHASE16_EVIDENCE_DIR", ".agent_tmp/phase16-evidence"), results)
