@@ -363,20 +363,28 @@ def validate_beta_composition(settings: RuntimeSettings) -> None:
 
 def _fallback_stt(settings: RuntimeSettings, backends: ProviderBackends) -> STTProvider:
     """Build the configured STT fallback without importing optional dependencies."""
-    return (
-        FasterWhisperSTT(backends.stt, settings.stt_model)
-        if settings.stt_fallback_provider == "faster-whisper"
-        else InMemorySTT()
-    )
+    stt_fallback_classes = {
+        "faster-whisper": FasterWhisperSTT,
+        "openai-whisper": OpenAIWhisperSTT,
+        "whisperx": WhisperXSTT,
+    }
+    cls = stt_fallback_classes.get(settings.stt_fallback_provider)
+    if cls is not None:
+        return cls(backends.stt, settings.stt_model)
+    return InMemorySTT()
 
 
 def _fallback_tts(settings: RuntimeSettings, backends: ProviderBackends) -> TTSProvider:
     """Build the configured TTS fallback without importing optional dependencies."""
-    return (
-        PiperKokoroTTS(backends.tts, settings.tts_model)
-        if settings.tts_fallback_provider in {"piper", "kokoro"}
-        else InMemoryTTS()
-    )
+    tts_fallback_classes = {
+        "piper": PiperKokoroTTS,
+        "kokoro": KokoroTTS,
+        "kokoro-onnx": KokoroOnnxTTS,
+    }
+    cls = tts_fallback_classes.get(settings.tts_fallback_provider)
+    if cls is not None:
+        return cls(backends.tts, settings.tts_model)
+    return InMemoryTTS()
 
 
 def _fallback_llm(settings: RuntimeSettings, backends: ProviderBackends) -> LLMProvider:
