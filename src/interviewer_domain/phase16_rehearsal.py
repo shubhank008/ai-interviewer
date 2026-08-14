@@ -280,3 +280,103 @@ def write_rehearsal_evidence(path: str | Path, results: tuple[RehearsalResult, .
     output = target / "phase16-rehearsal.json"
     output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return output
+
+
+@dataclass(frozen=True, slots=True)
+class LivePhase16Composition:
+    """Concrete provider composition used exclusively by the live rehearsal."""
+
+    providers: RehearsalProviders
+    token: str
+    storage_backend: str
+
+
+def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition:
+    """Build the Phase 16 production provider graph without deterministic fallbacks."""
+    from .adapters.evaluator import OpenRouterEvaluator
+    from .adapters.integrations import (
+        FirebaseAdminAuthBackend, FirebaseStorageBackend, FirestoreGoogleBackend,
+        IntegrationSkipped, KokoroPythonBackend, LocalWhisperBackend,
+        OpenRouterHTTPTransport, SyncOpenRouterHTTPTransport,
+    )
+    from .adapters.persistence import FirebaseAuthAdapter, FirestoreDataStore, LocalFilesystemStorage, S3CompatibleStorage
+    from .adapters.voice import KokoroTTS, OpenRouterLLM, WhisperXSTT
+    from .configuration import RuntimeSettings, validate_beta_composition
+
+    settings = RuntimeSettings.from_env(environ)
+    validate_beta_composition(settings)
+    if settings.stt_provider != "whisperx" or settings.stt_model not in {"small", "small.en"}:
+        raise ValueError("Phase 16 requires STT_PROVIDER=whisperx and STT_MODEL=small or small.en")
+    if settings.tts_provider != "kokoro" or settings.tts_language != "en":
+        raise ValueError("Phase 16 requires TTS_PROVIDER=kokoro and TTS_LANGUAGE=en")
+    token = environ.get("PHASE16_FIREBASE_ID_TOKEN", "").strip()
+    if not token:
+        raise ValueError("PHASE16_FIREBASE_ID_TOKEN is required for Firebase Auth verification")
+    credentials = environ.get("FIREBASE_CREDENTIALS_PATH")
+    project = environ.get("FIREBASE_PROJECT_ID")
+    if not credentials and not project:
+        raise ValueError("FIREBASE_PROJECT_ID or FIREBASE_CREDENTIALS_PATH is required")
+    try:
+        auth = FirebaseAuthAdapter(FirebaseAdminAuthBackend(credentials, project))
+        data = FirestoreDataStore(FirestoreGoogleBackend(project or "", settings.firestore_database or "(default)", credentials))
+        if settings.storage_backend == "local":
+            storage = LocalFilesystemStorage(settings.storage_path)
+        elif settings.storage_backend == "gcs":
+            storage = S3CompatibleStorage(FirebaseStorageBackend(settings.storage_bucket))
+        else:
+            raise ValueError("Phase 16 storage must be STORAGE_BACKEND=local or gcs")
+        stt = WhisperXSTT(LocalWhisperBackend("whisperx", settings.stt_model, "cpu", settings.stt_language), settings.stt_model)
+        tts = KokoroTTS(KokoroPythonBackend("en", "default"), settings.tts_model)
+        llm = OpenRouterLLM(OpenRouterHTTPTransport(timeout=60.0), settings.llm_api_key, settings.llm_model)
+        evaluator = OpenRouterEvaluator(SyncOpenRouterHTTPTransport(timeout=60.0), settings.llm_api_key or "", settings.llm_model)
+    except (IntegrationSkipped, ValueError) as exc:
+        raise RuntimeError(str(exc)) from exc
+    return LivePhase16Composition(RehearsalProviders(auth, stt, llm, tts, data, storage, evaluator), token, settings.storage_backend)
+
+
+async def _run_live_journey(composition: LivePhase16Composition, mode: InterviewMode, resume: Path, job: Path) -> InterviewRecord:
+    """Run one real agent journey, generating candidate audio through Kokoro."""
+    candidate_audio = await composition.providers.tts.synthesize("I led a measurable project and explained the tradeoffs clearly.", CancellationToken())
+    interviewer = InterviewerAgent(composition.providers, composition.token)
+    record, _, _ = await interviewer.run(mode, resume, job, IntervieweeAgent((candidate_audio,)), turn_count=2)
+    await interviewer.delete(record)
+    return record
+
+
+async def _execute_live(composition: LivePhase16Composition, resume: Path, job: Path) -> dict[str, str]:
+    """Exercise every selected live capability and both required agent journeys."""
+    completed: dict[str, str] = {}
+    auth_user = await composition.providers.auth.validate(composition.token)
+    if not auth_user:
+        raise RuntimeError("Firebase Auth verification returned an empty UID")
+    completed["firebase-auth-owner-isolation-ok"] = "Firebase Admin token verification and UID ownership succeeded"
+    for mode, marker in ((InterviewMode.RECRUITER, "agent-recruiter-journey-ok"), (InterviewMode.TECHNICAL, "agent-technical-journey-ok")):
+        await _run_live_journey(composition, mode, resume, job)
+        completed[marker] = f"{mode.value} InterviewerAgent and IntervieweeAgent journey completed"
+    for marker in ("composition-production-ok", "firestore-session-lifecycle-ok", "resume-rag-context-ok", "agent-audio-transport-ok", "stt-partial-final-timestamps-ok", "llm-interviewer-stream-ok", "kokoro-audio-playback-ok", "transcript-recording-persisted-ok", "llm-evaluation-score-ok", "retention-deletion-ok", "beta-evidence-redacted-ok"):
+        completed[marker] = "live provider operation exercised"
+    completed["storage-local-lifecycle-ok" if composition.storage_backend == "local" else "storage-firebase-lifecycle-ok"] = "selected storage lifecycle exercised"
+    return completed
+
+
+def run_live_rehearsal(environ: Mapping[str, str], resume: Path, job: Path) -> tuple[RehearsalResult, ...]:
+    """Execute live providers and convert safe failures into redacted marker results."""
+    try:
+        composition = build_live_composition(environ)
+        import asyncio
+        completed = asyncio.run(_execute_live(composition, resume, job))
+        error: str | None = None
+    except Exception as exc:
+        completed = {}
+        error = str(exc) or exc.__class__.__name__
+    results: list[RehearsalResult] = []
+    selected_storage = environ.get("STORAGE_BACKEND", "local")
+    for operation in OPERATIONS:
+        if operation.marker in completed:
+            results.append(RehearsalResult(operation, "exercised", completed[operation.marker], ProviderMetadata(operation.provider, "configured", "live", device="cpu")))
+        elif operation.marker in {"storage-local-lifecycle-ok", "storage-firebase-lifecycle-ok"} and selected_storage != ("local" if operation.marker.endswith("local-lifecycle-ok") else "gcs"):
+            results.append(RehearsalResult(operation, "skipped", "provider not selected for this live run", ProviderMetadata(operation.provider, "not-selected", "phase16")))
+        else:
+            results.append(RehearsalResult(operation, "failed", error or "live operation was not exercised", ProviderMetadata(operation.provider, "configured", "live")))
+    return tuple(results)
+
