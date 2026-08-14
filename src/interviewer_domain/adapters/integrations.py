@@ -37,10 +37,11 @@ class ProviderMetadata:
 class LocalWhisperBackend:
     """Run an operator-selected OpenAI Whisper or WhisperX model locally."""
 
-    def __init__(self, provider: str, model: str, device: str) -> None:
+    def __init__(self, provider: str, model: str, device: str, language: str | None = None) -> None:
         self.provider = provider
         self.model_name = model
         self.device = device
+        self.language = language
         if provider == "whisperx":
             try:
                 import whisperx  # type: ignore[import-not-found]
@@ -65,9 +66,9 @@ class LocalWhisperBackend:
             import soundfile as sf  # type: ignore[import-not-found]
             samples, _ = sf.read(io.BytesIO(audio), dtype="float32")
             if self.provider == "whisperx":
-                result = self.model.transcribe(samples, language=None)
+                result = self.model.transcribe(samples, language=self.language)
                 return str(result.get("text", "")).strip()
-            result = self.model.transcribe(samples, language=None, fp16=self.device != "cpu")
+            result = self.model.transcribe(samples, language=self.language, fp16=self.device != "cpu")
             return str(result.get("text", "")).strip()
         except ProviderError:
             raise

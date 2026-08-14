@@ -287,7 +287,7 @@ def compose_providers(
             stt_backend = None
     if stt_backend is None and settings.stt_provider in {"openai-whisper", "whisperx"}:
         try:
-            stt_backend = LocalWhisperBackend(settings.stt_provider, settings.stt_model, "cpu" if settings.stt_cpu else "cuda")
+            stt_backend = LocalWhisperBackend(settings.stt_provider, settings.stt_model, "cpu" if settings.stt_cpu else "cuda", language=settings.stt_language)
         except (IntegrationSkipped, ProviderError) as exc:
             if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.stt is None:
                 raise ConfigurationError("configured STT provider is unavailable") from exc
