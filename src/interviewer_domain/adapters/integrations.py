@@ -110,8 +110,10 @@ class KokoroPythonBackend:
     """Run the official Kokoro Python pipeline with an injected model choice."""
 
     _ENGLISH_VOICES = (
-        "af_heart", "af_bella", "af_aoede", "af_jessica", "af_kore",
-        "af_nicole", "af_river", "af_sarah", "af_sky", "am_adam", "am_echo",
+        "af_heart", "af_alloy", "af_aoede", "af_bella", "af_jessica",
+        "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
+        "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam",
+        "am_michael", "am_onyx", "am_puck",
     )
 
     def __init__(self, language: str = "en", voice: str = "af_heart") -> None:

@@ -393,6 +393,8 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
         raise RuntimeError(str(exc)) from exc
     if auth_mode == "internal-rehearsal":
         token = "phase16-internal-rehearsal"
+    else:
+        token = rehearsal_identity
     return LivePhase16Composition(
         RehearsalProviders(auth, stt, llm, tts, data, storage, evaluator),
         token,

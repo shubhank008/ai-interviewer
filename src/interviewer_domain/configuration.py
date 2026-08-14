@@ -299,14 +299,14 @@ def compose_providers(
     stt_backend: WhisperBackend | None = injected.stt
     if stt_backend is None and settings.stt_provider == "faster-whisper":
         try:
-            stt_backend = FasterWhisperLocalBackend(settings.stt_model_path, device="cpu" if settings.stt_cpu else "cuda")
+            stt_backend = FasterWhisperLocalBackend(settings.stt_model, device="cpu" if settings.stt_cpu else "cuda")
         except (IntegrationSkipped, ProviderError) as exc:
             if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.stt is None:
                 raise ConfigurationError("configured STT provider is unavailable") from exc
             stt_backend = None
     if stt_backend is None and settings.stt_provider in {"openai-whisper", "whisperx"}:
         try:
-            stt_backend = LocalWhisperBackend(settings.stt_provider, settings.stt_model, "cpu" if settings.stt_cpu else "cuda", language=settings.stt_language, model_path=settings.stt_model_path)
+            stt_backend = LocalWhisperBackend(settings.stt_provider, settings.stt_model, "cpu" if settings.stt_cpu else "cuda", language=settings.stt_language)
         except (IntegrationSkipped, ProviderError) as exc:
             if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.stt is None:
                 raise ConfigurationError("configured STT provider is unavailable") from exc
@@ -333,14 +333,7 @@ def compose_providers(
                 raise ConfigurationError("configured TTS provider is unavailable") from exc
             tts_backend = None
     if tts_backend is None and settings.tts_provider == "piper":
-        try:
-            if not settings.tts_command:
-                raise IntegrationSkipped("TTS_COMMAND is not configured")
-            tts_backend = PiperCommandBackend(settings.tts_command, settings.tts_model_path)
-        except (IntegrationSkipped, ProviderError) as exc:
-            if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
-                raise ConfigurationError("configured TTS provider is unavailable") from exc
-            tts_backend = None
+        raise ConfigurationError("piper TTS provider requires tts_command and tts_model_path settings not present in RuntimeSettings")
     if tts_backend is None and settings.tts_provider == "kokoro-onnx":
         if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
             raise ConfigurationError("kokoro-onnx backend is not implemented")
