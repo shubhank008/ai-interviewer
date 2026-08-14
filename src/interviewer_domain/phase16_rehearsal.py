@@ -46,7 +46,7 @@ class RehearsalResult:
 
 
 OPERATIONS: tuple[RehearsalOperation, ...] = (
-    RehearsalOperation("composition-production-ok", "composition", "firebase/openrouter/whisperx/kokoro", ("APP_PROFILE",)),
+    RehearsalOperation("composition-production-ok", "composition", "firebase/openrouter/whisperx/kokoro", ("APP_PROFILE", "FIREBASE_PROJECT_ID", "STT_PROVIDER", "TTS_PROVIDER", "LLM_PROVIDER", "LLM_API_KEY")),
     RehearsalOperation("firebase-auth-owner-isolation-ok", "firebase-auth", "firebase-auth", ("FIREBASE_PROJECT_ID", "FIREBASE_AUTH_DOMAIN")),
     RehearsalOperation("firestore-session-lifecycle-ok", "firestore", "firestore", ("FIREBASE_PROJECT_ID", "FIRESTORE_DATABASE")),
     RehearsalOperation("storage-firebase-lifecycle-ok", "storage-firebase", "firebase-storage", ("FIREBASE_PROJECT_ID", "STORAGE_BUCKET")),
