@@ -1,0 +1,72 @@
+Senior Infra Engineer - Full Cycle Retail Robotics Engineering
+TokyoRetail Robotics – Product Development - Systems & Apps /Full-time employee /Full-time Contract /Hybrid
+Role Overview
+Engineers working on the Robot Operation System operate at the intersection of cloud infrastructure, robotic systems, and real-world retail operations.
+In this role, you will not only design, develop, and deploy software, but also own the end-to-end lifecycle of product capabilities — from problem understanding and system design to implementation, release, operation, measurement, and continuous improvement.
+The scope extends beyond backend services. You will design, build, maintain, and evolve edge-connected applications that integrate robots, shelves, and vision systems with our core cloud backend platform.
+This role bridges software engineering and field deployment, with ownership of reliability and scalability across the robot operation stack — from cloud APIs to Jetson-based devices running ROS and C++ systems. You will work closely with backend engineers, robotics engineers, and field operations teams to turn real-world operational needs into robust, scalable software systems.
+ 
+Team & Platform Context
+We develop using C# (.NET) for both backend and edge communication services to ensure unified development across systems. Robots run ROS/C++ on NVIDIA Jetson AGX devices and connect to cloud services through gRPC and MQTT. You will work across this stack—implementing backend agents, on-device services, and deployment pipelines with Ansible and Docker—to deliver seamless cloud-to-edge operations.
+ 
+The Challenge: Software Meets Hardware
+Because our software applications (spanning both frontend and backend) serve as the direct interface for end-users, we face a constant stream of diverse and evolving requirements. You will work in a unique environment where software speed meets hardware reality:
+- Bridging the Cycle Gap: Hardware and Automation development cycles are inherently longer than pure software. You will often need to devise creative software workarounds to mitigate hardware issues or implement "virtual" features to validate business value before hardware is ready.
+- Elevating Engineering Standards: While teams in other specialized domains are experts in their fields, they may be less familiar with modern SaaS practices or non-functional requirements (NFRs). You will act as a bridge, supporting other teams with general software development know-how and ensuring the overall system is robust and scalable.
+ 
+This role requires more than just coding; it demands the flexibility to navigate constraints and the leadership to raise the bar for software engineering across the organization.
+ 
+ 
+Company-Wide Tech Stack
+- Frontend: TypeScript, React, C#, Blazor, (Tailwind, shadcn)
+- Backend: .NET
+- Cloud Infra: Terraform, Azure, Kubernetes
+- Data Stores: PostgreSQL, MongoDB, Redis
+- IoT/Edge: .NET, C++, Python, ROS, NVIDIA Jetson AGX, IoT boards
+- CI/CD: GitHub Actions, SonarQube, Ansible
+ 
+ 
+ 
+ 
+Key Responsibilities
+ 
+Edge Software Development
+Develop and maintain C# backend services and edge deviceagents that connect ROS-based systems with the cloud backend.
+Implement telemetry, monitoring, and diagnostic subsystems for robots and smart shelves.
+Optimize communication reliability and performance for large-scale IoT deployments.
+Debug low-level .NET clients with C++ modules to ensure real-time stability and efficiency.
+System Integration & Deployment
+Build and test deployment pipelines for NVIDIA Jetson AGX and similar Linux-based devices using Azure Container Registry, Ansible and Docker.
+Integrate telemetry and job execution pipelines between the cloud backend, robot control systems, and vision processing systems.
+Collaborate with robotics engineers to align ROS topics, services, and messages with .NET components.
+Production Readiness & Operations
+Support deployment validation in development and production environments.
+Partner with operations teams to analyze robot logs and improve stability and observability.
+Contribute to incident response and root-cause analysis for field issues.
+Collaboration & Continuous Improvement
+Collaborate with backend, robotics, and vision teams to enhance cross-system communication and reliability.
+Contribute to documentation, CI/CD pipelines, and quality improvement initiatives.
+Qualifications - Must Have
+6+ years of professional experience as a software engineer.
+4+ years of hands-on experience with C#/.NET.
+Ability to read and write production-level C++.
+3+ years of experience developing applications for real users, including release and operation phases.
+2+ years working with embedded systems, edge computing, or IoT devices.
+Experience in team development using Git with 5 or more engineers.
+Experience building software for edge or IoT devices running Linux (ARM64 preferred).
+Experience with containerized deployments (Docker) and remote provisioning (Ansible).
+Knowledge of gRPC, MQTT, WebSocket, or similar communication protocols.
+Experience integrating telemetry and monitoring systems for distributed environments.
+Comfortable collaborating with hardware and field operations teams, thriving in fast-paced environments, and open to occasional travel for on-site support.
+Nice to Have
+Robotics, computer vision, or automation systems experience.
+Knowledge of Azure IoT Hub, Azure Container Registry, or related cloud services.
+Familiarity with ROS/ROS2 concepts including nodes, topics, services, and launch files.
+Familiarity with web-based visualization and debugging tools.
+Background in performance optimization for real-time systems.
+Understanding of security and authentication mechanisms for device communication.
+Experience deploying robotics or large-scale IoT systems in production environments.
+Exposure to retail automation or supply chain technology.
+Experience deploying machine learning models on edge devices (TensorRT, ONNX).
+¥7,000,000 - ¥9,000,000 a year
+We may use artificial intelligence (AI) tools to support parts of the hiring process, such as reviewing applications, analyzing resumes, or assessing responses and identifying potential inconsistencies or verification signals in application materials based on available information. These tools assist our recruitment team but do not replace human judgment. Final hiring decisions are ultimately made by humans. If you would like more information about how your data is processed, please contact us.
