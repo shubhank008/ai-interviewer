@@ -19,6 +19,7 @@ class Phase16RehearsalTests(unittest.TestCase):
             next(result for result in results if result.operation.marker == "beta-evidence-redacted-ok").status,
             "exercised",
         )
+        self.assertEqual(len(results), 16)
 
     def test_configured_without_executor_fails(self) -> None:
         """Configured providers fail until a real live executor is supplied."""

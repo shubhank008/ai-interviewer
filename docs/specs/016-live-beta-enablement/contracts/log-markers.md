@@ -6,18 +6,18 @@
 - `[BETA16] firebase-auth-owner-isolation-ok`
 - `[BETA16] firestore-session-lifecycle-ok`
 - `[BETA16] storage-firebase-lifecycle-ok`
-- `[BETA16] storage-ftp-lifecycle-ok`
+- `[BETA16] storage-firebase-lifecycle-ok`
 - `[BETA16] storage-local-lifecycle-ok`
 - `[BETA16] resume-rag-context-ok`
-- `[BETA16] browser-audio-transport-ok`
+- `[BETA16] agent-audio-transport-ok`
 - `[BETA16] stt-partial-final-timestamps-ok`
 - `[BETA16] llm-interviewer-stream-ok`
 - `[BETA16] kokoro-audio-playback-ok`
 - `[BETA16] transcript-recording-persisted-ok`
 - `[BETA16] llm-evaluation-score-ok`
 - `[BETA16] retention-deletion-ok`
-- `[BETA16] browser-recruiter-journey-ok`
-- `[BETA16] browser-technical-journey-ok`
+- `[BETA16] agent-recruiter-journey-ok`
+- `[BETA16] agent-technical-journey-ok`
 - `[BETA16] beta-evidence-redacted-ok`
 
 ## Forbidden output
