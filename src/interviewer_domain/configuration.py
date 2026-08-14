@@ -376,8 +376,8 @@ def validate_beta_composition(settings: RuntimeSettings) -> None:
     ]
     if settings.stt_provider not in {"faster-whisper", "openai-whisper", "whisperx"}:
         missing.append("STT_PROVIDER=one of faster-whisper, openai-whisper, whisperx")
-    if settings.tts_provider not in {"piper", "kokoro", "kokoro-onnx"}:
-        missing.append("TTS_PROVIDER=one of piper, kokoro, kokoro-onnx")
+    if settings.tts_provider != "kokoro":
+        missing.append("TTS_PROVIDER=kokoro")
     if settings.llm_provider != "openrouter":
         missing.append("LLM_PROVIDER=openrouter")
     if not settings.llm_api_key:
