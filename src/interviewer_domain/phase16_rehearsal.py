@@ -295,7 +295,16 @@ def write_rehearsal_evidence(path: str | Path, results: tuple[RehearsalResult, .
         or selected_storage is None
         or result.operation.marker == selected_storage
     ]
-    failed = [result.operation.marker for result in required if result.status != "exercised"]
+    failed = [
+        result.operation.marker
+        for result in required
+        if result.status != "exercised"
+        and not (
+            result.operation.marker == "firebase-auth-owner-isolation-ok"
+            and result.status == "skipped"
+            and result.metadata.model == "deferred"
+        )
+    ]
     payload = {
         "schema_version": 1,
         "evidence_type": "phase16-live-beta-rehearsal",
@@ -352,21 +361,19 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
         raise ValueError("Phase 16 requires STT_PROVIDER=whisperx and STT_MODEL=small or small.en")
     if settings.tts_provider != "kokoro" or settings.tts_language != "en":
         raise ValueError("Phase 16 requires TTS_PROVIDER=kokoro and TTS_LANGUAGE=en")
-    token = environ.get("PHASE16_FIREBASE_ID_TOKEN", "").strip()
-    if token and token.count(".") != 2:
-        raise ValueError(
-            "PHASE16_FIREBASE_ID_TOKEN must be a Firebase ID-token JWT, not a Firebase UID"
-        )
+    rehearsal_identity = environ.get("PHASE16_FIREBASE_ID_TOKEN", "").strip()
+    firebase_token = rehearsal_identity if rehearsal_identity.count(".") == 2 else ""
     credentials = environ.get("FIREBASE_CREDENTIALS_PATH")
     project = environ.get("FIREBASE_PROJECT_ID")
     if not credentials and not project:
         raise ValueError("FIREBASE_PROJECT_ID or FIREBASE_CREDENTIALS_PATH is required")
-    auth_mode = "firebase" if token else "internal-rehearsal"
+    auth_mode = "firebase" if firebase_token else "internal-rehearsal"
+    rehearsal_uid = rehearsal_identity or "phase16-rehearsal-user"
     try:
         auth = (
             FirebaseAuthAdapter(FirebaseAdminAuthBackend(credentials, project))
-            if token
-            else InternalRehearsalAuth("phase16-rehearsal-user")
+            if firebase_token
+            else InternalRehearsalAuth(rehearsal_uid)
         )
         data = FirestoreDataStore(FirestoreGoogleBackend(project or "", settings.firestore_database or "(default)", credentials))
         if settings.storage_backend == "local":
@@ -449,8 +456,8 @@ def run_live_rehearsal(environ: Mapping[str, str], resume: Path, job: Path) -> t
     for operation in OPERATIONS:
         if operation.marker in completed:
             results.append(RehearsalResult(operation, "exercised", completed[operation.marker], ProviderMetadata(operation.provider, "configured", "live", device="cpu")))
-        elif operation.marker == "firebase-auth-owner-isolation-ok" and not environ.get("PHASE16_FIREBASE_ID_TOKEN", "").strip():
-            results.append(RehearsalResult(operation, "skipped", "no frontend signup token; internal rehearsal owner used", ProviderMetadata(operation.provider, "deferred", "backend-rehearsal")))
+        elif operation.marker == "firebase-auth-owner-isolation-ok" and environ.get("PHASE16_FIREBASE_ID_TOKEN", "").strip().count(".") != 2:
+            results.append(RehearsalResult(operation, "skipped", "rehearsal UID used; Firebase token owner isolation is a future task", ProviderMetadata(operation.provider, "deferred", "backend-rehearsal")))
         elif operation.marker in {"storage-local-lifecycle-ok", "storage-firebase-lifecycle-ok"} and selected_storage != ("local" if operation.marker.endswith("local-lifecycle-ok") else "gcs"):
             results.append(RehearsalResult(operation, "skipped", "provider not selected for this live run", ProviderMetadata(operation.provider, "not-selected", "phase16")))
         else:

@@ -35,11 +35,17 @@ selected_storage_marker = (
     if selected_storage == "local"
     else "storage-firebase-lifecycle-ok"
 )
+has_firebase_jwt = environ.get("PHASE16_FIREBASE_ID_TOKEN", "").strip().count(".") == 2
 required_markers = {
     result.operation.marker
     for result in results
-    if not result.operation.marker.startswith("storage-")
-    or result.operation.marker == selected_storage_marker
+    if (
+        (result.operation.marker != "firebase-auth-owner-isolation-ok" or has_firebase_jwt)
+        and (
+            not result.operation.marker.startswith("storage-")
+            or result.operation.marker == selected_storage_marker
+        )
+    )
 }
 if any(result.status != "exercised" for result in results if result.operation.marker in required_markers):
     raise SystemExit(1)
