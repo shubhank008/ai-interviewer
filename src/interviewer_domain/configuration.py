@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import random
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Mapping
@@ -33,6 +34,7 @@ from .provider_integration import (
     KokoroPythonBackend,
     LocalWhisperBackend,
     OpenRouterHTTPTransport,
+    PiperCommandBackend,
 )
 from .providers import InMemoryLLM, InMemorySTT, InMemoryTTS
 from .routing import FallbackRouter
@@ -40,6 +42,14 @@ from .routing import FallbackRouter
 
 class ConfigurationError(ValueError):
     """Raised when runtime configuration cannot safely compose the service."""
+
+
+_KOKORO_ENGLISH_VOICES = (
+    "af_heart", "af_alloy", "af_aoede", "af_bella", "af_jessica",
+    "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
+    "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam",
+    "am_michael", "am_onyx", "am_puck",
+)
 
 
 class RuntimeProfile(StrEnum):
@@ -305,11 +315,26 @@ def compose_providers(
     tts_backend: SpeechBackend | None = injected.tts
     if tts_backend is None and settings.tts_provider == "kokoro":
         try:
-            tts_backend = KokoroPythonBackend(settings.tts_language, settings.tts_model)
+            voice = settings.tts_model
+            if voice == "default" or voice not in _KOKORO_ENGLISH_VOICES:
+                voice = random.choice(_KOKORO_ENGLISH_VOICES)
+            tts_backend = KokoroPythonBackend(settings.tts_language, voice)
         except (IntegrationSkipped, ProviderError) as exc:
             if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
                 raise ConfigurationError("configured TTS provider is unavailable") from exc
             tts_backend = None
+    if tts_backend is None and settings.tts_provider == "piper":
+        try:
+            if not settings.tts_command:
+                raise IntegrationSkipped("TTS_COMMAND is not configured")
+            tts_backend = PiperCommandBackend(settings.tts_command, settings.tts_model)
+        except (IntegrationSkipped, ProviderError) as exc:
+            if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
+                raise ConfigurationError("configured TTS provider is unavailable") from exc
+            tts_backend = None
+    if tts_backend is None and settings.tts_provider == "kokoro-onnx":
+        if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
+            raise ConfigurationError("kokoro-onnx backend is not implemented")
     tts_classes = {
         "piper": PiperKokoroTTS,
         "kokoro": KokoroTTS,
@@ -349,8 +374,8 @@ def validate_beta_composition(settings: RuntimeSettings) -> None:
     ]
     if settings.stt_provider not in {"faster-whisper", "openai-whisper", "whisperx"}:
         missing.append("STT_PROVIDER=one of faster-whisper, openai-whisper, whisperx")
-    if settings.tts_provider not in {"piper", "kokoro", "kokoro-onnx"}:
-        missing.append("TTS_PROVIDER=one of piper, kokoro, kokoro-onnx")
+    if settings.tts_provider not in {"kokoro"}:
+        missing.append("TTS_PROVIDER=kokoro")
     if settings.llm_provider != "openrouter":
         missing.append("LLM_PROVIDER=openrouter")
     if not settings.llm_api_key:
