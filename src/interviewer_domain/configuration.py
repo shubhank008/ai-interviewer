@@ -124,7 +124,7 @@ class RuntimeSettings:
             llm_provider=values.get("LLM_PROVIDER", "in-memory"),
             llm_fallback_provider=values.get("LLM_FALLBACK_PROVIDER", "in-memory"),
             llm_api_key=_optional(values, "LLM_API_KEY"),
-            llm_model=values.get("LLM_MODEL", "default").lstrip("~"),
+            llm_model=values.get("LLM_MODEL", "default"),
             webrtc_ice_servers=values.get(
                 "WEBRTC_ICE_SERVERS", "stun:stun.l.google.com:19302"
             ),
@@ -285,7 +285,7 @@ def compose_providers(
             stt_backend = None
     if stt_backend is None and settings.stt_provider in {"openai-whisper", "whisperx"}:
         try:
-            stt_backend = LocalWhisperBackend(settings.stt_provider, settings.stt_model, "cpu" if settings.stt_cpu else "cuda")
+            stt_backend = LocalWhisperBackend(settings.stt_provider, settings.stt_model, "cpu" if settings.stt_cpu else "cuda", settings.stt_language)
         except (IntegrationSkipped, ProviderError) as exc:
             if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.stt is None:
                 raise ConfigurationError("configured STT provider is unavailable") from exc
