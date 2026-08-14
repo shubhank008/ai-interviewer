@@ -49,7 +49,13 @@ class LocalWhisperBackend:
                 import whisperx  # type: ignore[import-not-found,import-untyped]
             except ImportError as exc:
                 raise IntegrationSkipped("whisperx package is not installed") from exc
-            self.model = whisperx.load_model(model, device, compute_type="float32" if device != "cpu" else "int8")
+            self.model = whisperx.load_model(
+                model,
+                device,
+                compute_type="float32" if device != "cpu" else "int8",
+                language=language,
+                vad_method="silero",
+            )
         elif provider == "openai-whisper":
             try:
                 import whisper  # type: ignore[import-not-found]
@@ -78,7 +84,16 @@ class LocalWhisperBackend:
             samples = np.asarray(samples, dtype="float32")
             if self.provider == "whisperx":
                 result = self.model.transcribe(samples, language=self.language)
-                return str(result.get("text", "")).strip()
+                text = str(result.get("text", "")).strip()
+                if text:
+                    return text
+                segments, _ = self.model.model.transcribe(
+                    samples,
+                    language=self.language,
+                    vad_filter=False,
+                    without_timestamps=True,
+                )
+                return " ".join(str(segment.text).strip() for segment in segments).strip()
             result = self.model.transcribe(samples, language=self.language, fp16=self.device != "cpu")
             return str(result.get("text", "")).strip()
         except ProviderError:

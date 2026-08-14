@@ -349,7 +349,7 @@ class FirestoreDataStore:
     ) -> None:
         """Persist a transcript in the interview subcollection."""
         self.get_interview(user_id, interview_id)
-        payload = asdict(segment)
+        payload = _firestore_safe(asdict(segment))
         payload["user_id"] = user_id
         self.backend.set(
             f"{self.collection}/{interview_id}/transcripts",
@@ -383,7 +383,9 @@ class FirestoreDataStore:
         """Persist recording metadata in the interview document."""
         self.get_interview(user_id, interview_id)
         self.backend.set(
-            f"{self.collection}/{interview_id}", "recording", asdict(recording)
+            f"{self.collection}/{interview_id}/recordings",
+            "current",
+            _firestore_safe(asdict(recording)),
         )
 
     def save_evaluation(
@@ -392,13 +394,15 @@ class FirestoreDataStore:
         """Persist evaluation metadata in the interview document."""
         self.get_interview(user_id, interview_id)
         self.backend.set(
-            f"{self.collection}/{interview_id}", "evaluation", asdict(evaluation)
+            f"{self.collection}/{interview_id}/evaluations",
+            "current",
+            _firestore_safe(asdict(evaluation)),
         )
 
     def get_evaluation(self, user_id: str, interview_id: UUID) -> Evaluation | None:
         """Return an owned evaluation document or None when absent."""
         self.get_interview(user_id, interview_id)
-        value = self.backend.get(f"{self.collection}/{interview_id}", "evaluation")
+        value = self.backend.get(f"{self.collection}/{interview_id}/evaluations", "current")
         return _evaluation_from_json(value) if value is not None else None
 
     def save_document_reference(
@@ -406,7 +410,9 @@ class FirestoreDataStore:
     ) -> None:
         """Persist an opaque document reference for an owned interview."""
         self.get_interview(user_id, interview_id)
-        self.backend.set(f"{self.collection}/{interview_id}", "document", {"key": key})
+        self.backend.set(
+            f"{self.collection}/{interview_id}/documents", "current", {"key": key}
+        )
 
     def delete_interview(self, user_id: str, interview_id: UUID) -> None:
         """Delete all Firestore documents and subcollections for an owned interview, including expired data."""
@@ -418,8 +424,8 @@ class FirestoreDataStore:
             delete_document(self.collection, str(interview_id))
         else:
             self.backend.delete_collection_value(self.collection, "id", str(interview_id))
-        self.backend.delete_collection(f"{self.collection}/{interview_id}")
-        self.backend.delete_collection(f"{self.collection}/{interview_id}/transcripts")
+        for subcollection in ("transcripts", "recordings", "evaluations", "documents"):
+            self.backend.delete_collection(f"{self.collection}/{interview_id}/{subcollection}")
 
 
 class LocalFilesystemStorage:
@@ -606,6 +612,19 @@ class PersistenceService:
 
                 payload["evaluation"] = evaluation_dict(evaluation)
         return UXResource(view, interview_id, payload)
+
+
+def _firestore_safe(value: Any) -> Any:
+    """Convert domain values into Firestore-supported primitive containers."""
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(key): _firestore_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_firestore_safe(item) for item in value]
+    return value
 
 
 def _json_record(record: InterviewRecord) -> dict[str, Any]:

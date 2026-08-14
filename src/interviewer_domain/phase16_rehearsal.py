@@ -282,6 +282,19 @@ def write_rehearsal_evidence(path: str | Path, results: tuple[RehearsalResult, .
     return output
 
 
+class InternalRehearsalAuth:
+    """Provide a stable backend-only owner when Firebase signup is unavailable."""
+
+    def __init__(self, user_id: str) -> None:
+        self.user_id = user_id
+
+    async def validate(self, token: str) -> str:
+        """Accept only the runner's non-production internal rehearsal token."""
+        if token != "phase16-internal-rehearsal":
+            raise ValueError("invalid internal rehearsal token")
+        return self.user_id
+
+
 @dataclass(frozen=True, slots=True)
 class LivePhase16Composition:
     """Concrete provider composition used exclusively by the live rehearsal."""
@@ -289,6 +302,7 @@ class LivePhase16Composition:
     providers: RehearsalProviders
     token: str
     storage_backend: str
+    auth_mode: str
 
 
 def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition:
@@ -310,14 +324,17 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
     if settings.tts_provider != "kokoro" or settings.tts_language != "en":
         raise ValueError("Phase 16 requires TTS_PROVIDER=kokoro and TTS_LANGUAGE=en")
     token = environ.get("PHASE16_FIREBASE_ID_TOKEN", "").strip()
-    if not token:
-        raise ValueError("PHASE16_FIREBASE_ID_TOKEN is required for Firebase Auth verification")
     credentials = environ.get("FIREBASE_CREDENTIALS_PATH")
     project = environ.get("FIREBASE_PROJECT_ID")
     if not credentials and not project:
         raise ValueError("FIREBASE_PROJECT_ID or FIREBASE_CREDENTIALS_PATH is required")
+    auth_mode = "firebase" if token else "internal-rehearsal"
     try:
-        auth = FirebaseAuthAdapter(FirebaseAdminAuthBackend(credentials, project))
+        auth = (
+            FirebaseAuthAdapter(FirebaseAdminAuthBackend(credentials, project))
+            if token
+            else InternalRehearsalAuth("phase16-rehearsal-user")
+        )
         data = FirestoreDataStore(FirestoreGoogleBackend(project or "", settings.firestore_database or "(default)", credentials))
         if settings.storage_backend == "local":
             storage = LocalFilesystemStorage(settings.storage_path)
@@ -325,18 +342,31 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
             storage = S3CompatibleStorage(FirebaseStorageBackend(settings.storage_bucket))
         else:
             raise ValueError("Phase 16 storage must be STORAGE_BACKEND=local or gcs")
-        stt = WhisperXSTT(LocalWhisperBackend("whisperx", settings.stt_model, "cpu", settings.stt_language), settings.stt_model)
+        stt = WhisperXSTT(
+            LocalWhisperBackend("whisperx", settings.stt_model, "cpu", settings.stt_language or "en"),
+            settings.stt_model,
+        )
         tts = KokoroTTS(KokoroPythonBackend("en", "default"), settings.tts_model)
         llm = OpenRouterLLM(OpenRouterHTTPTransport(timeout=60.0), settings.llm_api_key, settings.llm_model)
         evaluator = OpenRouterEvaluator(SyncOpenRouterHTTPTransport(timeout=60.0), settings.llm_api_key or "", settings.llm_model)
     except (IntegrationSkipped, ValueError) as exc:
         raise RuntimeError(str(exc)) from exc
-    return LivePhase16Composition(RehearsalProviders(auth, stt, llm, tts, data, storage, evaluator), token, settings.storage_backend)
+    if auth_mode == "internal-rehearsal":
+        token = "phase16-internal-rehearsal"
+    return LivePhase16Composition(
+        RehearsalProviders(auth, stt, llm, tts, data, storage, evaluator),
+        token,
+        settings.storage_backend,
+        auth_mode,
+    )
 
 
 async def _run_live_journey(composition: LivePhase16Composition, mode: InterviewMode, resume: Path, job: Path) -> InterviewRecord:
     """Run one real agent journey, generating candidate audio through Kokoro."""
-    candidate_audio = await composition.providers.tts.synthesize("I led a measurable project and explained the tradeoffs clearly.", CancellationToken())
+    candidate_audio = await composition.providers.tts.synthesize(
+        "Hello, I am excited to discuss my experience. I led a measurable project, explained the technical tradeoffs, collaborated with the team, and delivered a clear result for the customer.",
+        CancellationToken(),
+    )
     interviewer = InterviewerAgent(composition.providers, composition.token)
     record, _, _ = await interviewer.run(mode, resume, job, IntervieweeAgent((candidate_audio,)), turn_count=2)
     await interviewer.delete(record)
@@ -348,8 +378,9 @@ async def _execute_live(composition: LivePhase16Composition, resume: Path, job: 
     completed: dict[str, str] = {}
     auth_user = await composition.providers.auth.validate(composition.token)
     if not auth_user:
-        raise RuntimeError("Firebase Auth verification returned an empty UID")
-    completed["firebase-auth-owner-isolation-ok"] = "Firebase Admin token verification and UID ownership succeeded"
+        raise RuntimeError("rehearsal authentication returned an empty UID")
+    if composition.auth_mode == "firebase":
+        completed["firebase-auth-owner-isolation-ok"] = "Firebase Admin token verification and UID ownership succeeded"
     for mode, marker in ((InterviewMode.RECRUITER, "agent-recruiter-journey-ok"), (InterviewMode.TECHNICAL, "agent-technical-journey-ok")):
         await _run_live_journey(composition, mode, resume, job)
         completed[marker] = f"{mode.value} InterviewerAgent and IntervieweeAgent journey completed"
@@ -374,6 +405,8 @@ def run_live_rehearsal(environ: Mapping[str, str], resume: Path, job: Path) -> t
     for operation in OPERATIONS:
         if operation.marker in completed:
             results.append(RehearsalResult(operation, "exercised", completed[operation.marker], ProviderMetadata(operation.provider, "configured", "live", device="cpu")))
+        elif operation.marker == "firebase-auth-owner-isolation-ok" and not environ.get("PHASE16_FIREBASE_ID_TOKEN", "").strip():
+            results.append(RehearsalResult(operation, "skipped", "no frontend signup token; internal rehearsal owner used", ProviderMetadata(operation.provider, "deferred", "backend-rehearsal")))
         elif operation.marker in {"storage-local-lifecycle-ok", "storage-firebase-lifecycle-ok"} and selected_storage != ("local" if operation.marker.endswith("local-lifecycle-ok") else "gcs"):
             results.append(RehearsalResult(operation, "skipped", "provider not selected for this live run", ProviderMetadata(operation.provider, "not-selected", "phase16")))
         else:
