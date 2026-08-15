@@ -10,6 +10,7 @@ import asyncio
 import html
 import json
 import os
+import random
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -37,17 +38,24 @@ class ProviderMetadata:
 class LocalWhisperBackend:
     """Run an operator-selected OpenAI Whisper or WhisperX model locally."""
 
-    def __init__(self, provider: str, model: str, device: str, language: str | None = None) -> None:
+    def __init__(self, provider: str, model: str, device: str, language: str | None = None, model_path: str | None = None) -> None:
         self.provider = provider
         self.model_name = model
         self.device = device
         self.language = language
+        self.model_path = model_path
         if provider == "whisperx":
             try:
-                import whisperx  # type: ignore[import-not-found]
+                import whisperx  # type: ignore[import-not-found,import-untyped]
             except ImportError as exc:
                 raise IntegrationSkipped("whisperx package is not installed") from exc
-            self.model = whisperx.load_model(model, device, compute_type="float32" if device != "cpu" else "int8")
+            self.model = whisperx.load_model(
+                model,
+                device,
+                compute_type="float32" if device != "cpu" else "int8",
+                language=language,
+                vad_method="silero",
+            )
         elif provider == "openai-whisper":
             try:
                 import whisper  # type: ignore[import-not-found]
@@ -63,11 +71,29 @@ class LocalWhisperBackend:
             raise ProviderError(ErrorCode.INVALID_REQUEST, "audio payload is empty")
         try:
             import io
-            import soundfile as sf  # type: ignore[import-not-found]
-            samples, _ = sf.read(io.BytesIO(audio), dtype="float32")
+            import soundfile as sf  # type: ignore[import-not-found,import-untyped]
+            import numpy as np  # type: ignore[import-not-found]
+            samples, sample_rate = sf.read(io.BytesIO(audio), dtype="float32")
+            if getattr(samples, "ndim", 1) > 1:
+                samples = samples.mean(axis=1)
+            if sample_rate != 16000:
+                target_length = round(len(samples) * 16000 / sample_rate)
+                source_positions = np.linspace(0, 1, len(samples), endpoint=False)
+                target_positions = np.linspace(0, 1, target_length, endpoint=False)
+                samples = np.interp(target_positions, source_positions, samples).astype("float32")
+            samples = np.asarray(samples, dtype="float32")
             if self.provider == "whisperx":
                 result = self.model.transcribe(samples, language=self.language)
-                return str(result.get("text", "")).strip()
+                text = str(result.get("text", "")).strip()
+                if text:
+                    return text
+                segments, _ = self.model.model.transcribe(
+                    samples,
+                    language=self.language,
+                    vad_filter=False,
+                    without_timestamps=True,
+                )
+                return " ".join(str(segment.text).strip() for segment in segments).strip()
             result = self.model.transcribe(samples, language=self.language, fp16=self.device != "cpu")
             return str(result.get("text", "")).strip()
         except ProviderError:
@@ -83,13 +109,29 @@ class LocalWhisperBackend:
 class KokoroPythonBackend:
     """Run the official Kokoro Python pipeline with an injected model choice."""
 
+    _ENGLISH_VOICES = (
+        "af_heart", "af_alloy", "af_aoede", "af_bella", "af_jessica",
+        "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
+        "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam",
+        "am_michael", "am_onyx", "am_puck",
+    )
+
     def __init__(self, language: str = "en", voice: str = "af_heart") -> None:
         try:
-            from kokoro import KPipeline  # type: ignore[import-not-found]
+            from kokoro import KPipeline  # type: ignore[import-not-found,import-untyped]
         except ImportError as exc:
             raise IntegrationSkipped("kokoro package is not installed") from exc
+        self.language = language
         self.voice = voice
         self.pipeline = KPipeline(lang_code=language[0])
+
+    def _voice_for_call(self) -> str:
+        """Select a supported English voice for each default synthesis call."""
+        if self.voice not in {"", "default"}:
+            return self.voice
+        if self.language.startswith("en"):
+            return random.choice(self._ENGLISH_VOICES)
+        raise ProviderError(ErrorCode.INVALID_REQUEST, "default Kokoro voice is only configured for English")
 
     def synthesize(self, text: str) -> bytes:
         """Synthesize text into a normalized WAV byte payload."""
@@ -97,8 +139,8 @@ class KokoroPythonBackend:
             raise ProviderError(ErrorCode.INVALID_REQUEST, "text is empty")
         try:
             import io
-            import soundfile as sf  # type: ignore[import-not-found]
-            chunks = [audio for _, _, audio in self.pipeline(text, voice=self.voice)]
+            import soundfile as sf  # type: ignore[import-not-found,import-untyped]
+            chunks = [audio for _, _, audio in self.pipeline(text, voice=self._voice_for_call())]
             if not chunks:
                 raise ProviderError(ErrorCode.INTERNAL, "Kokoro returned empty audio")
             output = io.BytesIO()
@@ -212,7 +254,7 @@ class FasterWhisperLocalBackend:
         self.device = device
         self.compute_type = compute_type
         try:
-            from faster_whisper import WhisperModel  # type: ignore[import-not-found]
+            from faster_whisper import WhisperModel  # type: ignore[import-not-found,import-untyped]
         except ImportError as exc:
             raise IntegrationSkipped("faster-whisper package is not installed") from exc
         model_path = Path(model).expanduser()

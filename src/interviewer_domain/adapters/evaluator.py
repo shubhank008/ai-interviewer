@@ -72,6 +72,8 @@ class OpenRouterEvaluator(Evaluator):
             ]
         else:
             raise ProviderError(ErrorCode.INTERNAL, "evaluator dimensions were malformed")
+        if not dimensions:
+            raise ProviderError(ErrorCode.INTERNAL, "evaluator dimensions were malformed")
         def strings(key: str) -> tuple[str, ...]:
             values = value.get(key, [])
             return tuple(str(item)[:500] for item in values if item) if isinstance(values, list) else ()

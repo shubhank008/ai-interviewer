@@ -230,7 +230,7 @@ class RehearsalResult:
 
 
 OPERATIONS: tuple[RehearsalOperation, ...] = (
-    RehearsalOperation("composition-production-ok", "composition", "firebase/openrouter/whisperx/kokoro", ("APP_PROFILE",)),
+    RehearsalOperation("composition-production-ok", "composition", "firebase/openrouter/whisperx/kokoro", ("APP_PROFILE", "FIREBASE_PROJECT_ID", "STT_PROVIDER", "TTS_PROVIDER", "LLM_PROVIDER", "LLM_API_KEY")),
     RehearsalOperation("firebase-auth-owner-isolation-ok", "firebase-auth", "firebase-auth", ("FIREBASE_PROJECT_ID", "FIREBASE_AUTH_DOMAIN")),
     RehearsalOperation("firestore-session-lifecycle-ok", "firestore", "firestore", ("FIREBASE_PROJECT_ID", "FIRESTORE_DATABASE")),
     RehearsalOperation("storage-firebase-lifecycle-ok", "storage-firebase", "firebase-storage", ("FIREBASE_PROJECT_ID", "STORAGE_BUCKET")),
@@ -376,6 +376,7 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
             else InternalRehearsalAuth(rehearsal_uid)
         )
         data = FirestoreDataStore(FirestoreGoogleBackend(project or "", settings.firestore_database or "(default)", credentials))
+        storage: RehearsalStorage
         if settings.storage_backend == "local":
             storage = LocalFilesystemStorage(settings.storage_path)
         elif settings.storage_backend == "gcs":
@@ -393,6 +394,8 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
         raise RuntimeError(str(exc)) from exc
     if auth_mode == "internal-rehearsal":
         token = "phase16-internal-rehearsal"
+    else:
+        token = rehearsal_identity
     return LivePhase16Composition(
         RehearsalProviders(auth, stt, llm, tts, data, storage, evaluator),
         token,

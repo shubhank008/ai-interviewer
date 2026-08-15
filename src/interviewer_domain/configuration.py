@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import random
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Mapping
@@ -40,6 +41,14 @@ from .routing import FallbackRouter
 
 class ConfigurationError(ValueError):
     """Raised when runtime configuration cannot safely compose the service."""
+
+
+_KOKORO_ENGLISH_VOICES = (
+    "af_heart", "af_alloy", "af_aoede", "af_bella", "af_jessica",
+    "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
+    "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam",
+    "am_michael", "am_onyx", "am_puck",
+)
 
 
 class RuntimeProfile(StrEnum):
@@ -297,7 +306,7 @@ def compose_providers(
             stt_backend = None
     if stt_backend is None and settings.stt_provider in {"openai-whisper", "whisperx"}:
         try:
-            stt_backend = LocalWhisperBackend(settings.stt_provider, settings.stt_model, "cpu" if settings.stt_cpu else "cuda", settings.stt_language)
+            stt_backend = LocalWhisperBackend(settings.stt_provider, settings.stt_model, "cpu" if settings.stt_cpu else "cuda", language=settings.stt_language)
         except (IntegrationSkipped, ProviderError) as exc:
             if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.stt is None:
                 raise ConfigurationError("configured STT provider is unavailable") from exc
@@ -315,11 +324,20 @@ def compose_providers(
     tts_backend: SpeechBackend | None = injected.tts
     if tts_backend is None and settings.tts_provider == "kokoro":
         try:
-            tts_backend = KokoroPythonBackend(settings.tts_language, settings.tts_model)
+            voice = settings.tts_model
+            if voice == "default" or voice not in _KOKORO_ENGLISH_VOICES:
+                voice = random.choice(_KOKORO_ENGLISH_VOICES)
+            tts_backend = KokoroPythonBackend(settings.tts_language, voice)
         except (IntegrationSkipped, ProviderError) as exc:
             if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
                 raise ConfigurationError("configured TTS provider is unavailable") from exc
             tts_backend = None
+    if tts_backend is None and settings.tts_provider == "piper":
+        if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
+            raise ConfigurationError("piper TTS provider requires tts_command and tts_model_path settings not present in RuntimeSettings")
+    if tts_backend is None and settings.tts_provider == "kokoro-onnx":
+        if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
+            raise ConfigurationError("kokoro-onnx backend is not implemented")
     tts_classes = {
         "piper": PiperKokoroTTS,
         "kokoro": KokoroTTS,
@@ -359,8 +377,8 @@ def validate_beta_composition(settings: RuntimeSettings) -> None:
     ]
     if settings.stt_provider not in {"faster-whisper", "openai-whisper", "whisperx"}:
         missing.append("STT_PROVIDER=one of faster-whisper, openai-whisper, whisperx")
-    if settings.tts_provider not in {"piper", "kokoro", "kokoro-onnx"}:
-        missing.append("TTS_PROVIDER=one of piper, kokoro, kokoro-onnx")
+    if settings.tts_provider != "kokoro":
+        missing.append("TTS_PROVIDER=kokoro")
     if settings.llm_provider != "openrouter":
         missing.append("LLM_PROVIDER=openrouter")
     if not settings.llm_api_key:
@@ -373,19 +391,27 @@ def validate_beta_composition(settings: RuntimeSettings) -> None:
 
 def _fallback_stt(settings: RuntimeSettings, backends: ProviderBackends) -> STTProvider:
     """Build the configured STT fallback without importing optional dependencies."""
-    if settings.stt_fallback_provider == "faster-whisper":
-        return FasterWhisperSTT(backends.stt, settings.stt_model)
-    if settings.stt_fallback_provider == "whisperx":
-        return WhisperXSTT(backends.stt, settings.stt_model)
+    stt_fallback_classes = {
+        "faster-whisper": FasterWhisperSTT,
+        "openai-whisper": OpenAIWhisperSTT,
+        "whisperx": WhisperXSTT,
+    }
+    cls = stt_fallback_classes.get(settings.stt_fallback_provider)
+    if cls is not None:
+        return cls(backends.stt, settings.stt_model)
     return InMemorySTT()
 
 
 def _fallback_tts(settings: RuntimeSettings, backends: ProviderBackends) -> TTSProvider:
     """Build the configured TTS fallback without importing optional dependencies."""
-    if settings.tts_fallback_provider == "piper":
-        return PiperKokoroTTS(backends.tts, settings.tts_model)
-    if settings.tts_fallback_provider == "kokoro":
-        return KokoroTTS(backends.tts, settings.tts_model)
+    tts_fallback_classes = {
+        "piper": PiperKokoroTTS,
+        "kokoro": KokoroTTS,
+        "kokoro-onnx": KokoroOnnxTTS,
+    }
+    cls = tts_fallback_classes.get(settings.tts_fallback_provider)
+    if cls is not None:
+        return cls(backends.tts, settings.tts_model)
     return InMemoryTTS()
 
 
