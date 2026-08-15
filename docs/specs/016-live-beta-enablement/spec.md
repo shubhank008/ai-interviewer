@@ -8,20 +8,34 @@ The beta uses one explicit provider set rather than a collection of unexercised 
 
 | Capability | Beta provider | Boundary |
 |---|---|---|
-| Authentication | Firebase Auth | `AuthProvider` |
+| Authentication | Firebase Web Auth email/password and Google Sign-In | `AuthProvider` |
 | Datastore | Firestore | `DataStore` |
-| Storage | Local filesystem, FTP storage, or Firebase Storage | `StorageProvider` |
-| Live LLM | OpenRouter using `LLM_MODEL` | `LLMProvider` |
+| Storage | Firebase Storage `gs://the-interviewer-c3a01.firebasestorage.app` plus local/NFS | `StorageProvider` |
+| Live LLM | OpenRouter using `LLM_API_KEY` and `LLM_MODEL` | `LLMProvider` |
 | STT | WhisperX using the `small` model | `STTProvider` |
-| TTS | Kokoro using `TTS_LANGUAGE`, with random per-invocation voice selection | `TTSProvider` |
-| Voice input | Browser microphone chunks with timestamped processing; evaluate VAD or streaming Whisper seams before custom WebRTC | `AudioTransport` |
-| Evaluation | OpenRouter LLM evaluator | `Evaluator` |
+| TTS | Kokoro 0.9.4 English, `af_bella` or `af_sky`, 24 kHz mono PCM | `TTSProvider` |
+| Voice input | Programmatic timestamped audio buffers exchanged by Interviewer and Interviewee agents | `AudioTransport` |
+| Evaluation | GPT-5.6 Luna Pro through OpenRouter after completion | `Evaluator` |
 | Runtime | One Docker container for the beta benchmark; split workers are a roadmap item | service composition |
 | Resume retention | 14 days | policy service |
 | Combined audio retention | 7 days | policy service |
 | Audit-log retention | 30 days | policy service |
 
-The beta is a live vertical slice. Offline tests and deterministic providers are not release evidence and must never mark beta readiness as passed.
+The beta is a live vertical slice. Offline tests and deterministic providers are contract protection only. They are not release evidence and must never mark beta readiness as passed. Phase 16 live rehearsal is programmatic: an Interviewer Agent and an Interviewee Agent complete recruiter and technical flows through the backend audio-buffer path. Browser execution is deferred and is not required for Phase 16 evidence.
+
+## Authoritative implementation decisions
+
+These Phase 16 decisions are final and must be taken from the main `SPEC.md` without reopening ordinary product choices:
+
+- Load the existing `.env` safely for live runs; never print or commit its values.
+- Use `FIREBASE_CREDENTIALS_PATH` for backend Firebase Admin credentials and Firebase Web Auth settings for the browser.
+- Use `LLM_API_KEY`, not `OPENROUTER_API_KEY`.
+- Use WhisperX `small` on CPU by default. Do not require `STT_MODEL_PATH`.
+- Use Kokoro Python with `TTS_LANGUAGE=en` and random supported voice selection. Do not require `TTS_MODEL_PATH` or `TTS_COMMAND`.
+- Use Firebase Storage `gs://the-interviewer-c3a01.firebasestorage.app`, selected by `STORAGE_BACKEND=gcs`; use `STORAGE_BACKEND=local` only for development and deterministic checks. Ignore FTP and S3 for Phase 16.
+- Use timestamped audio buffers between the Interviewer Agent and Interviewee Agent. Browser URL, browser automation, WebRTC, and TURN are not Phase 16 prerequisites.
+- Use one Docker container for the initial beta benchmark.
+- Live provider and agent-to-agent execution is mandatory evidence. Offline tests protect contracts only.
 
 ## Service flow
 
@@ -32,11 +46,11 @@ Firebase Web Auth
   -> Firebase uid and owner scope
 
 React setup
-  -> Firebase passwordless email signup or login
+  -> Firebase email/password or Google signup/login
   -> POST job description and optional resume metadata
   -> API validates 10 MB job-description and 10 MB resume limits
   -> StorageProvider stores original resume
-  -> DocumentParser extracts text or invokes the approved scanned-PDF extraction pass
+  -> DocumentParser extracts text from a text PDF or returns a descriptive unsupported-format error
   -> RetrievalProvider stores source-linked chunks
 
 POST /sessions
@@ -46,14 +60,14 @@ POST /sessions
   -> selected microphone chunk transport and timestamp contract
 
 Candidate audio
-  -> browser microphone chunks with timestamps
-  -> optional VAD or streaming-Whisper seam, selected by benchmark evidence
+  -> Interviewee Agent timestamped audio buffers
+  -> backend audio-buffer transport
   -> CPU WhisperX worker
   -> partial/final transcript events
   -> interview state machine and RAG context
   -> OpenRouter structured streaming response
   -> sentence chunker and Kokoro CPU TTS worker
-  -> browser-compatible compressed audio playback
+  -> 24 kHz mono linear PCM audio chunks
   -> Firestore transcript/event persistence
   -> combined interview recording storage for 7 days
 
@@ -67,7 +81,7 @@ POST /sessions/{id}/complete
 
 DELETE /sessions/{id}
   -> delete Firestore records
-  -> delete local, FTP, or Firebase objects
+  -> delete local or Firebase objects
   -> delete derived chunks, cached context, transcript, recording, and evaluation
   -> verify no owned artifacts remain across every selected backend
 ```
@@ -77,10 +91,10 @@ DELETE /sessions/{id}
 ### Authentication and account policy
 
 - Firebase Web Auth is the only beta browser authentication path.
-- The sign-in method is passwordless email link authentication.
+- The sign-in methods are email/password and Google Sign-In.
 - Open signup is enabled.
 - The Firebase project and Admin SDK JSON configured in the environment are beta resources. Production may use a different project and credential file without changing this contract.
-- Domain authorization is not a beta requirement for passwordless email sign-in.
+- Domain authorization is not a beta requirement for email/password or Google sign-in.
 - The current scope does not include an operator or recruiter administration panel. A separate backend or panel will later provide approved system-admin access to interview data.
 
 ### Firebase and Firestore
@@ -93,19 +107,19 @@ DELETE /sessions/{id}
 
 ### Storage
 
-- Supported beta storage adapters are local filesystem, FTP storage, and Firebase Storage.
+- Supported beta storage adapters are Firebase Storage and local filesystem/NFS. FTP is deferred.
 - S3 and GCS adapters are out of scope for this phase and must not be presented as selected beta providers.
 - Local filesystem storage must support an externally mounted filesystem such as NFS.
 - Firebase Storage uses `gs://the-interviewer-c3a01.firebasestorage.app` in the beta configuration and the US-EAST1 region.
-- The live storage rehearsal must switch between local/FTP and Firebase Storage and exercise upload, download, replay, retention, partial failure, and deletion.
+- The live storage rehearsal must switch between local/NFS and Firebase Storage and exercise upload, download, replay, retention, partial failure, and deletion.
 - Resume objects retain for 14 days. Combined interview audio retains for 7 days. Other user-owned artifacts follow the resume policy unless a more restrictive lifecycle is required.
 
 ### Inputs and resume processing
 
-- The sample fixtures are `tests/resume_demo.pdf` and `tests/job_description.txt`.
+- The sample fixtures are `tests/demo_resume.pdf` and `tests/demo_jobdescription.txt`; absence is a failed rehearsal precondition.
 - Job descriptions and PDF resumes have a 10 MB maximum each, regardless of whether the job description is uploaded, supplied as text, or pasted into the UI.
 - Password-protected PDFs must produce a graceful user-facing error requesting an unlocked PDF.
-- Scanned PDFs are supported through a separate extraction pass that may produce text or Markdown using an approved LLM/parser adapter. OCR or extraction failure must be explicit and must not invent content.
+- Scanned or encrypted PDFs fail gracefully with a descriptive error; Phase 16 does not perform OCR or guessed extraction.
 - Resume content may be sent to the selected LLM or injected into the system context when the interview script is generated. This is disclosed in the privacy notice.
 
 ### Speech and audio
@@ -113,7 +127,7 @@ DELETE /sessions/{id}
 - WhisperX is the active STT provider and the active model is `small` from `STT_PROVIDER=whisperx` and `STT_MODEL=small`.
 - No fixed latency or concurrency target is assumed initially. The live benchmark matrix measures provider, model, latency, CPU, memory, and failure behavior using the supplied sample audio and Kokoro-generated test audio.
 - Kokoro uses `TTS_LANGUAGE=en`. Voice selection is randomized per invocation from the supported voices for that language.
-- Browser audio must use the best supported compressed format that preserves intelligibility and playback reliability; WAV remains an allowed fallback for compatibility.
+- Kokoro emits 24 kHz mono linear PCM chunks with ordering, interruption, and cancellation metadata.
 - The browser microphone flow should prefer a proven chunked capture or VAD/streaming-Whisper approach over a custom full WebRTC media pipeline when benchmark and reliability evidence support it. Silero VAD and SimulStreaming are candidate integrations, not yet selected providers.
 
 ### LLM and evaluation
@@ -231,17 +245,17 @@ The evaluator uses a separate structured schema containing `score`, `summary`, `
 - [ ] A clean deployment starts with the documented CPU-only configuration.
 - [ ] Firebase browser signup, login, logout, refresh, protected routes, and server-side token verification work.
 - [ ] Firestore stores and retrieves owner-scoped setup, sessions, events, transcripts, evaluations, and deletion state.
-- [ ] Local/NFS-compatible, FTP, and Firebase Storage adapters each satisfy upload, download, replay, retention, partial-failure, and deletion contracts.
+- [ ] Local/NFS-compatible and Firebase Storage adapters satisfy upload, download, replay, retention, partial-failure, and deletion contracts. FTP is deferred.
 - [ ] A real PDF resume and job description pass through storage, parsing, source-linked retrieval, and prompt context.
-- [ ] Browser microphone capture reaches WhisperX through the selected chunked, VAD, streaming-Whisper, or WebRTC transport and produces partial and final timestamped transcript events.
+- [ ] Interviewee Agent audio buffers reach WhisperX and produce partial and final timestamped transcript events.
 - [ ] OpenRouter generates validated structured interviewer responses with streaming, cancellation, 60 second timeout, up to 3 retries, cost, and model metadata.
 - [ ] Kokoro uses English and randomized per-invocation voices to produce browser-compatible audio with benchmarked sequencing, interruption, and cancellation.
-- [ ] The selected browser audio transport works from the target browser environment; a custom STUN/TURN WebRTC deployment is required only if that transport is selected by the benchmark.
-- [ ] The browser completes at least one recruiter and one technical interview using real providers.
+- [ ] Interviewer and Interviewee agents complete recruiter and technical interviews through the backend using real providers.
+- [ ] Browser URL, browser automation, WebRTC, STUN, and TURN are explicitly deferred from Phase 16 acceptance; agent-to-agent live rehearsal is required.
 - [ ] Candidate and interviewer audio, final transcript, events, and evaluation persist and replay from durable storage.
 - [ ] The LLM evaluator runs only after completion and stores validated feedback with score 0 through 100.
 - [ ] Deleting an interview removes raw, derived, cached, transcript, recording, evaluation, and provider-created test artifacts.
 - [ ] The beta reports provider, model, version, device, latency, cost, quality, failure, and limitation metadata without sensitive payloads.
-- [ ] Negative cases cover invalid auth, owner mismatch, malformed PDF/audio, provider timeout, cancellation, quota/rate limit, selected browser-audio transport failure, storage failure, and deletion failure.
+- [ ] Negative cases cover invalid auth, owner mismatch, malformed or scanned/encrypted PDF/audio, provider timeout, cancellation, quota/rate limit, storage failure, and deletion failure.
 - [ ] Live tests are the only release evidence. Offline tests may protect contracts but cannot mark any Phase 16 acceptance item as passed.
 - [ ] Every live marker is backed by an exercised run, and skipped configuration never passes readiness.

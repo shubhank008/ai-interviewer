@@ -34,7 +34,6 @@ from .provider_integration import (
     KokoroPythonBackend,
     LocalWhisperBackend,
     OpenRouterHTTPTransport,
-    PiperCommandBackend,
 )
 from .providers import InMemoryLLM, InMemorySTT, InMemoryTTS
 from .routing import FallbackRouter
@@ -84,7 +83,6 @@ class RuntimeSettings:
     tts_api_key: str | None
     tts_model: str
     tts_language: str
-    tts_command: str | None
     llm_provider: str
     llm_fallback_provider: str
     llm_api_key: str | None
@@ -132,11 +130,10 @@ class RuntimeSettings:
             tts_api_key=_optional(values, "TTS_API_KEY"),
             tts_model=values.get("TTS_MODEL", "default").lower(),
             tts_language=values.get("TTS_LANGUAGE", values.get("DEFAULT_LANGUAGE", "en")).lower(),
-            tts_command=_optional(values, "TTS_COMMAND"),
             llm_provider=values.get("LLM_PROVIDER", "in-memory"),
             llm_fallback_provider=values.get("LLM_FALLBACK_PROVIDER", "in-memory"),
             llm_api_key=_optional(values, "LLM_API_KEY"),
-            llm_model=values.get("LLM_MODEL", "default").lstrip("~"),
+            llm_model=values.get("LLM_MODEL", "default"),
             webrtc_ice_servers=values.get(
                 "WEBRTC_ICE_SERVERS", "stun:stun.l.google.com:19302"
             ),
@@ -287,6 +284,18 @@ def compose_providers(
     injected = backends or ProviderBackends()
     if settings.profile is RuntimeProfile.LOCAL:
         return RuntimeProviders((InMemorySTT(),), (InMemoryTTS(),), (InMemoryLLM(),))
+    if strict:
+        fallback_names = {
+            "STT_FALLBACK_PROVIDER": settings.stt_fallback_provider,
+            "TTS_FALLBACK_PROVIDER": settings.tts_fallback_provider,
+            "LLM_FALLBACK_PROVIDER": settings.llm_fallback_provider,
+        }
+        unsafe_fallbacks = [name for name, value in fallback_names.items() if value == "in-memory"]
+        if unsafe_fallbacks:
+            raise ConfigurationError(
+                "production composition cannot use deterministic fallbacks: "
+                + ", ".join(unsafe_fallbacks)
+            )
     stt_backend: WhisperBackend | None = injected.stt
     if stt_backend is None and settings.stt_provider == "faster-whisper":
         try:
@@ -324,14 +333,8 @@ def compose_providers(
                 raise ConfigurationError("configured TTS provider is unavailable") from exc
             tts_backend = None
     if tts_backend is None and settings.tts_provider == "piper":
-        try:
-            if not settings.tts_command:
-                raise IntegrationSkipped("TTS_COMMAND is not configured")
-            tts_backend = PiperCommandBackend(settings.tts_command, settings.tts_model)
-        except (IntegrationSkipped, ProviderError) as exc:
-            if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
-                raise ConfigurationError("configured TTS provider is unavailable") from exc
-            tts_backend = None
+        if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
+            raise ConfigurationError("piper TTS provider requires tts_command and tts_model_path settings not present in RuntimeSettings")
     if tts_backend is None and settings.tts_provider == "kokoro-onnx":
         if strict and settings.profile is RuntimeProfile.PRODUCTION and injected.tts is None:
             raise ConfigurationError("kokoro-onnx backend is not implemented")
@@ -374,7 +377,7 @@ def validate_beta_composition(settings: RuntimeSettings) -> None:
     ]
     if settings.stt_provider not in {"faster-whisper", "openai-whisper", "whisperx"}:
         missing.append("STT_PROVIDER=one of faster-whisper, openai-whisper, whisperx")
-    if settings.tts_provider not in {"kokoro"}:
+    if settings.tts_provider != "kokoro":
         missing.append("TTS_PROVIDER=kokoro")
     if settings.llm_provider != "openrouter":
         missing.append("LLM_PROVIDER=openrouter")

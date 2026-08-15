@@ -1,5 +1,5 @@
 export const API_BASE = '/api/v1'
-export const MAX_RESUME_BYTES = 5 * 1024 * 1024
+export const MAX_RESUME_BYTES = 10 * 1024 * 1024
 
 export function authHeaders(token, json = false) {
   const headers = { Authorization: `Bearer ${token}` }
@@ -36,7 +36,7 @@ export function completeSessionRequest(id, token) {
 export function validateResume(file) {
   if (!file) return { valid: true, error: '' }
   if (file.type !== 'application/pdf') return { valid: false, error: 'Resume must be a PDF file.' }
-  if (file.size > MAX_RESUME_BYTES) return { valid: false, error: 'Resume must be smaller than 5 MB.' }
+  if (file.size > MAX_RESUME_BYTES) return { valid: false, error: 'Resume must be smaller than 10 MB.' }
   return { valid: true, error: '' }
 }
 
