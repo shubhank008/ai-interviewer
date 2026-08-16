@@ -97,6 +97,7 @@ class LiveDocumentParserTests(unittest.TestCase):
         self.assertFalse(parser.used_fallback)
         self.assertIn("role", parser.primary.last_fields)
         self.assertEqual(transport.payload["model"], "vision-model")
+<<<<<<< HEAD
         print("[DOC17] vision-parser-contract-ok")
 
     def test_malformed_vision_response_fails_closed(self) -> None:

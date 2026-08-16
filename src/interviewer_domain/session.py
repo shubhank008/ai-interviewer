@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 from .adapters.ending import EndEvaluator, InterviewEndingPolicy
 from .contracts import CancellationToken, DataStore, ErrorCode, EventBus, LLMProvider, ProviderError, STTProvider, TTSProvider
-from .models import InterviewSession, LifecycleEvent, QuestionPlan, SessionStatus, Turn
+from .models import EndDecision, InterviewSession, LifecycleEvent, QuestionPlan, SessionStatus, Turn
 
 
 class SessionStateError(ValueError):
@@ -99,6 +99,7 @@ class InterviewSessionEngine:
             self._last_answer = transcript.text
             response = await self.llm.generate(transcript.text, operation_token)
             audio = await self.tts.synthesize(response, operation_token)
+<<<<<<< HEAD
             try:
                 decision = await self.ending_policy.evaluate(transcript.text, turn.sequence, operation_token)
             except ProviderError as error:

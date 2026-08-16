@@ -92,6 +92,7 @@ class SessionEngineTests(unittest.TestCase):
         self.assertIn("answer is sufficiently evidenced", engine.session.end_rationale)
         self.assertTrue(any(event.name == "ending.decided" for event in events.events))
         self.assertTrue(any(event.name == "session.completed" for event in events.events))
+<<<<<<< HEAD
         print("[END17] llm-directed-ending-ok")
 
     def test_time_limit_uses_injected_clock(self) -> None:
