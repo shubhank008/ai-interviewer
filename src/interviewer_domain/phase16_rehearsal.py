@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping, Protocol
@@ -409,37 +411,63 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
         auth_mode,
     )
 
+def _progress(environ: Mapping[str, str], message: str) -> None:
+    """Emit a flushed, redacted checkpoint when live progress logging is enabled."""
+    if environ.get("PHASE16_PROGRESS_LOG", "").lower() in {"1", "true", "yes"}:
+        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        print(f"[BETA16-PROGRESS] {timestamp} {message}", file=sys.stderr, flush=True)
+
+
 
 async def _run_live_journey(
-    composition: LivePhase16Composition, mode: InterviewMode, resume: Path, job: Path
+    composition: LivePhase16Composition,
+    mode: InterviewMode,
+    resume: Path,
+    job: Path,
+    environ: Mapping[str, str],
 ) -> tuple[InterviewRecord, tuple[AgentTurn, ...]]:
     """Run one real agent journey, generating candidate audio through Kokoro."""
+    _progress(environ, f"journey={mode.value} tts=start")
     candidate_audio = await composition.providers.tts.synthesize(
         "Hello, I am excited to discuss my experience. I led a measurable project, explained the technical tradeoffs, collaborated with the team, and delivered a clear result for the customer.",
         CancellationToken(),
     )
+    _progress(environ, f"journey={mode.value} tts=complete")
     interviewer = InterviewerAgent(composition.providers, composition.token)
+    _progress(environ, f"journey={mode.value} interviewer-run=start")
     record, turns, _ = await interviewer.run(
         mode, resume, job, IntervieweeAgent((candidate_audio,)), turn_count=2
     )
+    _progress(environ, f"journey={mode.value} interviewer-run=complete turns={len(turns)}")
     _validate_audio_buffers(tuple(buffer for turn in turns for buffer in turn.buffers))
+    _progress(environ, f"journey={mode.value} audio-validation=complete")
     await interviewer.delete(record)
+    _progress(environ, f"journey={mode.value} lifecycle=complete")
     return record, turns
 
 
-async def _execute_live(composition: LivePhase16Composition, resume: Path, job: Path) -> dict[str, str]:
+async def _execute_live(
+    composition: LivePhase16Composition,
+    resume: Path,
+    job: Path,
+    environ: Mapping[str, str],
+) -> dict[str, str]:
     """Exercise every selected live capability and both required agent journeys."""
     completed: dict[str, str] = {}
+    _progress(environ, "auth-validation=start")
     auth_user = await composition.providers.auth.validate(composition.token)
+    _progress(environ, "auth-validation=complete")
     if not auth_user:
         raise RuntimeError("rehearsal authentication returned an empty UID")
     if composition.auth_mode == "firebase":
         completed["firebase-auth-owner-isolation-ok"] = "Firebase Admin token verification and UID ownership succeeded"
     journey_buffer_count = 0
     for mode, marker in ((InterviewMode.RECRUITER, "agent-recruiter-journey-ok"), (InterviewMode.TECHNICAL, "agent-technical-journey-ok")):
-        _, turns = await _run_live_journey(composition, mode, resume, job)
+        _progress(environ, f"journey={mode.value} start")
+        _, turns = await _run_live_journey(composition, mode, resume, job, environ)
         journey_buffer_count += sum(len(turn.buffers) for turn in turns)
         completed[marker] = f"{mode.value} InterviewerAgent and IntervieweeAgent journey completed"
+        _progress(environ, f"journey={mode.value} complete buffers={journey_buffer_count}")
     completed["agent-audio-transport-ok"] = (
         f"live timestamped audio buffers exercised; count={journey_buffer_count}; "
         "sequence=contiguous; timestamps=ordered-non-overlapping"
@@ -453,11 +481,16 @@ async def _execute_live(composition: LivePhase16Composition, resume: Path, job: 
 def run_live_rehearsal(environ: Mapping[str, str], resume: Path, job: Path) -> tuple[RehearsalResult, ...]:
     """Execute live providers and convert safe failures into redacted marker results."""
     try:
+        _progress(environ, "composition-build=start")
         composition = build_live_composition(environ)
+        _progress(environ, "composition-build=complete")
         import asyncio
-        completed = asyncio.run(_execute_live(composition, resume, job))
+        _progress(environ, "live-execution=start")
+        completed = asyncio.run(_execute_live(composition, resume, job, environ))
+        _progress(environ, "live-execution=complete")
         error: str | None = None
     except Exception as exc:
+        _progress(environ, f"live-execution=failed error={exc.__class__.__name__}")
         completed = {}
         error = str(exc) or exc.__class__.__name__
     results: list[RehearsalResult] = []
