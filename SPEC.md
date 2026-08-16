@@ -310,6 +310,8 @@ These decisions are final for Phase 16 and must not be reopened by delegated imp
 - Use `LLM_API_KEY`, not `OPENROUTER_API_KEY`, for the OpenRouter credential.
 - Do not require `STT_MODEL_PATH`, `TTS_MODEL_PATH`, or `TTS_COMMAND`; WhisperX and Kokoro receive provider model/language configuration through `STT_MODEL`, `TTS_MODEL`, and language settings.
 - Use WhisperX `small` on CPU by default, Kokoro English with random supported voice selection, and OpenRouter with the configured model.
+- Use `DOCUMENT_LLM_MODEL` (defaulting to `gemma4`) for vision-document resume parsing, separate from `LLM_MODEL`. The vision parser is optional and fails closed when unconfigured; the local text-only parser remains the deterministic/development path.
+- Use the shared `InterviewEndingPolicy` for adaptive interview ending in both the session engine and the rehearsal. Every completed candidate turn produces a validated end decision; the interview ends on LLM decision, 30-minute wall-clock limit, 10-turn limit, explicit stop, cancellation, provider failure, or timeout.
 - Use Firebase Storage as the beta storage provider with bucket `gs://the-interviewer-c3a01.firebasestorage.app`; select it with `STORAGE_BACKEND=gcs`. Retain `STORAGE_BACKEND=local` only for development and deterministic/local integration checks. Ignore FTP and S3 for Phase 16.
 - The Phase 16 live rehearsal is programmatic, not browser-dependent: an Interviewer Agent and an Interviewee Agent exchange timestamped audio buffers through the backend flow. Browser WebRTC, secure WebSocket signaling, and managed STUN/TURN remain implementation requirements for the later browser transport phase, not a Phase 16 beta-evidence gate.
 - Use one Docker container for the initial beta benchmark.
@@ -339,7 +341,8 @@ The normalized contracts are:
 
 - **Identity:** user ID, optional email, provider, issued-at, expiry, and assurance. Raw tokens never enter domain services.
 - **Setup:** job description, optional resume upload ID, recruiter/technical mode, optional seniority and location metadata.
-- **Session:** ID, owner, mode, lifecycle status, provider set, creation time, and expiry.
+- **Session:** ID, owner, mode, lifecycle status, end reason, end rationale, provider set, creation time, and expiry.
+- **EndDecision:** boolean should_end, bounded reason (continue, llm_decision, time_limit, turn_limit, explicit_stop, cancelled, provider_failure, timeout), and bounded rationale under 500 characters. Malformed decisions are provider failures.
 - **Event:** schema version, session ID, sequence, correlation ID, timestamp, type, and metadata payload. Audio bytes never enter WebSocket events.
 - **Transcript:** segment ID, speaker, text, start/end milliseconds, final flag, confidence, and source.
 - **Interviewer response:** spoken text, question type, topic, evidence request, completion flag, and bounded state update.
@@ -524,11 +527,11 @@ The project has three explicit evidence levels:
 
 Level 2 closes the Phase 16 programmatic live-beta evidence gate. Level 3 remains a subsequent browser and operational release gate and is not required for the Phase 16 agent-to-agent rehearsal because browser/WebRTC/TURN are explicitly deferred.
 
-The current resume path validates the PDF signature and size, extracts text operators locally with `LocalDocumentParser`, marks extracted chunks as untrusted source text, and sends bounded extracted context to the interviewer/evaluator path. It does not run OCR, does not upload the raw PDF to the LLM for opaque parsing, and fails safely when no text is extractable. OCR is a future adapter requirement for scanned resumes.
+The live resume path validates the PDF signature and size, then selects between a `VisionDocumentParser` (which sends the PDF to a configured vision-capable model through an injected OpenRouter transport and validates bounded structured output) and the local `LocalDocumentParser` (which extracts text operators only). A `FallbackDocumentParser` explicitly falls back to local parsing when the vision provider is unavailable; production never silently claims hosted parsing succeeded. Extracted chunks are always marked as untrusted source text. OCR for scanned or encrypted resumes is a future adapter requirement.
 
 ### 10.7 Rehearsal transcript and evidence artifacts
 
-Every successful live rehearsal must write a readable transcript to `PHASE16_TRANSCRIPT_PATH`, defaulting to `tests/phase16_rehearsal_transcript.txt`. The text file contains both recruiter and technical journeys, job description, locally extracted resume text, the actual prompt sent to the interviewer model, each turn's UUID, relative `MM:SS.mmm` audio timestamp, UTC STT/TTS start and finish timestamps, Interviewee partial and final transcript text, the Interviewer response with its role label, and the structured evaluation report. The partial line is currently a simulated interim prefix after final STT returns, not a provider streaming callback. The current rehearsal ends at `PHASE16_TURN_COUNT` (default 2); adaptive semantic ending is not wired into this runner. This transcript is intentionally separate from redacted machine evidence and must be treated as sensitive test output.
+Every successful live rehearsal must write a readable transcript to `PHASE16_TRANSCRIPT_PATH`, defaulting to `tests/phase16_rehearsal_transcript.txt`. The text file contains both recruiter and technical journeys, job description, locally extracted resume text, the actual prompt sent to the interviewer model, each turn's UUID, relative `MM:SS.mmm` audio timestamp, UTC STT/TTS start and finish timestamps, Interviewee partial and final transcript text, the Interviewer response with its role label, each turn's structured ending decision (should_end, reason, rationale), the session ending reason and rationale, and the structured evaluation report. The partial line is a simulated interim prefix after final STT returns, not a provider streaming callback. Adaptive semantic ending is wired into the rehearsal through the shared `InterviewEndingPolicy`; the runner ends when the ending provider decides to end, the 30-minute wall-clock limit, or the 10-turn limit is reached, whichever comes first.
 
 The gate also writes redacted `phase16-rehearsal.json`, marker output, progress output when `PHASE16_PROGRESS_LOG=1`, and the test log under `PHASE16_EVIDENCE_DIR`. It must never write credentials, provider tokens, raw audio bytes, or secret configuration values to evidence.
 

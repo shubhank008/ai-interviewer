@@ -3,19 +3,21 @@
 import asyncio
 import sys
 import unittest
+from datetime import timedelta
 
 sys.path.insert(0, "src")
 
+from interviewer_domain.adapters.ending import InterviewEndingPolicy
 from interviewer_domain.contracts import CancellationToken, ErrorCode, ProviderError
 from interviewer_domain.models import InterviewMode, InterviewSession, SessionStatus, Turn
-from interviewer_domain.providers import InMemoryDataStore, InMemoryEventBus, InMemoryLLM, InMemorySTT, InMemoryTTS
+from interviewer_domain.providers import InMemoryDataStore, InMemoryEndDecisionProvider, InMemoryEventBus, InMemoryLLM, InMemorySTT, InMemoryTTS
 from interviewer_domain.session import InterviewSessionEngine, QuestionPlanner, SessionStateError
 
 
 class SessionEngineTests(unittest.TestCase):
     """Exercise the real provider-independent session state machine."""
 
-    def build(self, mode: InterviewMode = InterviewMode.RECRUITER, stt=None) -> tuple[InterviewSessionEngine, InMemoryDataStore, InMemoryEventBus]:
+    def build(self, mode: InterviewMode = InterviewMode.RECRUITER, stt=None, ending=None) -> tuple[InterviewSessionEngine, InMemoryDataStore, InMemoryEventBus]:
         """Build an engine with deterministic Phase 1 providers."""
         store = InMemoryDataStore()
         events = InMemoryEventBus()
@@ -26,6 +28,7 @@ class SessionEngineTests(unittest.TestCase):
             InMemoryTTS(),
             store,
             events,
+            ending=ending,
         )
         return engine, store, events
 
@@ -79,6 +82,42 @@ class SessionEngineTests(unittest.TestCase):
         self.assertEqual(current.topic, "technical-depth")
         print("[ENGINE] guarded-planning-ok")
 
+    def test_adaptive_ending_persists_reason_and_emits_markers(self) -> None:
+        """A validated ending decision completes the session without another question."""
+        engine, _, events = self.build(ending=InMemoryEndDecisionProvider(True, "llm_decision", "answer is sufficiently evidenced"))
+        asyncio.run(engine.start())
+        asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"audio")))
+        self.assertEqual(engine.session.status, SessionStatus.COMPLETED.value)
+        self.assertEqual(engine.session.end_reason, "llm_decision")
+        self.assertIn("answer is sufficiently evidenced", engine.session.end_rationale)
+        self.assertTrue(any(event.name == "ending.decided" for event in events.events))
+        self.assertTrue(any(event.name == "session.completed" for event in events.events))
+        print("[END17] llm-directed-ending-ok")
+
+    def test_time_limit_uses_injected_clock(self) -> None:
+        """The shared policy ends after the configured wall-clock boundary."""
+        engine, _, _ = self.build()
+        policy = InterviewEndingPolicy(
+            None,
+            engine.session.created_at,
+            clock=lambda: engine.session.created_at + timedelta(minutes=30),
+        )
+        engine.ending_policy = policy
+        asyncio.run(engine.start())
+        asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"audio")))
+        self.assertEqual(engine.session.end_reason, "time_limit")
+        print("[END17] time-limit-ending-ok")
+
+    def test_turn_limit_ends_after_current_turn(self) -> None:
+        """The shared policy protects the maximum interviewer turn count."""
+        engine, _, _ = self.build()
+        engine.ending_policy = InterviewEndingPolicy(None, engine.session.created_at, max_interviewer_turns=1)
+        asyncio.run(engine.start())
+        asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"audio")))
+        self.assertEqual(engine.session.end_reason, "turn_limit")
+
+        print("[END17] turn-limit-ending-ok")
+
     def test_cancellation_is_terminal_without_completion(self) -> None:
         """Cancellation transitions explicitly and never reports completion."""
         engine, _, events = self.build()
@@ -90,7 +129,7 @@ class SessionEngineTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, ErrorCode.CANCELLED)
         self.assertEqual(engine.session.status, SessionStatus.CANCELLED.value)
         self.assertNotIn("session.completed", [event.name for event in events.events])
-        print("[ENGINE] cancellation-failure-ok")
+        print("[END17] explicit-stop-ending-ok")
 
     def test_provider_failure_is_terminal(self) -> None:
         """Invalid deterministic input transitions the session to failed."""
@@ -100,7 +139,7 @@ class SessionEngineTests(unittest.TestCase):
             asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"")))
         self.assertEqual(engine.session.status, SessionStatus.FAILED.value)
         self.assertEqual(events.events[-1].name, "session.failed")
-        print("[ENGINE] provider-failure-ok")
+        print("[END17] provider-failure-ending-ok")
 
     def test_planner_rejects_empty_follow_up_context(self) -> None:
         """Follow-up preparation requires substantive current context."""

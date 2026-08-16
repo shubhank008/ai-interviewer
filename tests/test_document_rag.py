@@ -73,5 +73,59 @@ class DocumentRagTests(unittest.TestCase):
         print("[RAG] mock-ingestion-ok")
 
 
+
+class VisionTransportFixture:
+    """Return bounded structured output without network access."""
+
+    def complete(self, payload: dict, api_key: str) -> dict:
+        """Return a provider-shaped JSON response."""
+        self.payload = payload
+        return {"choices": [{"message": {"content": '{"text":"EXPERIENCE:\\nBuilt reliable APIs for customers.","sections":["EXPERIENCE"],"fields":{"role":"Backend Engineer"}}'}}]}
+
+
+class LiveDocumentParserTests(unittest.TestCase):
+    """Exercise the injected vision path and explicit fallback behavior."""
+
+    def test_vision_parser_returns_safe_attributed_chunks_and_fields(self) -> None:
+        from interviewer_domain.documents import FallbackDocumentParser, VisionDocumentParser
+
+        transport = VisionTransportFixture()
+        parser = FallbackDocumentParser(VisionDocumentParser(transport, "test-key", "vision-model"))
+        chunks = parser.parse(b"%PDF-1.7\n(binary)", "application/pdf", "resume")
+        self.assertEqual(chunks[0].source, DocumentSource.RESUME)
+        self.assertEqual(chunks[0].section, "EXPERIENCE")
+        self.assertFalse(parser.used_fallback)
+        self.assertIn("role", parser.primary.last_fields)
+        self.assertEqual(transport.payload["model"], "vision-model")
+        print("[DOC17] vision-parser-contract-ok")
+
+    def test_malformed_vision_response_fails_closed(self) -> None:
+        from interviewer_domain.documents import VisionDocumentParser
+
+        class MalformedTransport:
+            def complete(self, payload: dict, api_key: str) -> dict:
+                return {"choices": [{"message": {"content": "not-json"}}]}
+
+        with self.assertRaises(ProviderError) as raised:
+            VisionDocumentParser(MalformedTransport(), "test-key").parse(
+                b"%PDF-1.7\n(binary)", "application/pdf", "resume"
+            )
+        self.assertEqual(raised.exception.code, ErrorCode.INTERNAL)
+
+    def test_unavailable_vision_parser_explicitly_falls_back(self) -> None:
+        from interviewer_domain.documents import FallbackDocumentParser, LocalDocumentParser, VisionDocumentParser
+
+        parser = FallbackDocumentParser(VisionDocumentParser(object(), ""), LocalDocumentParser())
+        chunks = parser.parse(
+            b"%PDF-1.7\n(Backend engineer with reliable API experience.)",
+            "application/pdf",
+            "resume",
+        )
+        self.assertTrue(parser.used_fallback)
+        self.assertIn("Backend engineer", chunks[0].text)
+
+        print("[DOC17] document-source-boundary-ok")
+
+
 if __name__ == "__main__":
     unittest.main()

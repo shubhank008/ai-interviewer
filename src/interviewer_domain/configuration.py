@@ -87,6 +87,7 @@ class RuntimeSettings:
     llm_fallback_provider: str
     llm_api_key: str | None
     llm_model: str
+    document_llm_model: str
     webrtc_ice_servers: str
     webrtc_sample_rate: int
     cors_origins: tuple[str, ...]
@@ -134,6 +135,7 @@ class RuntimeSettings:
             llm_fallback_provider=values.get("LLM_FALLBACK_PROVIDER", "in-memory"),
             llm_api_key=_optional(values, "LLM_API_KEY"),
             llm_model=values.get("LLM_MODEL", "default"),
+            document_llm_model=values.get("DOCUMENT_LLM_MODEL", "gemma4"),
             webrtc_ice_servers=values.get(
                 "WEBRTC_ICE_SERVERS", "stun:stun.l.google.com:19302"
             ),
@@ -158,6 +160,8 @@ class RuntimeSettings:
         """Reject unsafe values and missing production requirements."""
         if self.storage_backend not in {"local", "s3", "gcs"}:
             raise ConfigurationError("STORAGE_BACKEND must be local, s3, or gcs")
+        if not self.document_llm_model.strip():
+            raise ConfigurationError("DOCUMENT_LLM_MODEL must not be empty")
         if self.profile is RuntimeProfile.LOCAL:
             return
         required = {
@@ -221,6 +225,11 @@ class RuntimeSettings:
                 "stt": self.stt_provider,
                 "tts": self.tts_provider,
                 "llm": self.llm_provider,
+                "document_parser": "openrouter-vision",
+            },
+            "models": {
+                "interviewer": self.llm_model,
+                "document_parser": self.document_llm_model,
             },
             "fallbacks": {
                 "stt": self.stt_fallback_provider,

@@ -69,6 +69,25 @@ class RuntimeConfigurationTests(unittest.TestCase):
         print("[PHASE11] config-local-ok")
         print("[PHASE11] diagnostics-redacted")
 
+    def test_document_model_is_independent_and_redacted(self) -> None:
+        """Document parsing uses its own model setting without exposing secrets."""
+        settings = RuntimeSettings.from_env(
+            {
+                "DOCUMENT_LLM_MODEL": "vision-document-model",
+                "LLM_MODEL": "interviewer-model",
+                "LLM_API_KEY": "private-key-material",
+            }
+        )
+        diagnostics = settings.diagnostics()
+        self.assertEqual(settings.document_llm_model, "vision-document-model")
+        self.assertEqual(diagnostics["models"], {
+            "interviewer": "interviewer-model",
+            "document_parser": "vision-document-model",
+        })
+        self.assertNotIn("private-key-material", str(diagnostics))
+        print("[DOC17] document-model-config-ok")
+
+
     def test_production_missing_required_configuration_fails_safely(self) -> None:
         """Production never silently falls back to the local profile."""
         with self.assertRaisesRegex(

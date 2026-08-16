@@ -67,6 +67,36 @@ class SessionStatus(StrEnum):
     COMPLETED = "completed"
 
 
+
+class EndReason(StrEnum):
+    """Terminal reasons shared by browser sessions and rehearsals."""
+
+    LLM_DECISION = "llm_decision"
+    TIME_LIMIT = "time_limit"
+    TURN_LIMIT = "turn_limit"
+    EXPLICIT_STOP = "explicit_stop"
+    CANCELLED = "cancelled"
+    PROVIDER_FAILURE = "provider_failure"
+    TIMEOUT = "timeout"
+
+
+@dataclass(frozen=True, slots=True)
+class EndDecision:
+    """Validated bounded continuation decision returned after a candidate turn."""
+
+    should_end: bool
+    reason: str = "continue"
+    rationale: str = ""
+
+    def __post_init__(self) -> None:
+        """Reject unbounded or unsupported model decision values."""
+        if self.reason not in {"continue", *(reason.value for reason in EndReason)}:
+            raise ValueError("unsupported interview end reason")
+        if len(self.rationale) > 500:
+            raise ValueError("end rationale exceeds 500 characters")
+
+
+
 @dataclass(frozen=True, slots=True)
 class QuestionPlan:
     """A guarded, mode-specific candidate question plan."""
@@ -88,6 +118,8 @@ class InterviewSession:
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)
     status: str = "created"
+    end_reason: str | None = None
+    end_rationale: str = ""
 
 
 @dataclass(frozen=True, slots=True)

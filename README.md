@@ -9,7 +9,7 @@ Supported interview modes:
 
 The intended post-interview experience includes replayable audio, a timestamped speaker-labeled transcript, a score out of 100, a summary, strengths, missed opportunities, role-specific feedback, and concrete improvements.
 
-> **Current status:** deterministic local domain and acceptance paths are implemented, and Phase 15 added opt-in concrete provider transports. The latest Phase 15 run skipped every real integration because safe credentials, model paths, and a browser integration URL were absent. This repository must not yet claim live production interview readiness.
+> **Current status:** Phase 16 has produced programmatic live-beta evidence: the agent-to-agent rehearsal exercises WhisperX, OpenRouter, Kokoro, Firebase Auth/Admin, Firestore, Firebase Storage, vision-document parsing, and adaptive interview ending. Browser authentication owner isolation, browser media, and Phase 17 operational release controls remain open.
 
 ## Contents
 
@@ -194,6 +194,7 @@ cp .env.example .env
 | `STT_PROVIDER`, `STT_MODEL`, `STT_CPU`, `STT_LANGUAGE` | WhisperX selection, model name, CPU mode, and language; beta uses `whisperx` and `small` |
 | `TTS_PROVIDER`, `TTS_MODEL`, `TTS_LANGUAGE` | Kokoro selection, provider model setting, and language; beta uses English with random per-call voice selection |
 | `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY` | OpenRouter selection, configured model, and unified credential |
+| `DOCUMENT_LLM_MODEL` | Vision-capable model for resume parsing, separate from the interviewer model; defaults to `gemma4` |
 | `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS_PATH`, Firebase Web Auth settings | Beta Firebase Admin/Web Auth and EU Firestore |
 | `STORAGE_BACKEND`, `STORAGE_PATH`, `STORAGE_BUCKET` | `gcs` selects locked Firebase Storage for beta; `local` is development/deterministic only |
 | `WEBRTC_ICE_SERVERS` | Optional benchmark transport configuration; timestamped browser chunks are the initial beta transport |
@@ -240,13 +241,13 @@ Supported rehearsal parameters:
 | `PHASE16_JOB_FIXTURE` | `tests/demo_jobdescription.txt` | Job-description fixture |
 | `PHASE16_EVIDENCE_DIR` | `.agent_tmp/phase16-gate` | Directory for redacted JSON and marker evidence |
 | `PHASE16_TRANSCRIPT_PATH` | `tests/phase16_rehearsal_transcript.txt` | Full readable turn-by-turn transcript output |
-| `PHASE16_TURN_COUNT` | `2` | Rehearsal turn count, clamped to 1 through 10; the current runner ends at this configured limit |
+| `PHASE16_TURN_COUNT` | `2` | Rehearsal turn count, clamped to 1 through 10; adaptive ending may terminate earlier |
 | `PHASE16_PROGRESS_LOG` | unset | Set to `1`, `true`, or `yes` for flushed UTC progress checkpoints |
 | `PHASE16_FIREBASE_ID_TOKEN` | unset | Optional real Firebase ID token; without it the backend rehearsal UID is used and token owner-isolation is marked deferred |
 | `PHASE16_REHEARSAL_UID` | `phase16-rehearsal-user` | Internal owner used only when no Firebase ID token is supplied |
 | `STORAGE_BACKEND` | from `.env` | Must be `gcs` for Firebase/GCS beta evidence; `local` is deterministic development mode |
 
-The transcript is plain text and includes journey inputs, the actual interviewer prompt, relative `MM:SS.mmm` audio offsets, UTC STT/TTS start and finish timestamps, turn IDs, partial and final Interviewee/candidate text, Interviewer responses, and the structured evaluation report. The current partial line is a rehearsal-simulated interim prefix created after the provider returns; it is not yet a live WhisperX partial callback. The current programmatic runner ends after `PHASE16_TURN_COUNT` turns because no semantic `should_end` response is wired into this rehearsal path. It is deliberately separate from redacted JSON evidence because it contains rehearsal conversation content. Do not publish it when the fixture or provider output contains sensitive data.
+The transcript is plain text and includes journey inputs, the actual interviewer prompt, relative `MM:SS.mmm` audio offsets, UTC STT/TTS start and finish timestamps, turn IDs, partial and final Interviewee/candidate text, Interviewer responses, and the structured evaluation report. The current partial line is a rehearsal-simulated interim prefix created after the provider returns; it is not yet a live WhisperX partial callback. Adaptive ending is wired into the rehearsal through the shared `InterviewEndingPolicy`; the runner ends when the ending provider decides to end, the 30-minute wall-clock limit, or the 10-turn limit is reached. This transcript is intentionally separate from redacted machine evidence because it contains rehearsal conversation content.
 
 The authoritative gate fails closed: missing required live configuration is skipped and cannot establish readiness, a selected provider failure fails its marker, and in-memory providers cannot satisfy production composition. A successful live gate produces `phase16-rehearsal.json`, `markers.log`, `test.log`, and the transcript path above.
 

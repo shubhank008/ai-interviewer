@@ -12,8 +12,9 @@ from .configuration import (
 )
 
 
+from .adapters import AdaptiveEndingProvider
 from .benchmark import BenchmarkReport, ProviderBenchmark
-from .documents import LocalDocumentParser
+from .documents import FallbackDocumentParser, LocalDocumentParser, VisionDocumentParser
 from .evaluation import (
     EVALUATION_VERSION,
     DeterministicEvaluator,
@@ -32,6 +33,8 @@ from .live_voice import (
 from .models import (
     DocumentChunk,
     DocumentSource,
+    EndDecision,
+    EndReason,
     InterviewMode,
     InterviewSession,
     QuestionPlan,
@@ -87,6 +90,7 @@ __all__ = [
     "ConfigurationError",
     "EVALUATION_VERSION",
     "MAX_RESUME_BYTES",
+    "AdaptiveEndingProvider",
     "AudioScheduler",
     "BenchmarkReport",
     "BrowserControlTransport",
@@ -96,6 +100,8 @@ __all__ = [
     "DeterministicEvaluator",
     "DocumentChunk",
     "DocumentSource",
+    "EndDecision",
+    "EndReason",
     "FallbackRouter",
     "FasterWhisperSTT",
     "FirebaseAuthAdapter",
@@ -112,7 +118,9 @@ __all__ = [
     "LiveVoiceOrchestrator",
     "LiveVoiceTurnResult",
     "LocalBrowserControlTransport",
+    "FallbackDocumentParser",
     "LocalDocumentParser",
+    "VisionDocumentParser",
     "LocalFilesystemStorage",
     "LocalSessionEventChannel",
     "LocalWebRTCMediaTransport",

@@ -19,10 +19,11 @@ from uuid import UUID, uuid4
 
 from .adapters.integrations import IntegrationEvidence, ProviderMetadata, redact_evidence
 from .adapters.persistence import InterviewRecord, PersistentDataStore
-from .capabilities.contracts import CancellationToken
-from .documents import LocalDocumentParser
+from .capabilities.contracts import CancellationToken, DocumentParser, ErrorCode, ProviderError
+from .documents import LocalDocumentParser, VisionDocumentParser
 from .evaluation import Evaluation, Evaluator, InterviewContext
-from .models import InterviewMode, Recording, TranscriptSegment
+from .adapters.ending import EndEvaluator, InterviewEndingPolicy
+from .models import EndDecision, EndReason, InterviewMode, Recording, TranscriptSegment
 
 
 class RehearsalAuth(Protocol):
@@ -78,7 +79,8 @@ class RehearsalProviders:
     data: PersistentDataStore
     storage: RehearsalStorage
     evaluator: Evaluator
-    parser: LocalDocumentParser = field(default_factory=LocalDocumentParser)
+    parser: DocumentParser = field(default_factory=LocalDocumentParser)
+    ending: EndEvaluator | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +99,7 @@ class AgentTurn:
     stt_finished_at: str
     tts_started_at: str
     tts_finished_at: str
+    end_decision: EndDecision = field(default_factory=lambda: EndDecision(False))
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +111,8 @@ class JourneyTranscript:
     job_description: str
     turns: tuple[AgentTurn, ...]
     evaluation: Evaluation
+    end_reason: str | None = None
+    end_rationale: str = ""
 
 
 class IntervieweeAgent:
@@ -153,6 +158,7 @@ class InterviewerAgent:
         job_path: Path,
         interviewee: IntervieweeAgent,
         turn_count: int = 2,
+        clock: Callable[[], datetime] | None = None,
     ) -> tuple[InterviewRecord, tuple[AgentTurn, ...], Evaluation]:
         """Execute one complete provider-backed journey with owned persistence."""
         user_id = await self.providers.auth.validate(self.token)
@@ -168,9 +174,10 @@ class InterviewerAgent:
         context_text = " ".join(chunk.text for chunk in (*resume_chunks, *job_chunks))
         turns: list[AgentTurn] = []
         token = CancellationToken()
+        policy = InterviewEndingPolicy(self.providers.ending, record.created_at, clock=clock)
         system_prompt = (
             f"You are the {mode.value} interviewer. Ask one adaptive, evidence-based question at a time. "
-            "Do not end the interview unless the configured rehearsal turn limit is reached."
+            "Evaluate each final candidate answer for suitability; enforce the shared 30-minute and 10-turn limits."
         )
         for sequence in range(turn_count):
             buffers = interviewee.buffers(sequence)
@@ -186,6 +193,12 @@ class InterviewerAgent:
             self.providers.data.save_transcript(user_id, record.id, final)
             user_prompt = f"{system_prompt} Context: {context_text[:2000]} Answer evidence: {final.text}"
             interviewer_text = await self.providers.llm.generate(user_prompt, token)
+            try:
+                decision = await policy.evaluate(final.text, sequence + 1, token)
+            except ProviderError as error:
+                if error.code is ErrorCode.CANCELLED:
+                    raise
+                decision = policy.evaluate_without_provider(sequence + 1)
             tts_started_at = datetime.now(timezone.utc).isoformat(timespec="microseconds")
             interviewer_audio = await self.providers.tts.synthesize(interviewer_text, token)
             tts_finished_at = datetime.now(timezone.utc).isoformat(timespec="microseconds")
@@ -194,10 +207,17 @@ class InterviewerAgent:
                 AgentTurn(
                     turn_id, buffers, partial, final, interviewer_text, len(interviewer_audio),
                     system_prompt, user_prompt, stt_started_at, stt_finished_at,
-                    tts_started_at, tts_finished_at,
+                    tts_started_at, tts_finished_at, decision,
                 )
             )
-        completed = InterviewRecord(record.user_id, record.mode, record.id, record.created_at, record.expires_at, "completed")
+            if decision.should_end:
+                break
+        terminal_decision = turns[-1].end_decision if turns else EndDecision(True, EndReason.TURN_LIMIT.value, "no turns completed")
+        completed = InterviewRecord(
+            record.user_id, record.mode, record.id, record.created_at, record.expires_at, "completed",
+            terminal_decision.reason if terminal_decision.should_end else EndReason.TURN_LIMIT.value,
+            terminal_decision.rationale,
+        )
         self.providers.data.save_interview(completed)
         recording_key = prefix + "combined.pcm"
         combined_audio = b"".join(
@@ -394,7 +414,7 @@ def write_rehearsal_transcript(
             candidate = turn.final
             lines.extend(
                 (
-                    f"[turn {number} | {candidate.turn_id} | audio {_relative_timestamp(candidate.start_ms)}]",
+                    f"[turn {number} | {candidate.turn_id} | audio {_relative_timestamp(candidate.start_ms or 0)}]",
                     f"STT start (UTC): {turn.stt_started_at}",
                     f"STT finish (UTC): {turn.stt_finished_at}",
                     f"Interviewee / candidate (partial): {turn.partial.text}",
@@ -403,12 +423,15 @@ def write_rehearsal_transcript(
                     f"TTS start (UTC): {turn.tts_started_at}",
                     f"TTS finish (UTC): {turn.tts_finished_at}",
                     f"Interviewer / {journey.mode.value}: {turn.interviewer_text}",
+                    f"Ending decision: should_end={turn.end_decision.should_end} reason={turn.end_decision.reason} rationale={turn.end_decision.rationale}",
                     "",
                 )
             )
         evaluation = journey.evaluation
         lines.extend(
             (
+                f"Ending reason: {journey.end_reason or 'unknown'}",
+                f"Ending rationale: {journey.end_rationale}",
                 "--- EVALUATION REPORT ---",
                 f"Score: {evaluation.score}",
                 f"Rubric version: {evaluation.rubric_version}",
@@ -497,6 +520,11 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
         )
         tts = KokoroTTS(KokoroPythonBackend("en", "default"), settings.tts_model)
         llm = OpenRouterLLM(OpenRouterHTTPTransport(timeout=60.0), settings.llm_api_key, settings.llm_model)
+        document_parser = VisionDocumentParser(
+            SyncOpenRouterHTTPTransport(timeout=60.0),
+            settings.llm_api_key or "",
+            settings.document_llm_model,
+        )
         evaluator = OpenRouterEvaluator(SyncOpenRouterHTTPTransport(timeout=60.0), settings.llm_api_key or "", settings.llm_model)
     except (IntegrationSkipped, ValueError) as exc:
         raise RuntimeError(str(exc)) from exc
@@ -505,7 +533,7 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
     else:
         token = rehearsal_identity
     return LivePhase16Composition(
-        RehearsalProviders(auth, stt, llm, tts, data, storage, evaluator),
+        RehearsalProviders(auth, stt, llm, tts, data, storage, evaluator, document_parser),
         token,
         settings.storage_backend,
         auth_mode,
@@ -573,8 +601,8 @@ async def _execute_live(
     job_description = job.read_text(encoding="utf-8", errors="replace")
     for mode, marker in ((InterviewMode.RECRUITER, "agent-recruiter-journey-ok"), (InterviewMode.TECHNICAL, "agent-technical-journey-ok")):
         _progress(environ, f"journey={mode.value} start")
-        _, turns, evaluation = await _run_live_journey(composition, mode, resume, job, environ)
-        journeys.append(JourneyTranscript(mode, resume_text, job_description, turns, evaluation))
+        record, turns, evaluation = await _run_live_journey(composition, mode, resume, job, environ)
+        journeys.append(JourneyTranscript(mode, resume_text, job_description, turns, evaluation, record.end_reason, record.end_rationale))
         journey_buffer_count += sum(len(turn.buffers) for turn in turns)
         completed[marker] = f"{mode.value} InterviewerAgent and IntervieweeAgent journey completed"
         _progress(environ, f"journey={mode.value} complete buffers={journey_buffer_count}")

@@ -1,6 +1,6 @@
 # Provider readiness and operational characteristics
 
-Phase 16 is the live-provider phase. Contract tests and local fixtures remain useful for protecting boundaries, but they are not provider or beta evidence. The production profile must load the configured `.env`, initialize the selected providers, and fail closed when a required provider is unavailable. The first beta uses Firebase Auth/Admin, EU Firestore, local/NFS storage, WhisperX small on CPU, Kokoro Python, OpenRouter through `LLM_API_KEY`, and timestamped browser microphone chunks.
+Phase 16 is the live-provider phase. Contract tests and local fixtures remain useful for protecting boundaries, but they are not provider or beta evidence. The production profile must load the configured `.env`, initialize the selected providers, and fail closed when a required provider is unavailable. The first beta uses Firebase Auth/Admin, EU Firestore, local/NFS storage, WhisperX small on CPU, Kokoro Python, OpenRouter through `LLM_API_KEY`, vision-document parsing through `DOCUMENT_LLM_MODEL`, and timestamped agent audio buffers.
 
 ## Data sharing and retention
 

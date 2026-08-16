@@ -12,7 +12,7 @@ from ...contracts import (
     StreamAudioChunk,
     StreamTextChunk,
 )
-from ...models import LifecycleEvent, Recording, TranscriptSegment
+from ...models import EndDecision, LifecycleEvent, Recording, TranscriptSegment
 
 
 class InMemorySTT:
@@ -57,6 +57,22 @@ class InMemoryLLM:
     async def health(self) -> HealthStatus:
         """Return deterministic healthy status."""
         return HealthStatus(True)
+
+
+
+class InMemoryEndDecisionProvider:
+    """Return a configured bounded decision for deterministic rehearsals."""
+
+    def __init__(self, should_end: bool = False, reason: str = "continue", rationale: str = "") -> None:
+        """Configure the decision returned for every candidate answer."""
+        self.decision = EndDecision(should_end, reason, rationale)
+
+    async def evaluate_end(self, answer: str, token: CancellationToken) -> EndDecision:
+        """Return the configured decision after validating cancellation and input."""
+        token.raise_if_cancelled()
+        if not answer.strip():
+            raise ProviderError(ErrorCode.INVALID_REQUEST, "answer is empty")
+        return self.decision
 
 
 class InMemoryTTS:
