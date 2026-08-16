@@ -354,8 +354,10 @@ def write_rehearsal_evidence(path: str | Path, results: tuple[RehearsalResult, .
 
 
 
-def _relative_timestamp(milliseconds: int) -> str:
+def _relative_timestamp(milliseconds: int | None) -> str:
     """Format a rehearsal-relative millisecond offset for transcript readers."""
+    if milliseconds is None:
+        return "00:00.000"
     seconds, remainder = divmod(milliseconds, 1000)
     minutes, seconds = divmod(seconds, 60)
     return f"{minutes:02d}:{seconds:02d}.{remainder:03d}"
