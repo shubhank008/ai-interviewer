@@ -54,8 +54,19 @@ class OpenRouterEvaluator(Evaluator):
                 if candidate.startswith("```"):
                     candidate = candidate.removeprefix("```").removeprefix("json").removesuffix("```").strip()
                 if not candidate.startswith("{"):
-                    start, end = candidate.find("{"), candidate.rfind("}")
-                    candidate = candidate[start : end + 1] if start >= 0 and end >= start else candidate
+                    start = candidate.find("{")
+                    if start >= 0:
+                        depth = 0
+                        end = start
+                        for i in range(start, len(candidate)):
+                            if candidate[i] == "{":
+                                depth += 1
+                            elif candidate[i] == "}":
+                                depth -= 1
+                            if depth == 0:
+                                end = i
+                                break
+                        candidate = candidate[start : end + 1]
                 value = json.loads(candidate)
             else:
                 value = content
