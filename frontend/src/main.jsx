@@ -3,16 +3,24 @@ import { createRoot } from 'react-dom/client'
 import { createSessionRequest, historyRequest, sessionWebSocketUrl, setupValidation } from './api.js'
 import { createMediaTransport } from './media.js'
 import { createSessionTransport } from './transport.js'
-import { localAuthProvider } from './auth.js'
+import { firebaseAuthProvider, localAuthProvider } from './auth.js'
 import { ActiveView, AuthScreen, HistoryView, ResultsView, SetupView, Shell } from './ui.jsx'
 import './style.css'
 
-const auth = localAuthProvider()
-const token = 'dev-token'
+const production = import.meta.env.VITE_APP_PROFILE === 'production'
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+}
+const configuredForFirebase = Object.values(firebaseConfig).every(Boolean)
+if (production && !configuredForFirebase) throw new Error('Firebase web authentication is not configured')
+const auth = configuredForFirebase ? firebaseAuthProvider(firebaseConfig) : localAuthProvider()
 const client = { validate: setupValidation, create: (mode, authToken) => createSessionRequest(mode, authToken) }
 
 export function App({ authProvider = auth, fetcher = fetch }) {
   const [user, setUser] = useState(undefined)
+  const token = user?.token || (production ? '' : 'dev-token')
   const [view, setView] = useState('setup')
   const [session, setSession] = useState(null)
   const [history, setHistory] = useState([])

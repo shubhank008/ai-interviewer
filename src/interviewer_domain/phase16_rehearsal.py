@@ -380,7 +380,13 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
         if settings.storage_backend == "local":
             storage = LocalFilesystemStorage(settings.storage_path)
         elif settings.storage_backend == "gcs":
-            storage = S3CompatibleStorage(FirebaseStorageBackend(settings.storage_bucket))
+            storage = S3CompatibleStorage(
+                FirebaseStorageBackend(
+                    settings.storage_bucket,
+                    credentials,
+                    project,
+                )
+            )
         else:
             raise ValueError("Phase 16 storage must be STORAGE_BACKEND=local or gcs")
         stt = WhisperXSTT(
