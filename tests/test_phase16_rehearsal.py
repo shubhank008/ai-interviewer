@@ -12,6 +12,7 @@ from interviewer_domain.models import InterviewMode, TranscriptSegment
 from interviewer_domain.phase16_rehearsal import (
     IntervieweeAgent,
     InterviewerAgent,
+    JourneyTranscript,
     RehearsalProviders,
     load_dotenv,
 )
@@ -67,6 +68,9 @@ class AgentRoleFlowTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(turns[0].partial.is_final)
             self.assertTrue(turns[0].final.is_final)
             self.assertLess(turns[0].partial.start_ms, turns[0].final.end_ms)
+            self.assertLess(turns[0].stt_started_at, turns[0].stt_finished_at)
+            self.assertLess(turns[0].tts_started_at, turns[0].tts_finished_at)
+            self.assertIn(f"{mode.value} interviewer", turns[0].system_prompt)
             self.assertGreater(evaluation.score or 0, 0)
             self.assertTrue(providers.data.list_transcripts("firebase-user", record.id))
             await interviewer.delete(record)
@@ -75,20 +79,32 @@ class AgentRoleFlowTests(unittest.IsolatedAsyncioTestCase):
     async def test_transcript_writer_preserves_roles_timestamps_and_turns(self):
         providers = _providers()
         interviewer = InterviewerAgent(providers, "firebase-id-token")
-        _, turns, _ = await interviewer.run(
+        _, turns, evaluation = await interviewer.run(
             InterviewMode.TECHNICAL,
             Path("tests/demo_resume.pdf"),
             Path("tests/demo_jobdescription.txt"),
             IntervieweeAgent((b"candidate audio buffer",)),
             turn_count=2,
         )
+        journey = JourneyTranscript(
+            InterviewMode.TECHNICAL,
+            "extracted resume text",
+            "job description text",
+            turns,
+            evaluation,
+        )
         with tempfile.TemporaryDirectory() as directory:
-            output = write_rehearsal_transcript(directory + "/transcript.txt", ((InterviewMode.TECHNICAL, turns),))
+            output = write_rehearsal_transcript(directory + "/transcript.txt", (journey,))
             transcript = Path(output).read_text(encoding="utf-8")
+        self.assertIn("Interviewee / candidate (partial):", transcript)
         self.assertIn("Interviewee / candidate (final):", transcript)
         self.assertIn("Interviewer / technical:", transcript)
-        self.assertIn("00:00.000", transcript)
-        self.assertEqual(transcript.count("[turn "), 4)
+        self.assertIn("JOB DESCRIPTION", transcript)
+        self.assertIn("SYSTEM PROMPT", transcript)
+        self.assertIn("STT start (UTC):", transcript)
+        self.assertIn("TTS finish (UTC):", transcript)
+        self.assertIn("EVALUATION REPORT", transcript)
+        self.assertEqual(transcript.count("[turn "), 2)
 
     def test_dotenv_loader_preserves_existing_environment_without_output(self):
         with tempfile.TemporaryDirectory() as directory:

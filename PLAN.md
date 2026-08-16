@@ -232,6 +232,22 @@ A deterministic test pass cannot mark Phase 16 complete. The authoritative progr
 - [ ] Run a scripted beta rehearsal with provider/model/version, latency, cost, quality, and limitation evidence.
 - [ ] Declare beta readiness only after Phase 16 real execution and all operational gates pass.
 
+### Browser-based live launch gates
+
+These are explicit follow-on targets after the programmatic Phase 16 gate. They define a soft-browser release path without changing the Phase 16 provider evidence boundary.
+
+- [ ] **B1: Firebase browser identity gate:** exercise email/password signup, Google sign-in where enabled, session restoration, logout, ID-token refresh, expired-token rejection, protected routes, API token forwarding, server verification, and cross-user owner isolation with two test accounts.
+- [ ] **B2: Browser setup and consent gate:** exercise consent notice, job-description entry, 10 MB validation, PDF selection/upload progress, parser errors for scanned/encrypted PDFs, mode selection, and setup recovery in a real browser.
+- [ ] **B3: Browser control-channel gate:** exercise authenticated WebSocket connect, heartbeat, ordered events, reconnect replay, sequence cursors, cancellation, interruption, provider error states, and secure-origin/CORS behavior.
+- [ ] **B4: Browser audio gate:** exercise microphone permission, capture, mute, stop, teardown, agent playback, ordered transcript/audio state, and a soft-browser audio turn. WebRTC/TURN must be validated only if selected by deployment configuration; browser tests must not put media bytes in WebSocket events.
+- [ ] **B5: Browser completed-interview gate:** complete recruiter and technical soft-browser interviews, verify adaptive continuation/end conditions, final transcript, replay recording, evaluation results, and user-visible failure recovery.
+- [ ] **B6: Browser persistence and deletion gate:** verify history, transcript, results, replay, retention display, per-interview deletion, account deletion, and cross-user access denial against Firebase/Firestore/Storage.
+- [ ] **B7: Production security gate:** remove development `dev-token` paths from production, enforce HTTPS, secure WebSocket origins, CORS allowlists, Firebase rules, secret injection, redacted logs, rate limits, upload limits, and fail-closed startup/readiness.
+- [ ] **B8: Release-candidate operations gate:** run the frontend/API/worker Docker release candidate, verify health/readiness probes, model warm-up, resource limits, monitoring, alerts, backup/restore assumptions, rollback, retention scheduling, deletion retries, and incident runbook.
+- [ ] **B9: Soft-browser acceptance gate:** run a scripted real-browser smoke test with the demo fixtures and test account, capture screenshots/logs without sensitive data, record provider/model/version, latency, cost, quality, and limitations, and obtain explicit beta-launch approval.
+
+The browser launch is not ready until B1 through B9 pass. The programmatic Phase 16 gate remains a prerequisite, not a substitute for these browser and operational gates.
+
 ## SDD feature order
 
 Feature specifications have been completed through `011-runtime-configuration-and-provider-readiness`. New specifications must be created in this order:

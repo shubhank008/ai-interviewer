@@ -524,9 +524,12 @@ The project has three explicit evidence levels:
 
 Level 2 closes the Phase 16 programmatic live-beta evidence gate. Level 3 remains a subsequent browser and operational release gate and is not required for the Phase 16 agent-to-agent rehearsal because browser/WebRTC/TURN are explicitly deferred.
 
+The current resume path validates the PDF signature and size, extracts text operators locally with `LocalDocumentParser`, marks extracted chunks as untrusted source text, and sends bounded extracted context to the interviewer/evaluator path. It does not run OCR, does not upload the raw PDF to the LLM for opaque parsing, and fails safely when no text is extractable. OCR is a future adapter requirement for scanned resumes.
+
+
 ### 10.7 Rehearsal transcript and evidence artifacts
 
-Every successful live rehearsal must write a readable transcript to `PHASE16_TRANSCRIPT_PATH`, defaulting to `tests/phase16_rehearsal_transcript.txt`. The text file contains both recruiter and technical journeys, each turn's UUID, relative `MM:SS.mmm` audio timestamp, Interviewee partial and final transcript text, and the Interviewer response with its role label. This transcript is intentionally separate from redacted machine evidence and must be treated as sensitive test output.
+Every successful live rehearsal must write a readable transcript to `PHASE16_TRANSCRIPT_PATH`, defaulting to `tests/phase16_rehearsal_transcript.txt`. The text file contains both recruiter and technical journeys, job description, locally extracted resume text, the actual prompt sent to the interviewer model, each turn's UUID, relative `MM:SS.mmm` audio timestamp, UTC STT/TTS start and finish timestamps, Interviewee partial and final transcript text, the Interviewer response with its role label, and the structured evaluation report. The partial line is currently a simulated interim prefix after final STT returns, not a provider streaming callback. The current rehearsal ends at `PHASE16_TURN_COUNT` (default 2); adaptive semantic ending is not wired into this runner. This transcript is intentionally separate from redacted machine evidence and must be treated as sensitive test output.
 
 The gate also writes redacted `phase16-rehearsal.json`, marker output, progress output when `PHASE16_PROGRESS_LOG=1`, and the test log under `PHASE16_EVIDENCE_DIR`. It must never write credentials, provider tokens, raw audio bytes, or secret configuration values to evidence.
 

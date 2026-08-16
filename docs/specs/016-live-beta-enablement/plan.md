@@ -35,4 +35,7 @@
 - Resume tests use `tests/demo_resume.pdf` and `tests/demo_jobdescription.txt`, plus protected/scanned PDF cases.
 - Benchmark tables report STT/TTS/LLM provider, model, version, device, latency, CPU, memory, tokens, cost, quality, failures, and limitations without sensitive payloads.
 - Evidence must distinguish exercised, skipped, and failed; skipped never passes beta readiness.
+- The readable rehearsal transcript must include source inputs, the actual prompt sent to the interviewer model, UTC STT/TTS start and finish timestamps, each candidate partial/final segment, interviewer responses, and the structured evaluation report.
+- The current rehearsal's partial segment is an interim-prefix simulation after final STT returns. A future streaming STT integration must replace it with provider-emitted partial callbacks and preserve final-segment commit semantics.
+- The current rehearsal ends at `PHASE16_TURN_COUNT` (default 2); adaptive `should_end` completion is a browser/live-interview gate, not yet implemented in this runner.
 - Offline gates are optional contract protection only. Run configured live beta gates and save only redacted metadata and screenshots.

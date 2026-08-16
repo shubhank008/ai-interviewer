@@ -240,12 +240,13 @@ Supported rehearsal parameters:
 | `PHASE16_JOB_FIXTURE` | `tests/demo_jobdescription.txt` | Job-description fixture |
 | `PHASE16_EVIDENCE_DIR` | `.agent_tmp/phase16-gate` | Directory for redacted JSON and marker evidence |
 | `PHASE16_TRANSCRIPT_PATH` | `tests/phase16_rehearsal_transcript.txt` | Full readable turn-by-turn transcript output |
+| `PHASE16_TURN_COUNT` | `2` | Rehearsal turn count, clamped to 1 through 10; the current runner ends at this configured limit |
 | `PHASE16_PROGRESS_LOG` | unset | Set to `1`, `true`, or `yes` for flushed UTC progress checkpoints |
 | `PHASE16_FIREBASE_ID_TOKEN` | unset | Optional real Firebase ID token; without it the backend rehearsal UID is used and token owner-isolation is marked deferred |
 | `PHASE16_REHEARSAL_UID` | `phase16-rehearsal-user` | Internal owner used only when no Firebase ID token is supplied |
 | `STORAGE_BACKEND` | from `.env` | Must be `gcs` for Firebase/GCS beta evidence; `local` is deterministic development mode |
 
-The transcript is plain text and includes relative `MM:SS.mmm` timestamps, turn IDs, partial and final Interviewee/candidate text, and Interviewer responses. It is deliberately separate from redacted JSON evidence because it contains rehearsal conversation content. Do not publish it when the fixture or provider output contains sensitive data.
+The transcript is plain text and includes journey inputs, the actual interviewer prompt, relative `MM:SS.mmm` audio offsets, UTC STT/TTS start and finish timestamps, turn IDs, partial and final Interviewee/candidate text, Interviewer responses, and the structured evaluation report. The current partial line is a rehearsal-simulated interim prefix created after the provider returns; it is not yet a live WhisperX partial callback. The current programmatic runner ends after `PHASE16_TURN_COUNT` turns because no semantic `should_end` response is wired into this rehearsal path. It is deliberately separate from redacted JSON evidence because it contains rehearsal conversation content. Do not publish it when the fixture or provider output contains sensitive data.
 
 The authoritative gate fails closed: missing required live configuration is skipped and cannot establish readiness, a selected provider failure fails its marker, and in-memory providers cannot satisfy production composition. A successful live gate produces `phase16-rehearsal.json`, `markers.log`, `test.log`, and the transcript path above.
 
