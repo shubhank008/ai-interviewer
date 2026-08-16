@@ -1873,6 +1873,188 @@ class PersistenceEdgeCases(unittest.TestCase):
         self.assertIsNone(result)
 
 
+class EndingPolicyEdgeCases(unittest.TestCase):
+    """Behavioral edge cases for InterviewEndingPolicy and AdaptiveEndingProvider."""
+
+    def test_init_rejects_naive_start_time(self) -> None:
+        from interviewer_domain.adapters.ending import InterviewEndingPolicy
+
+        with self.assertRaises(ValueError) as ctx:
+            InterviewEndingPolicy(None, datetime(2027, 1, 1))
+        self.assertIn("timezone-aware", str(ctx.exception))
+
+    def test_init_rejects_non_positive_max_duration(self) -> None:
+        from interviewer_domain.adapters.ending import InterviewEndingPolicy
+
+        with self.assertRaises(ValueError) as ctx:
+            InterviewEndingPolicy(None, datetime(2027, 1, 1, tzinfo=timezone.utc), max_duration=timedelta(0))
+        self.assertIn("positive", str(ctx.exception))
+
+    def test_init_rejects_zero_turn_limit(self) -> None:
+        from interviewer_domain.adapters.ending import InterviewEndingPolicy
+
+        with self.assertRaises(ValueError) as ctx:
+            InterviewEndingPolicy(None, datetime(2027, 1, 1, tzinfo=timezone.utc), max_interviewer_turns=0)
+        self.assertIn("positive", str(ctx.exception))
+
+    def test_evaluate_without_provider_time_limit(self) -> None:
+        from interviewer_domain.adapters.ending import InterviewEndingPolicy
+
+        started = datetime(2027, 1, 1, tzinfo=timezone.utc)
+        policy = InterviewEndingPolicy(None, started, clock=lambda: started + timedelta(minutes=31))
+        decision = policy.evaluate_without_provider(1)
+        self.assertTrue(decision.should_end)
+        self.assertEqual(decision.reason, "time_limit")
+
+    def test_evaluator_reason_continue_mapped_to_llm_decision(self) -> None:
+        from interviewer_domain.adapters.ending import InterviewEndingPolicy
+
+        class _Evaluator:
+            async def evaluate_end(self, answer, token):
+                from interviewer_domain.models import EndDecision
+                return EndDecision(True, "continue", "continuing evaluation")
+
+        started = datetime(2027, 1, 1, tzinfo=timezone.utc)
+        policy = InterviewEndingPolicy(_Evaluator(), started)
+
+        async def call():
+            token = CancellationToken()
+            decision = await policy.evaluate("answer", 1, token)
+            self.assertTrue(decision.should_end)
+            self.assertEqual(decision.reason, "llm_decision")
+            self.assertEqual(decision.rationale, "continuing evaluation")
+
+        asyncio.run(call())
+
+    def test_adaptive_ending_provider_valid_json(self) -> None:
+        from interviewer_domain.adapters.ending import AdaptiveEndingProvider
+
+        class _LLM:
+            async def generate(self, prompt, token):
+                return json.dumps({"should_end": True, "reason": "llm_decision", "rationale": "good answer"})
+
+        provider = AdaptiveEndingProvider(_LLM())
+
+        async def call():
+            token = CancellationToken()
+            decision = await provider.evaluate_end("My answer is solid.", token)
+            self.assertTrue(decision.should_end)
+            self.assertEqual(decision.reason, "llm_decision")
+            self.assertEqual(decision.rationale, "good answer")
+
+        asyncio.run(call())
+
+    def test_adaptive_ending_provider_empty_answer_raises(self) -> None:
+        from interviewer_domain.adapters.ending import AdaptiveEndingProvider
+
+        provider = AdaptiveEndingProvider(type("_LLM", (), {"generate": None})())
+
+        async def call():
+            token = CancellationToken()
+            with self.assertRaises(ProviderError) as ctx:
+                await provider.evaluate_end("  ", token)
+            self.assertEqual(ctx.exception.code, ErrorCode.INVALID_REQUEST)
+
+        asyncio.run(call())
+
+    def test_adaptive_ending_provider_cancelled_token(self) -> None:
+        from interviewer_domain.adapters.ending import AdaptiveEndingProvider
+
+        provider = AdaptiveEndingProvider(type("_LLM", (), {"generate": None})())
+
+        async def call():
+            token = CancellationToken()
+            token.cancel()
+            with self.assertRaises(ProviderError) as ctx:
+                await provider.evaluate_end("answer", token)
+            self.assertEqual(ctx.exception.code, ErrorCode.CANCELLED)
+
+        asyncio.run(call())
+
+    def test_adaptive_ending_provider_malformed_json_raises(self) -> None:
+        from interviewer_domain.adapters.ending import AdaptiveEndingProvider
+
+        class _LLM:
+            async def generate(self, prompt, token):
+                return "not json at all"
+
+        provider = AdaptiveEndingProvider(_LLM())
+
+        async def call():
+            token = CancellationToken()
+            with self.assertRaises(ProviderError) as ctx:
+                await provider.evaluate_end("answer", token)
+            self.assertEqual(ctx.exception.code, ErrorCode.INTERNAL)
+
+        asyncio.run(call())
+
+    def test_adaptive_ending_provider_non_dict_json_raises(self) -> None:
+        from interviewer_domain.adapters.ending import AdaptiveEndingProvider
+
+        class _LLM:
+            async def generate(self, prompt, token):
+                return json.dumps([1, 2, 3])
+
+        provider = AdaptiveEndingProvider(_LLM())
+
+        async def call():
+            token = CancellationToken()
+            with self.assertRaises(ProviderError) as ctx:
+                await provider.evaluate_end("answer", token)
+            self.assertEqual(ctx.exception.code, ErrorCode.INTERNAL)
+
+        asyncio.run(call())
+
+    def test_adaptive_ending_provider_invalid_fields_raises(self) -> None:
+        from interviewer_domain.adapters.ending import AdaptiveEndingProvider
+
+        class _LLM:
+            async def generate(self, prompt, token):
+                return json.dumps({"should_end": "yes", "reason": 123, "rationale": []})
+
+        provider = AdaptiveEndingProvider(_LLM())
+
+        async def call():
+            token = CancellationToken()
+            with self.assertRaises(ProviderError) as ctx:
+                await provider.evaluate_end("answer", token)
+            self.assertEqual(ctx.exception.code, ErrorCode.INTERNAL)
+
+        asyncio.run(call())
+
+
+class EvaluatorEmbeddedJsonEdgeCases(unittest.TestCase):
+    """Behavioral edge cases for evaluator JSON extraction from non-JSON-starting content."""
+
+    def test_evaluate_content_with_embedded_json(self) -> None:
+        from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+        from interviewer_domain.evaluation import InterviewContext
+
+        value = {"score": 70, "dimensions": [{"dimension": "Communication", "assessment": "Clear"}]}
+        content = "Here is the analysis: " + json.dumps(value) + " Hope this helps."
+        transport = MagicMock()
+        transport.complete.return_value = {"choices": [{"message": {"content": content}}]}
+        evaluator = OpenRouterEvaluator(transport, api_key="key", model="gpt-4")
+        context = InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid")
+        transcript = (TranscriptSegment(uuid4(), "candidate", "An answer"),)
+        result = evaluator.evaluate(context, transcript)
+        self.assertEqual(result.score, 70)
+
+    def test_evaluate_content_with_embedded_json_and_surrounding_text(self) -> None:
+        from interviewer_domain.adapters.evaluator import OpenRouterEvaluator
+        from interviewer_domain.evaluation import InterviewContext
+
+        value = {"score": 85, "dimensions": [{"dimension": "Technical", "assessment": "Strong"}]}
+        content = "After careful review, the candidate performed well. " + json.dumps(value) + " End of analysis."
+        transport = MagicMock()
+        transport.complete.return_value = {"choices": [{"message": {"content": content}}]}
+        evaluator = OpenRouterEvaluator(transport, api_key="key", model="gpt-4")
+        context = InterviewContext(InterviewMode.TECHNICAL, "Developer", "senior")
+        transcript = (TranscriptSegment(uuid4(), "candidate", "Answer text"),)
+        result = evaluator.evaluate(context, transcript)
+        self.assertEqual(result.score, 85)
+
+
 # Need httpx import for the sync transport test (it's used in the mock side_effect)
 try:
     import httpx
