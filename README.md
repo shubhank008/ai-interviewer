@@ -386,20 +386,17 @@ Resumes, job descriptions, voice recordings, transcripts, and evaluations may co
 
 ## Roadmap and readiness
 
-Phases 1 through 15 establish product specifications, capability contracts, local PDF/RAG, live voice orchestration, persistence/evaluation boundaries, browser transport, offline acceptance, and concrete opt-in provider transports.
+Phases 1 through 16 establish product specifications, capability contracts, local PDF/RAG, live voice orchestration, persistence/evaluation boundaries, browser transport, offline acceptance, concrete opt-in provider transports, and programmatic live-beta evidence.
 
-Phase 15 is merged, but its real-provider execution checkbox remains incomplete. The latest evidence says OpenRouter, Faster-Whisper, Piper/Kokoro, Firebase, Firestore, storage, and browser audio were skipped because required configuration was absent. The project is therefore **not ready to claim a live production interview**.
-
-Phase 16 must not be closed until it has backend/provider coverage, a clean Docker release candidate, the configured live provider turns, durable artifact and deletion verification, operations procedures, and a scripted live agent-to-agent rehearsal recording provider/model, latency, cost, quality, and limitations.
+Phase 16 has closed the programmatic live-beta evidence gate: the agent-to-agent rehearsal exercises WhisperX, OpenRouter, Kokoro, Firebase Auth/Admin, Firestore, Firebase Storage, and the post-interview evaluator. Browser authentication owner isolation, browser media, and Phase 17 operational release controls remain open.
 
 ## Known limitations
 
-- Full live provider execution and agent-to-agent journeys remain to be exercised with configured deployment accounts.
+- Browser authentication owner isolation, browser media, and production operations remain deferred from the Phase 16 programmatic gate.
 - Password-protected, scanned, or encrypted PDFs require a graceful text-only parser error in Phase 16; OCR is deferred.
 - The initial deployment is a single Docker container; separate worker containers are a roadmap item.
 - Browser audio transport remains selected by the Phase 16 deployment configuration; benchmark evidence must document latency, quality, and limitations.
 - The repository contains no model weights, Firebase credentials, FTP credentials, or production secrets.
-- Phase 15 evidence is not live readiness. A profile must produce an `exercised` result from a deliberate real run.
 
 ## Contributing
 

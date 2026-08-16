@@ -6,7 +6,7 @@ This document tracks the initial implementation roadmap for the voice-native AI 
 
 ## Current status
 
-Phases 0 through 15 provide the provider-independent domain foundation, deterministic offline pipeline, persistence seams, evaluation, API/frontend shell, browser transport seams, and concrete provider adapters. The repository is not yet ready for a live beta. The active program is Live Beta Enablement: one explicit provider set must be composed into a real browser-to-provider vertical slice before any release gate can claim readiness.
+Phases 0 through 15 provide the provider-independent domain foundation, deterministic offline pipeline, persistence seams, evaluation, API/frontend shell, browser transport seams, and concrete provider adapters. Phase 16 has produced programmatic live-beta evidence: the agent-to-agent rehearsal exercises WhisperX, OpenRouter, Kokoro, Firebase Auth/Admin, Firestore, Firebase Storage, and the post-interview evaluator with recorded transcripts. Browser authentication owner isolation, browser media, and production operations remain open gates.
 
 A passing offline test suite proves deterministic code-path behavior only. It does not prove that Firebase, storage, STT, TTS, LLM, WebRTC, browser permissions, deployment configuration, or production observability work together.
 
