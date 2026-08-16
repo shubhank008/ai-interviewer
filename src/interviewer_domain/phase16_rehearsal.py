@@ -158,6 +158,7 @@ class InterviewerAgent:
         job_path: Path,
         interviewee: IntervieweeAgent,
         turn_count: int = 2,
+        clock: Callable[[], datetime] | None = None,
     ) -> tuple[InterviewRecord, tuple[AgentTurn, ...], Evaluation]:
         """Execute one complete provider-backed journey with owned persistence."""
         user_id = await self.providers.auth.validate(self.token)
@@ -173,7 +174,7 @@ class InterviewerAgent:
         context_text = " ".join(chunk.text for chunk in (*resume_chunks, *job_chunks))
         turns: list[AgentTurn] = []
         token = CancellationToken()
-        policy = InterviewEndingPolicy(self.providers.ending, record.created_at)
+        policy = InterviewEndingPolicy(self.providers.ending, record.created_at, clock=clock)
         system_prompt = (
             f"You are the {mode.value} interviewer. Ask one adaptive, evidence-based question at a time. "
             "Evaluate each final candidate answer for suitability; enforce the shared 30-minute and 10-turn limits."

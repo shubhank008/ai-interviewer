@@ -92,7 +92,7 @@ class SessionEngineTests(unittest.TestCase):
         self.assertIn("answer is sufficiently evidenced", engine.session.end_rationale)
         self.assertTrue(any(event.name == "ending.decided" for event in events.events))
         self.assertTrue(any(event.name == "session.completed" for event in events.events))
-        print("[PHASE17] adaptive-ending-ok")
+        print("[END17] llm-directed-ending-ok")
 
     def test_time_limit_uses_injected_clock(self) -> None:
         """The shared policy ends after the configured wall-clock boundary."""
@@ -106,6 +106,7 @@ class SessionEngineTests(unittest.TestCase):
         asyncio.run(engine.start())
         asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"audio")))
         self.assertEqual(engine.session.end_reason, "time_limit")
+        print("[END17] time-limit-ending-ok")
 
     def test_turn_limit_ends_after_current_turn(self) -> None:
         """The shared policy protects the maximum interviewer turn count."""
@@ -115,7 +116,7 @@ class SessionEngineTests(unittest.TestCase):
         asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"audio")))
         self.assertEqual(engine.session.end_reason, "turn_limit")
 
-        print("[PHASE17] adaptive-ending-evidence-ok")
+        print("[END17] turn-limit-ending-ok")
 
     def test_cancellation_is_terminal_without_completion(self) -> None:
         """Cancellation transitions explicitly and never reports completion."""
@@ -128,7 +129,7 @@ class SessionEngineTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, ErrorCode.CANCELLED)
         self.assertEqual(engine.session.status, SessionStatus.CANCELLED.value)
         self.assertNotIn("session.completed", [event.name for event in events.events])
-        print("[ENGINE] cancellation-failure-ok")
+        print("[END17] explicit-stop-ending-ok")
 
     def test_provider_failure_is_terminal(self) -> None:
         """Invalid deterministic input transitions the session to failed."""
@@ -138,7 +139,7 @@ class SessionEngineTests(unittest.TestCase):
             asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"")))
         self.assertEqual(engine.session.status, SessionStatus.FAILED.value)
         self.assertEqual(events.events[-1].name, "session.failed")
-        print("[ENGINE] provider-failure-ok")
+        print("[END17] provider-failure-ending-ok")
 
     def test_planner_rejects_empty_follow_up_context(self) -> None:
         """Follow-up preparation requires substantive current context."""

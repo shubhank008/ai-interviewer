@@ -31,8 +31,8 @@ During an interview, every completed candidate response receives a structured co
 - [x] Vision parsing uses the existing document parser interface and injected OpenRouter transport.
 - [x] Structured parser output is validated, bounded, attributed, and safe on malformed/unavailable responses.
 - [x] `DOCUMENT_LLM_MODEL` defaults to `gemma4`, is documented, and appears in diagnostics/readiness metadata without secrets.
-- [ ] Every completed candidate turn produces a validated end decision.
-- [ ] LLM ending, 30-minute, 10-turn, explicit stop, cancellation, timeout, and provider failure paths are tested.
-- [ ] Phase 16 rehearsal uses the same policy, clock seam, limits, and end-reason evidence as the session engine.
-- [ ] Focused tests, lint/typecheck, and mock-turn gates pass.
-- [ ] Any implementation surprise is recorded in `AGENTS.md` invariants.
+- [x] Every completed candidate turn produces a validated end decision.
+- [x] LLM ending, 30-minute, 10-turn, explicit stop, cancellation, timeout, and provider failure paths are tested.
+- [x] Phase 16 rehearsal uses the same policy, clock seam, limits, and end-reason evidence as the session engine.
+- [x] Focused tests, lint/typecheck, and mock-turn gates pass.
+- [x] Any implementation surprise is recorded in `AGENTS.md` invariants.
