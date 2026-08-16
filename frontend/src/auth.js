@@ -29,14 +29,17 @@ export function configuredAuthProvider(adapter) {
   }
 }
 
-export function firebaseAuthProvider(config) {
+async function defaultFirebaseLoader(config) {
+  const [app, auth] = await Promise.all([import('firebase/app'), import('firebase/auth')])
+  const firebaseApp = app.initializeApp(config)
+  return { auth: auth.getAuth(firebaseApp), ...auth }
+}
+
+export function firebaseAuthProvider(config, loadFn = defaultFirebaseLoader) {
   let initialized
   const load = async () => {
     if (!initialized) {
-      initialized = Promise.all([import('firebase/app'), import('firebase/auth')]).then(([app, auth]) => {
-        const firebaseApp = app.initializeApp(config)
-        return { auth: auth.getAuth(firebaseApp), ...auth }
-      })
+      initialized = loadFn(config)
     }
     return initialized
   }
