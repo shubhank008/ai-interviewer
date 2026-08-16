@@ -28,18 +28,19 @@ The intended post-interview experience includes replayable audio, a timestamped 
 
 ## Status
 
-| Capability | Local path | Configured path | Evidence |
+| Capability | Local path | Live beta path | Evidence |
 |---|---|---|---|
-| Setup, modes, PDF parsing, retrieval | Implemented | Needs application verification | Phase 14 offline |
-| Live voice orchestration | In-memory STT, LLM, TTS | Provider adapters exist | Live run pending |
-| STT | Contract fixture only | WhisperX small on CPU | Live execution pending |
-| TTS | Contract fixture only | Kokoro Python, English, randomized voice | Live execution pending |
-| LLM | Contract fixture only | OpenRouter through `LLM_API_KEY` | Live execution pending |
-| Auth and data | Development fixtures only | Firebase Auth, Firestore, local/NFS storage | Live execution pending |
-| Browser media | Timestamped chunk contract | Browser microphone chunk transport | Live execution pending |
-| Evaluation | Contract evaluator only | OpenRouter post-interview evaluator | Live execution pending |
+| Setup, modes, PDF parsing, retrieval | Implemented | Real demo fixtures exercised | Phase 16 live gate |
+| Live voice orchestration | In-memory contracts | WhisperX small -> OpenRouter -> Kokoro | Phase 16 live gate |
+| STT | Deterministic providers | WhisperX small on CPU | Exercised in Phase 16 |
+| TTS | Deterministic providers | Kokoro English | Exercised in Phase 16 |
+| LLM | Deterministic providers | OpenRouter through `LLM_API_KEY` | Exercised in Phase 16 |
+| Auth and data | Development fixtures | Firebase Admin, Firestore, internal rehearsal UID | Firebase lifecycle exercised; browser token isolation deferred |
+| Storage | Local filesystem | Firebase Storage/GCS via `STORAGE_BACKEND=gcs` | Lifecycle exercised in Phase 16 |
+| Browser media | Deferred transport contract | Not a Phase 16 gate | WebRTC/TURN deferred |
+| Evaluation | Deterministic evaluator | OpenRouter post-interview evaluator | Exercised in Phase 16 |
 
-Requirements are in [`SPEC.md`](SPEC.md), implementation status is in [`PLAN.md`](PLAN.md), and provider operations are in [`docs/provider-readiness.md`](docs/provider-readiness.md).
+Phase 16 is ready for the documented programmatic live beta rehearsal, not yet a production launch. Browser authentication owner isolation, browser media, deployment operations, and Phase 17 release controls remain open. Requirements are in [`SPEC.md`](SPEC.md), implementation status is in [`PLAN.md`](PLAN.md), and provider operations are in [`docs/provider-readiness.md`](docs/provider-readiness.md).
 
 ## How it works
 
@@ -158,7 +159,6 @@ Run the frontend separately or serve its built `frontend/dist` through an HTTPS 
 | GET | `/api/v1/sessions/{id}/{view}` | Retrieve an owned view |
 | POST | `/api/v1/sessions/{id}/complete` | Complete a session |
 | WS | `/ws/v1/sessions/{id}` | Authenticated control channel |
-| WS | `/ws/v1/sessions/{id}/media` | Authenticated microphone frame channel |
 | WS | `/ws/v1/sessions/{id}/signaling` | Authenticated signaling channel |
 
 The FastAPI composition root targets the Phase 16 live beta configuration: Firebase email/password and Google Sign-In Auth, Firestore, Firebase Storage with local/NFS checks, WhisperX small on CPU, OpenRouter through `LLM_API_KEY`, and Kokoro. The single Docker container is the initial self-hosted/Railway benchmark target. Offline tests protect contracts only; live composition and agent-to-agent rehearsal are required before beta readiness.
@@ -216,9 +216,147 @@ export PYTHONPATH="$PWD/src"
 
 The live runner must use safe beta accounts and fixtures, exercise both recruiter and technical journeys, switch storage adapters, execute negative cases, and emit the required markers without credentials, personal data, raw provider payloads, transcript text, resume text, or audio bytes.
 
+### Phase 16 live beta rehearsal
+
+Phase 16 is live-usable for the documented **programmatic beta rehearsal** when the authoritative gate passes with the selected live providers. It intentionally does not claim browser microphone, WebRTC, TURN, Firebase browser-token owner isolation, or production operations readiness. Those remain separate release gates.
+
+The rehearsal uses the real fixtures `tests/demo_resume.pdf` and `tests/demo_jobdescription.txt`, creates both recruiter and technical journeys, and runs an `InterviewerAgent` and `IntervieweeAgent` through WhisperX, OpenRouter, Kokoro, Firestore, and Firebase Storage. Candidate audio is exchanged as timestamped in-memory buffers; browser/WebRTC/TURN are not required.
+
+```bash
+# Load the repository .env without replacing already-exported variables.
+set -a; . ./.env; set +a
+export PYTHONPATH="$PWD/src"
+PHASE16_PROGRESS_LOG=1 \
+PHASE16_EVIDENCE_DIR=.agent_tmp/phase16-gate \
+PHASE16_TRANSCRIPT_PATH=tests/phase16_rehearsal_transcript.txt \
+./scripts/test_phase16.sh
+```
+
+Supported rehearsal parameters:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PHASE16_RESUME_FIXTURE` | `tests/demo_resume.pdf` | Text-based PDF fixture used by both journeys |
+| `PHASE16_JOB_FIXTURE` | `tests/demo_jobdescription.txt` | Job-description fixture |
+| `PHASE16_EVIDENCE_DIR` | `.agent_tmp/phase16-gate` | Directory for redacted JSON and marker evidence |
+| `PHASE16_TRANSCRIPT_PATH` | `tests/phase16_rehearsal_transcript.txt` | Full readable turn-by-turn transcript output |
+| `PHASE16_TURN_COUNT` | `2` | Rehearsal turn count, clamped to 1 through 10; the current runner ends at this configured limit |
+| `PHASE16_PROGRESS_LOG` | unset | Set to `1`, `true`, or `yes` for flushed UTC progress checkpoints |
+| `PHASE16_FIREBASE_ID_TOKEN` | unset | Optional real Firebase ID token; without it the backend rehearsal UID is used and token owner-isolation is marked deferred |
+| `PHASE16_REHEARSAL_UID` | `phase16-rehearsal-user` | Internal owner used only when no Firebase ID token is supplied |
+| `STORAGE_BACKEND` | from `.env` | Must be `gcs` for Firebase/GCS beta evidence; `local` is deterministic development mode |
+
+The transcript is plain text and includes journey inputs, the actual interviewer prompt, relative `MM:SS.mmm` audio offsets, UTC STT/TTS start and finish timestamps, turn IDs, partial and final Interviewee/candidate text, Interviewer responses, and the structured evaluation report. The current partial line is a rehearsal-simulated interim prefix created after the provider returns; it is not yet a live WhisperX partial callback. The current programmatic runner ends after `PHASE16_TURN_COUNT` turns because no semantic `should_end` response is wired into this rehearsal path. It is deliberately separate from redacted JSON evidence because it contains rehearsal conversation content. Do not publish it when the fixture or provider output contains sensitive data.
+
+The authoritative gate fails closed: missing required live configuration is skipped and cannot establish readiness, a selected provider failure fails its marker, and in-memory providers cannot satisfy production composition. A successful live gate produces `phase16-rehearsal.json`, `markers.log`, `test.log`, and the transcript path above.
+
+### Phase 16 full-cycle diagram
+
+```mermaid
+flowchart TD
+    ENV[.env and locked provider tuple] --> COMPOSE[Production-shaped composition]
+    COMPOSE --> AUTH[Auth validation]
+    AUTH --> SETUP[Load PDF and job description]
+    SETUP --> RAG[Parse and retrieve role context]
+    RAG --> EE[Interviewee Agent timestamped audio buffers]
+    EE --> STT[WhisperX small STT]
+    STT --> TRANSCRIPT[Partial and final transcript segments]
+    TRANSCRIPT --> LLM[OpenRouter Interviewer response]
+    LLM --> TTS[Kokoro English synthesis]
+    TTS --> AUDIO[Timestamped agent audio and Firebase Storage]
+    LLM --> NEXT[Next adaptive turn]
+    NEXT --> EE
+    TRANSCRIPT --> FS[Firestore transcript/events]
+    AUDIO --> COMPLETE[Completion and replay artifact]
+    FS --> COMPLETE
+    COMPLETE --> EVAL[OpenRouter post-interview evaluation]
+    EVAL --> RESULTS[Score, summary, strengths, gaps]
+    RESULTS --> RETAIN[Retention scheduler]
+    RETAIN --> DELETE[Owner deletion removes Firestore and Storage data]
+```
+
+### Firestore ERD
+
+The application uses owner-scoped document paths and repeats `ownerId` in documents so authorization checks do not depend on collection traversal.
+
+```mermaid
+erDiagram
+    USER ||--o{ INTERVIEW : owns
+    INTERVIEW ||--o{ EVENT : contains
+    INTERVIEW ||--o{ TRANSCRIPT_SEGMENT : contains
+    INTERVIEW ||--o{ DOCUMENT_REFERENCE : references
+    INTERVIEW ||--|| RECORDING : produces
+    INTERVIEW ||--|| EVALUATION : produces
+    USER {
+        string uid PK
+        timestamp createdAt
+        timestamp deletedAt
+    }
+    INTERVIEW {
+        string interviewId PK
+        string ownerId FK
+        string mode
+        string status
+        timestamp createdAt
+        timestamp expiresAt
+    }
+    EVENT {
+        string eventId PK
+        string interviewId FK
+        int sequence
+        string type
+        timestamp createdAt
+    }
+    TRANSCRIPT_SEGMENT {
+        string segmentId PK
+        string interviewId FK
+        string role
+        boolean isFinal
+        int startMs
+        int endMs
+        string text
+    }
+    DOCUMENT_REFERENCE {
+        string documentId PK
+        string interviewId FK
+        string storageKey
+        string contentType
+    }
+    RECORDING {
+        string interviewId PK
+        string storageKey
+        string contentType
+        timestamp createdAt
+    }
+    EVALUATION {
+        string interviewId PK
+        string rubricVersion
+        int score
+        string summary
+        timestamp createdAt
+    }
+```
+
+Recommended Firestore paths are `users/{uid}`, `users/{uid}/interviews/{interviewId}`, and interview subcollections `events`, `transcripts`, and `documents`; recording and evaluation are interview-owned documents. Exact adapter field serialization remains the source of truth.
+
+### Firebase Storage layout
+
+```text
+users/{uid}/interviews/{interviewId}/
+├── resume.pdf
+├── job-description.txt                 # optional persisted setup artifact
+├── turn-0000.pcm                       # provider-normalized turn audio
+├── turn-0001.pcm
+├── combined.pcm                        # replay recording
+├── transcript.json                     # optional export
+└── evaluation.json                     # optional export
+```
+
+Every key is owner- and interview-scoped. Retention deletes expired objects, and interview/account deletion removes the complete prefix. The beta selects the Firebase bucket with `STORAGE_BACKEND=gcs` and `STORAGE_BUCKET`; local filesystem storage is only for development and deterministic checks.
+
 ## Production deployment
 
-Production is not yet a supported one-command deployment. Before accepting real candidate data:
+The programmatic live beta rehearsal is supported by the documented gate. This is not yet a production launch approval. Before accepting real candidate data:
 
 1. Implement Firebase email/password and Google Sign-In signup/login, open signup, session restoration, server-side ID-token verification, and remove `dev-token` from the production path.
 2. Compose Firebase Auth, EU Firestore, Firebase Storage plus local/NFS, WhisperX small, OpenRouter, and Kokoro in one Docker container for the beta benchmark.
@@ -248,20 +386,17 @@ Resumes, job descriptions, voice recordings, transcripts, and evaluations may co
 
 ## Roadmap and readiness
 
-Phases 1 through 15 establish product specifications, capability contracts, local PDF/RAG, live voice orchestration, persistence/evaluation boundaries, browser transport, offline acceptance, and concrete opt-in provider transports.
+Phases 1 through 16 establish product specifications, capability contracts, local PDF/RAG, live voice orchestration, persistence/evaluation boundaries, browser transport, offline acceptance, concrete opt-in provider transports, and programmatic live-beta evidence.
 
-Phase 15 is merged, but its real-provider execution checkbox remains incomplete. The latest evidence says OpenRouter, Faster-Whisper, Piper/Kokoro, Firebase, Firestore, storage, and browser audio were skipped because required configuration was absent. The project is therefore **not ready to claim a live production interview**.
-
-Phase 16 must not be closed until it has backend/provider coverage, a clean Docker release candidate, the configured live provider turns, durable artifact and deletion verification, operations procedures, and a scripted live agent-to-agent rehearsal recording provider/model, latency, cost, quality, and limitations.
+Phase 16 has closed the programmatic live-beta evidence gate: the agent-to-agent rehearsal exercises WhisperX, OpenRouter, Kokoro, Firebase Auth/Admin, Firestore, Firebase Storage, and the post-interview evaluator. Browser authentication owner isolation, browser media, and Phase 17 operational release controls remain open.
 
 ## Known limitations
 
-- Full live provider execution and agent-to-agent journeys remain to be exercised with configured deployment accounts.
+- Browser authentication owner isolation, browser media, and production operations remain deferred from the Phase 16 programmatic gate.
 - Password-protected, scanned, or encrypted PDFs require a graceful text-only parser error in Phase 16; OCR is deferred.
 - The initial deployment is a single Docker container; separate worker containers are a roadmap item.
 - Browser audio transport remains selected by the Phase 16 deployment configuration; benchmark evidence must document latency, quality, and limitations.
 - The repository contains no model weights, Firebase credentials, FTP credentials, or production secrets.
-- Phase 15 evidence is not live readiness. A profile must produce an `exercised` result from a deliberate real run.
 
 ## Contributing
 

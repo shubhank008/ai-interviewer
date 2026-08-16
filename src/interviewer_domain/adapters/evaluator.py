@@ -44,7 +44,32 @@ class OpenRouterEvaluator(Evaluator):
         try:
             response = self.transport.complete(payload, self.api_key)
             content = response["choices"][0]["message"]["content"]
-            value = json.loads(content) if isinstance(content, str) else content
+            if isinstance(content, list):
+                content = "".join(
+                    str(part.get("text", "")) if isinstance(part, dict) else str(part)
+                    for part in content
+                )
+            if isinstance(content, str):
+                candidate = content.strip()
+                if candidate.startswith("```"):
+                    candidate = candidate.removeprefix("```").removeprefix("json").removesuffix("```").strip()
+                if not candidate.startswith("{"):
+                    start = candidate.find("{")
+                    if start >= 0:
+                        depth = 0
+                        end = start
+                        for i in range(start, len(candidate)):
+                            if candidate[i] == "{":
+                                depth += 1
+                            elif candidate[i] == "}":
+                                depth -= 1
+                            if depth == 0:
+                                end = i
+                                break
+                        candidate = candidate[start : end + 1]
+                value = json.loads(candidate)
+            else:
+                value = content
             return self._normalize(value, context, transcript)
         except ProviderError:
             raise

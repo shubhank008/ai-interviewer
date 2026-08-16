@@ -92,7 +92,7 @@ The local deterministic browser profile may use in-memory providers, but it must
 
 ### 2.7 Phase 12 implementation status
 
-The React frontend now provides a protected, responsive application shell, deterministic local identity journey, setup validation, PDF selection and progress/error surfaces, live interview control states, history and feedback states, and a provider-neutral configured-auth seam. The local journey is verified with behavior tests and browser frames. Firebase configuration, real upload persistence, microphone/WebRTC/WebSocket media, replay, and completed evaluation retrieval remain deployment or subsequent integration work and are not claimed by local evidence.
+The React frontend now provides a protected, responsive application shell, deterministic local identity journey, setup validation, PDF selection and progress/error surfaces, live interview control states, history and feedback states, and a provider-neutral configured-auth seam. The local journey is verified with behavior tests and browser frames. Firebase Auth, Firestore, Storage, and post-interview evaluation are now exercised through the Phase 16 programmatic live gate; browser media (microphone/WebRTC/WebSocket) and Firebase browser-token owner isolation remain deferred.
 
 ### 2.8 Phase 13 implementation status
 
@@ -519,7 +519,17 @@ These diagrams describe the beta execution boundary. Deterministic local provide
 The project has three explicit evidence levels:
 
 1. Contract readiness: interfaces and deterministic tests.
-2. Provider readiness: real configured provider operation through the adapter.
-3. Beta readiness: a real browser user completes the entire flow and receives durable results.
+2. Provider readiness: real configured provider operation through the adapter, including the programmatic Interviewer-Agent/Interviewee-Agent rehearsal.
+3. Browser production readiness: a real browser user completes the entire flow and receives durable results through Firebase browser authentication and browser media.
 
-Only level 3 can close Live Beta Enablement.
+Level 2 closes the Phase 16 programmatic live-beta evidence gate. Level 3 remains a subsequent browser and operational release gate and is not required for the Phase 16 agent-to-agent rehearsal because browser/WebRTC/TURN are explicitly deferred.
+
+The current resume path validates the PDF signature and size, extracts text operators locally with `LocalDocumentParser`, marks extracted chunks as untrusted source text, and sends bounded extracted context to the interviewer/evaluator path. It does not run OCR, does not upload the raw PDF to the LLM for opaque parsing, and fails safely when no text is extractable. OCR is a future adapter requirement for scanned resumes.
+
+### 10.7 Rehearsal transcript and evidence artifacts
+
+Every successful live rehearsal must write a readable transcript to `PHASE16_TRANSCRIPT_PATH`, defaulting to `tests/phase16_rehearsal_transcript.txt`. The text file contains both recruiter and technical journeys, job description, locally extracted resume text, the actual prompt sent to the interviewer model, each turn's UUID, relative `MM:SS.mmm` audio timestamp, UTC STT/TTS start and finish timestamps, Interviewee partial and final transcript text, the Interviewer response with its role label, and the structured evaluation report. The partial line is currently a simulated interim prefix after final STT returns, not a provider streaming callback. The current rehearsal ends at `PHASE16_TURN_COUNT` (default 2); adaptive semantic ending is not wired into this runner. This transcript is intentionally separate from redacted machine evidence and must be treated as sensitive test output.
+
+The gate also writes redacted `phase16-rehearsal.json`, marker output, progress output when `PHASE16_PROGRESS_LOG=1`, and the test log under `PHASE16_EVIDENCE_DIR`. It must never write credentials, provider tokens, raw audio bytes, or secret configuration values to evidence.
+
+The Phase 16 cycle and storage/datastore ERDs are maintained in the README because they are operational runbook diagrams; their paths and field ownership must remain consistent with the provider adapters and this specification.

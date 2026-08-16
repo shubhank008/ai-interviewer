@@ -212,7 +212,13 @@ class InterviewApplication:
                     raise RuntimeError(f"S3 storage backend requires boto3: {exc}") from exc
             elif settings.storage_backend == "gcs":
                 assert settings.storage_bucket is not None
-                storage = S3CompatibleStorage(FirebaseStorageBackend(settings.storage_bucket))
+                storage = S3CompatibleStorage(
+                    FirebaseStorageBackend(
+                        settings.storage_bucket,
+                        settings.firebase_credentials_path,
+                        settings.firebase_project_id,
+                    )
+                )
             else:
                 raise RuntimeError(f"unsupported STORAGE_BACKEND: {settings.storage_backend}")
             self.persistence = PersistenceService(

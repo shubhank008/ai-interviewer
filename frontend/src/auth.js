@@ -22,9 +22,62 @@ export function configuredAuthProvider(adapter) {
   if (!adapter) return null
   return {
     restore: () => adapter.restore(),
-    signIn: email => adapter.signIn(email),
-    signUp: email => adapter.signUp(email),
+    signIn: (email, password) => adapter.signIn(email, password),
+    signUp: (email, password) => adapter.signUp(email, password),
+    ...(adapter.signInWithGoogle ? { signInWithGoogle: () => adapter.signInWithGoogle() } : {}),
     signOut: () => adapter.signOut(),
+  }
+}
+
+async function defaultFirebaseLoader(config) {
+  const [app, auth] = await Promise.all([import('firebase/app'), import('firebase/auth')])
+  const firebaseApp = app.initializeApp(config)
+  return { auth: auth.getAuth(firebaseApp), ...auth }
+}
+
+export function firebaseAuthProvider(config, loadFn = defaultFirebaseLoader) {
+  let initialized
+  const load = async () => {
+    if (!initialized) {
+      initialized = loadFn(config)
+    }
+    return initialized
+  }
+  const normalize = async user => user ? ({
+    uid: user.uid,
+    email: user.email || '',
+    provider: 'firebase',
+    token: await user.getIdToken(),
+  }) : null
+  return {
+    async restore() {
+      const { auth, onAuthStateChanged } = await load()
+      return new Promise((resolve, reject) => {
+        const unsubscribe = onAuthStateChanged(auth, user => {
+          unsubscribe()
+          normalize(user).then(resolve, reject)
+        }, reject)
+      })
+    },
+    async signIn(email, password) {
+      const { auth, signInWithEmailAndPassword } = await load()
+      const result = await signInWithEmailAndPassword(auth, email.trim(), password)
+      return normalize(result.user)
+    },
+    async signUp(email, password) {
+      const { auth, createUserWithEmailAndPassword } = await load()
+      const result = await createUserWithEmailAndPassword(auth, email.trim(), password)
+      return normalize(result.user)
+    },
+    async signInWithGoogle() {
+      const { auth, GoogleAuthProvider, signInWithPopup } = await load()
+      const result = await signInWithPopup(auth, new GoogleAuthProvider())
+      return normalize(result.user)
+    },
+    async signOut() {
+      const { auth, signOut } = await load()
+      return signOut(auth)
+    },
   }
 }
 

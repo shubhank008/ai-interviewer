@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping, Protocol
@@ -81,7 +83,7 @@ class RehearsalProviders:
 
 @dataclass(frozen=True, slots=True)
 class AgentTurn:
-    """Redacted lifecycle result for one candidate turn."""
+    """Full lifecycle result for one candidate turn and provider timings."""
 
     turn_id: UUID
     buffers: tuple[TimestampedAudioBuffer, ...]
@@ -89,6 +91,23 @@ class AgentTurn:
     final: TranscriptSegment
     interviewer_text: str
     interviewer_audio_bytes: int
+    system_prompt: str
+    user_prompt: str
+    stt_started_at: str
+    stt_finished_at: str
+    tts_started_at: str
+    tts_finished_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class JourneyTranscript:
+    """Readable transcript inputs retained for one complete rehearsal journey."""
+
+    mode: InterviewMode
+    resume_text: str
+    job_description: str
+    turns: tuple[AgentTurn, ...]
+    evaluation: Evaluation
 
 
 class IntervieweeAgent:
@@ -149,21 +168,35 @@ class InterviewerAgent:
         context_text = " ".join(chunk.text for chunk in (*resume_chunks, *job_chunks))
         turns: list[AgentTurn] = []
         token = CancellationToken()
+        system_prompt = (
+            f"You are the {mode.value} interviewer. Ask one adaptive, evidence-based question at a time. "
+            "Do not end the interview unless the configured rehearsal turn limit is reached."
+        )
         for sequence in range(turn_count):
             buffers = interviewee.buffers(sequence)
             audio = b"".join(buffer.audio for buffer in buffers)
             turn_id = uuid4()
+            stt_started_at = datetime.now(timezone.utc).isoformat(timespec="microseconds")
             final = await self.providers.stt.transcribe(audio, turn_id, token)
+            stt_finished_at = datetime.now(timezone.utc).isoformat(timespec="microseconds")
             partial_text = final.text[: max(1, len(final.text) // 2)]
             partial = TranscriptSegment(turn_id, "candidate", partial_text, False, buffers[0].start_ms, buffers[-1].start_ms + buffers[-1].duration_ms)
             final = TranscriptSegment(turn_id, "candidate", final.text, True, partial.start_ms, partial.end_ms)
             self.providers.data.save_transcript(user_id, record.id, partial)
             self.providers.data.save_transcript(user_id, record.id, final)
-            prompt = f"Ask the next {mode.value} interview question using this context: {context_text[:2000]} Answer evidence: {final.text}"
-            interviewer_text = await self.providers.llm.generate(prompt, token)
+            user_prompt = f"{system_prompt} Context: {context_text[:2000]} Answer evidence: {final.text}"
+            interviewer_text = await self.providers.llm.generate(user_prompt, token)
+            tts_started_at = datetime.now(timezone.utc).isoformat(timespec="microseconds")
             interviewer_audio = await self.providers.tts.synthesize(interviewer_text, token)
+            tts_finished_at = datetime.now(timezone.utc).isoformat(timespec="microseconds")
             self.providers.storage.put(prefix + f"turn-{sequence}.pcm", interviewer_audio, "audio/pcm;rate=24000;channels=1")
-            turns.append(AgentTurn(turn_id, buffers, partial, final, interviewer_text, len(interviewer_audio)))
+            turns.append(
+                AgentTurn(
+                    turn_id, buffers, partial, final, interviewer_text, len(interviewer_audio),
+                    system_prompt, user_prompt, stt_started_at, stt_finished_at,
+                    tts_started_at, tts_finished_at,
+                )
+            )
         completed = InterviewRecord(record.user_id, record.mode, record.id, record.created_at, record.expires_at, "completed")
         self.providers.data.save_interview(completed)
         recording_key = prefix + "combined.pcm"
@@ -320,6 +353,75 @@ def write_rehearsal_evidence(path: str | Path, results: tuple[RehearsalResult, .
     return output
 
 
+
+def _relative_timestamp(milliseconds: int | None) -> str:
+    """Format a rehearsal-relative millisecond offset for transcript readers."""
+    if milliseconds is None:
+        return "00:00.000"
+    seconds, remainder = divmod(milliseconds, 1000)
+    minutes, seconds = divmod(seconds, 60)
+    return f"{minutes:02d}:{seconds:02d}.{remainder:03d}"
+
+
+def write_rehearsal_transcript(
+    path: str | Path,
+    journeys: tuple[JourneyTranscript, ...],
+) -> Path:
+    """Write full conversation, inputs, prompts, timings, and evaluation reports."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "Phase 16 live beta rehearsal transcript",
+        "Timestamps are UTC provider timestamps; audio offsets are relative per journey.",
+        "Partial lines are the rehearsal's simulated interim STT result; final lines are the committed STT result.",
+        "",
+    ]
+    for journey in journeys:
+        lines.extend(
+            (
+                f"=== {journey.mode.value.upper()} INTERVIEW ===",
+                "--- JOB DESCRIPTION ---",
+                journey.job_description,
+                "--- RESUME TEXT EXTRACTED LOCALLY ---",
+                journey.resume_text,
+                "--- SYSTEM PROMPT ---",
+                journey.turns[0].system_prompt if journey.turns else "(no turns)",
+                "--- TURNS ---",
+                "",
+            )
+        )
+        for number, turn in enumerate(journey.turns, start=1):
+            candidate = turn.final
+            lines.extend(
+                (
+                    f"[turn {number} | {candidate.turn_id} | audio {_relative_timestamp(candidate.start_ms)}]",
+                    f"STT start (UTC): {turn.stt_started_at}",
+                    f"STT finish (UTC): {turn.stt_finished_at}",
+                    f"Interviewee / candidate (partial): {turn.partial.text}",
+                    f"Interviewee / candidate (final): {candidate.text}",
+                    f"Prompt sent to interviewer LLM: {turn.user_prompt}",
+                    f"TTS start (UTC): {turn.tts_started_at}",
+                    f"TTS finish (UTC): {turn.tts_finished_at}",
+                    f"Interviewer / {journey.mode.value}: {turn.interviewer_text}",
+                    "",
+                )
+            )
+        evaluation = journey.evaluation
+        lines.extend(
+            (
+                "--- EVALUATION REPORT ---",
+                f"Score: {evaluation.score}",
+                f"Rubric version: {evaluation.rubric_version}",
+                f"Summary: {evaluation.summary}",
+                f"Strengths: {'; '.join(evaluation.strengths)}",
+                f"Weaknesses: {'; '.join(evaluation.weaknesses)}",
+                f"Recommendations: {'; '.join(evaluation.recommendations)}",
+                "",
+            )
+        )
+    target.write_text("\n".join(lines), encoding="utf-8")
+    return target
+
 class InternalRehearsalAuth:
     """Provide a stable backend-only owner when Firebase signup is unavailable."""
 
@@ -380,7 +482,13 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
         if settings.storage_backend == "local":
             storage = LocalFilesystemStorage(settings.storage_path)
         elif settings.storage_backend == "gcs":
-            storage = S3CompatibleStorage(FirebaseStorageBackend(settings.storage_bucket))
+            storage = S3CompatibleStorage(
+                FirebaseStorageBackend(
+                    settings.storage_bucket,
+                    credentials,
+                    project,
+                )
+            )
         else:
             raise ValueError("Phase 16 storage must be STORAGE_BACKEND=local or gcs")
         stt = WhisperXSTT(
@@ -403,37 +511,73 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
         auth_mode,
     )
 
+def _progress(environ: Mapping[str, str], message: str) -> None:
+    """Emit a flushed, redacted checkpoint when live progress logging is enabled."""
+    if environ.get("PHASE16_PROGRESS_LOG", "").lower() in {"1", "true", "yes"}:
+        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        print(f"[BETA16-PROGRESS] {timestamp} {message}", file=sys.stderr, flush=True)
+
+
 
 async def _run_live_journey(
-    composition: LivePhase16Composition, mode: InterviewMode, resume: Path, job: Path
-) -> tuple[InterviewRecord, tuple[AgentTurn, ...]]:
+    composition: LivePhase16Composition,
+    mode: InterviewMode,
+    resume: Path,
+    job: Path,
+    environ: Mapping[str, str],
+) -> tuple[InterviewRecord, tuple[AgentTurn, ...], Evaluation]:
     """Run one real agent journey, generating candidate audio through Kokoro."""
+    _progress(environ, f"journey={mode.value} tts=start")
     candidate_audio = await composition.providers.tts.synthesize(
         "Hello, I am excited to discuss my experience. I led a measurable project, explained the technical tradeoffs, collaborated with the team, and delivered a clear result for the customer.",
         CancellationToken(),
     )
+    _progress(environ, f"journey={mode.value} tts=complete")
     interviewer = InterviewerAgent(composition.providers, composition.token)
-    record, turns, _ = await interviewer.run(
-        mode, resume, job, IntervieweeAgent((candidate_audio,)), turn_count=2
+    _progress(environ, f"journey={mode.value} interviewer-run=start")
+    try:
+        turn_count = max(1, min(10, int(environ.get("PHASE16_TURN_COUNT", "2"))))
+    except ValueError as exc:
+        raise ValueError("PHASE16_TURN_COUNT must be an integer from 1 through 10") from exc
+    record, turns, evaluation = await interviewer.run(
+        mode, resume, job, IntervieweeAgent((candidate_audio,)), turn_count=turn_count
     )
+    _progress(environ, f"journey={mode.value} interviewer-run=complete turns={len(turns)}")
     _validate_audio_buffers(tuple(buffer for turn in turns for buffer in turn.buffers))
+    _progress(environ, f"journey={mode.value} audio-validation=complete")
     await interviewer.delete(record)
-    return record, turns
+    _progress(environ, f"journey={mode.value} lifecycle=complete")
+    return record, turns, evaluation
 
 
-async def _execute_live(composition: LivePhase16Composition, resume: Path, job: Path) -> dict[str, str]:
+async def _execute_live(
+    composition: LivePhase16Composition,
+    resume: Path,
+    job: Path,
+    environ: Mapping[str, str],
+) -> tuple[dict[str, str], tuple[JourneyTranscript, ...]]:
     """Exercise every selected live capability and both required agent journeys."""
     completed: dict[str, str] = {}
+    journeys: list[JourneyTranscript] = []
+    _progress(environ, "auth-validation=start")
     auth_user = await composition.providers.auth.validate(composition.token)
+    _progress(environ, "auth-validation=complete")
     if not auth_user:
         raise RuntimeError("rehearsal authentication returned an empty UID")
     if composition.auth_mode == "firebase":
         completed["firebase-auth-owner-isolation-ok"] = "Firebase Admin token verification and UID ownership succeeded"
     journey_buffer_count = 0
+    resume_text = " ".join(
+        chunk.text for chunk in composition.providers.parser.parse(resume.read_bytes(), "application/pdf", "resume")
+    )
+    job_description = job.read_text(encoding="utf-8", errors="replace")
     for mode, marker in ((InterviewMode.RECRUITER, "agent-recruiter-journey-ok"), (InterviewMode.TECHNICAL, "agent-technical-journey-ok")):
-        _, turns = await _run_live_journey(composition, mode, resume, job)
+        _progress(environ, f"journey={mode.value} start")
+        _, turns, evaluation = await _run_live_journey(composition, mode, resume, job, environ)
+        journeys.append(JourneyTranscript(mode, resume_text, job_description, turns, evaluation))
         journey_buffer_count += sum(len(turn.buffers) for turn in turns)
         completed[marker] = f"{mode.value} InterviewerAgent and IntervieweeAgent journey completed"
+        _progress(environ, f"journey={mode.value} complete buffers={journey_buffer_count}")
     completed["agent-audio-transport-ok"] = (
         f"live timestamped audio buffers exercised; count={journey_buffer_count}; "
         "sequence=contiguous; timestamps=ordered-non-overlapping"
@@ -441,17 +585,25 @@ async def _execute_live(composition: LivePhase16Composition, resume: Path, job: 
     for marker in ("composition-production-ok", "firestore-session-lifecycle-ok", "resume-rag-context-ok", "stt-partial-final-timestamps-ok", "llm-interviewer-stream-ok", "kokoro-audio-playback-ok", "transcript-recording-persisted-ok", "llm-evaluation-score-ok", "retention-deletion-ok", "beta-evidence-redacted-ok"):
         completed[marker] = "live provider operation exercised"
     completed["storage-local-lifecycle-ok" if composition.storage_backend == "local" else "storage-firebase-lifecycle-ok"] = "selected storage lifecycle exercised"
-    return completed
+    return completed, tuple(journeys)
 
 
 def run_live_rehearsal(environ: Mapping[str, str], resume: Path, job: Path) -> tuple[RehearsalResult, ...]:
     """Execute live providers and convert safe failures into redacted marker results."""
     try:
+        _progress(environ, "composition-build=start")
         composition = build_live_composition(environ)
+        _progress(environ, "composition-build=complete")
         import asyncio
-        completed = asyncio.run(_execute_live(composition, resume, job))
+        _progress(environ, "live-execution=start")
+        completed, journeys = asyncio.run(_execute_live(composition, resume, job, environ))
+        transcript_path = environ.get("PHASE16_TRANSCRIPT_PATH", "tests/phase16_rehearsal_transcript.txt")
+        write_rehearsal_transcript(transcript_path, journeys)
+        _progress(environ, f"transcript-written path={transcript_path}")
+        _progress(environ, "live-execution=complete")
         error: str | None = None
     except Exception as exc:
+        _progress(environ, f"live-execution=failed error={exc.__class__.__name__}")
         completed = {}
         error = str(exc) or exc.__class__.__name__
     results: list[RehearsalResult] = []

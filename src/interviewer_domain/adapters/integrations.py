@@ -439,13 +439,35 @@ class Boto3ObjectBackend:
 class FirebaseStorageBackend:
     """Adapt Firebase Storage through the official Admin SDK bucket API."""
 
-    def __init__(self, bucket_name: str | None = None) -> None:
+    def __init__(
+        self,
+        bucket_name: str | None = None,
+        credential_path: str | None = None,
+        project_id: str | None = None,
+    ) -> None:
         try:
-            from firebase_admin import storage  # type: ignore[import-not-found]
+            import firebase_admin  # type: ignore[import-not-found,import-untyped]
+            from firebase_admin import credentials, storage  # type: ignore[import-not-found]
         except ImportError as exc:
             raise IntegrationSkipped("firebase-admin package is not installed") from exc
         try:
-            self.bucket = storage.bucket(bucket_name)
+            if not credential_path and not project_id:
+                raise IntegrationSkipped("Firebase Storage requires credentials or project ID")
+            options = {"projectId": project_id} if project_id else None
+            credential = (
+                credentials.Certificate(credential_path)
+                if credential_path
+                else credentials.ApplicationDefault()
+            )
+            app_name = "phase16-storage"
+            try:
+                app = firebase_admin.get_app(app_name)
+            except ValueError:
+                app = firebase_admin.initialize_app(credential, options, name=app_name)
+            normalized_bucket = bucket_name.removeprefix("gs://") if bucket_name else None
+            self.bucket = storage.bucket(normalized_bucket, app=app)
+        except IntegrationSkipped:
+            raise
         except Exception as exc:
             raise ProviderError(ErrorCode.UNAVAILABLE, "Firebase Storage setup failed") from exc
 

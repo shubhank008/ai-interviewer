@@ -3,16 +3,24 @@ import { createRoot } from 'react-dom/client'
 import { createSessionRequest, historyRequest, sessionWebSocketUrl, setupValidation } from './api.js'
 import { createMediaTransport } from './media.js'
 import { createSessionTransport } from './transport.js'
-import { localAuthProvider } from './auth.js'
+import { firebaseAuthProvider, localAuthProvider } from './auth.js'
 import { ActiveView, AuthScreen, HistoryView, ResultsView, SetupView, Shell } from './ui.jsx'
 import './style.css'
 
-const auth = localAuthProvider()
-const token = 'dev-token'
+const production = import.meta.env.PROD
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+}
+const configuredForFirebase = Object.values(firebaseConfig).every(Boolean)
+if (production && !configuredForFirebase) throw new Error('Firebase web authentication is not configured')
+const auth = production || configuredForFirebase ? firebaseAuthProvider(firebaseConfig) : localAuthProvider()
 const client = { validate: setupValidation, create: (mode, authToken) => createSessionRequest(mode, authToken) }
 
 export function App({ authProvider = auth, fetcher = fetch }) {
   const [user, setUser] = useState(undefined)
+  const token = user?.token || (production ? '' : 'dev-token')
   const [view, setView] = useState('setup')
   const [session, setSession] = useState(null)
   const [history, setHistory] = useState([])
@@ -22,7 +30,7 @@ export function App({ authProvider = auth, fetcher = fetch }) {
   useEffect(() => { const setup = () => setView('setup'); window.addEventListener('go-setup', setup); return () => window.removeEventListener('go-setup', setup) }, [])
   async function loadHistory() { setLoading(true); try { const request = historyRequest(token); const response = await fetcher(request.url, request.init); if (!response.ok) throw new Error('history'); const data = await response.json(); setHistory(data.payload?.interviews || []); setView('history') } catch { setHistory([]); setView('history') } finally { setLoading(false) } }
   function deleteInterview(id) { setHistory(current => current.filter(item => item.id !== id)) }
-  const transport = useMemo(() => session ? createSessionTransport({ url: sessionWebSocketUrl(session.id, token), token, sessionId: session.id }) : null, [session])
+  const transport = useMemo(() => session ? createSessionTransport({ url: sessionWebSocketUrl(session.id, token), token, sessionId: session.id }) : null, [session, token])
   const media = useMemo(() => session ? createMediaTransport() : null, [session])
   if (user === undefined) return <main className="loading-screen"><span className="auth-mark">◎</span><p>Restoring your workspace…</p></main>
   if (!user) return <AuthScreen auth={authProvider} onAuthenticated={setUser} />

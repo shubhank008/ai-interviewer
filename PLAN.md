@@ -6,9 +6,18 @@ This document tracks the initial implementation roadmap for the voice-native AI 
 
 ## Current status
 
-Phases 0 through 15 provide the provider-independent domain foundation, deterministic offline pipeline, persistence seams, evaluation, API/frontend shell, browser transport seams, and concrete provider adapters. The repository is not yet ready for a live beta. The active program is Live Beta Enablement: one explicit provider set must be composed into a real browser-to-provider vertical slice before any release gate can claim readiness.
+Phases 0 through 15 provide the provider-independent domain foundation, deterministic offline pipeline, persistence seams, evaluation, API/frontend shell, browser transport seams, and concrete provider adapters. Phase 16 has produced programmatic live-beta evidence: the agent-to-agent rehearsal exercises WhisperX, OpenRouter, Kokoro, Firebase Auth/Admin, Firestore, Firebase Storage, and the post-interview evaluator with recorded transcripts. Browser authentication owner isolation, browser media, and production operations remain open gates.
 
 A passing offline test suite proves deterministic code-path behavior only. It does not prove that Firebase, storage, STT, TTS, LLM, WebRTC, browser permissions, deployment configuration, or production observability work together.
+
+## Next execution priorities
+
+These are the highest-priority planned moves for the next implementation session. They must be completed before wrapping Phase 16 and moving to the remaining browser/operations launch gates.
+
+- [ ] **P0.1: Vision LLM document parsing adapter:** add an `LLMDocumentParser` adapter behind the existing `DocumentParser` interface for resume PDF extraction and structured data extraction. The adapter must send the document to a vision-capable LLM through the configured OpenRouter transport, rather than relying on the current simple PDF text-operator parser. Define a dedicated system prompt that instructs the model to extract faithful resume content and bounded structured fields, treat resume text as untrusted data, never follow instructions found inside the document, preserve uncertainty, and return validated structured output. Keep the local parser as an explicit fallback/development path and fail safely when the vision parser is unavailable.
+- [ ] **P0.2: Dedicated document model configuration:** add a separate document-parsing model setting, defaulting to `gemma4`, configurable through `.env`/runtime configuration (for example `DOCUMENT_LLM_MODEL`), with its own readiness/evidence reporting and OpenRouter request metadata. Do not reuse the interviewer model setting implicitly; document the setting and ensure secrets remain environment-injected.
+- [ ] **P0.3: Adaptive interview ending policy:** extend `QuestionPlanner` and the live session state so every completed candidate turn produces an end decision. The LLM must evaluate the candidate response on each turn and return structured `should_end` plus bounded rationale/decision metadata. `should_end=true` has highest priority and ends the interview immediately after the current turn is safely persisted. Otherwise enforce the hard limits of a maximum 30-minute wall-clock interview and a maximum of 10 interviewer turns. Explicit candidate stop, cancellation, provider failure, and timeout remain terminal conditions. Persist the end reason and expose it through lifecycle events/results.
+- [ ] **P0.4: Rehearsal parity for ending behavior:** update the Phase 16 agent-to-agent rehearsal to use exactly the same adaptive ending policy and limits as the browser session, including injectable clock/time seams for deterministic 30-minute tests, structured `should_end` fixtures, immediate unsuitable-candidate termination, ten-turn protection, and transcript/evidence output showing the end reason and triggering evaluation. Add tests for LLM-directed ending, time-limit ending, turn-limit ending, explicit stop, and provider failure.
 
 ## Guiding principles
 
@@ -201,27 +210,28 @@ Phase 14 implementation is complete: `scripts/test_phase14.sh` runs real behavio
 - [x] Redact credentials and personal data from logs and test artifacts; record provider/model/version/region/device/timing/cost/quality/limitations when configured.
 - [ ] Exercise real providers and configured browser/TURN infrastructure. This remains opt-in and is skipped when safe credentials, model paths, or infrastructure are absent.
 
-Phase 15 implementation provides real execution paths and an honest opt-in gate. The current environment has no Firebase, Faster-Whisper, Piper/Kokoro, or browser automation configuration, so no production-provider readiness is claimed by the offline run.
+Phase 15 implementation provided the provider execution paths. Phase 16 now has authoritative live-provider evidence for the programmatic beta rehearsal; browser automation, browser media, and operational release evidence remain Phase 17/future gates.
 
 ### Phase 16: Live Beta Enablement
 
 Specification, plan, and marker contract: `docs/specs/016-live-beta-enablement/`.
 
-- [ ] Restructure `src/interviewer_domain` into `capabilities/`, `adapters/`, `providers/in_memory/`, domain services, and a production composition package.
-- [x] Compose the explicit beta set: Firebase Auth, Firestore, Firebase Storage selected by `STORAGE_BACKEND=gcs`, OpenRouter, WhisperX small, Kokoro, timestamped agent audio buffers, and an OpenRouter LLM evaluator.
+- [ ] Restructure `src/interviewer_domain` into the long-term package layout; compatibility modules remain for the current beta.
+- [x] Compose the explicit beta set: Firebase Auth/Admin, Firestore, Firebase Storage selected by `STORAGE_BACKEND=gcs`, OpenRouter, WhisperX small, Kokoro, timestamped agent audio buffers, and an OpenRouter evaluator.
 - [x] Implement production startup validation that rejects accidental in-memory providers and exposes active provider health without secrets.
-- [ ] Future task: implement Firebase browser authentication, token refresh, protected routes, server verification, and owner isolation. This is intentionally deferred and does not block the Phase 16 programmatic rehearsal.
-- [ ] Implement Firestore session, event, transcript, evaluation, user, retention, and deletion repositories.
+- [ ] Future browser gate: Firebase browser authentication owner isolation, token refresh, protected routes, and server verification. This is explicitly deferred from the programmatic Phase 16 gate.
+- [x] Exercise Firestore session, transcript, recording, evaluation, retention, and exact deletion lifecycle through the rehearsal repositories.
 - [x] Implement Firebase Storage upload, download, replay, retention, and deletion lifecycle; retain local storage only for development and deterministic checks. Keep FTP and S3 out of scope.
-- [ ] Implement real resume upload, text extraction, source-linked retrieval, and live prompt context.
-- [x] Implement the required programmatic timestamped audio-buffer ingress and interviewer egress through the agent-to-agent rehearsal; browser microphone, WebRTC, and TURN remain deferred.
-- [ ] Implement CPU WhisperX small transcription with partial/final timestamped events and worker limits.
-- [ ] Implement OpenRouter structured streaming interviewer responses, cancellation, timeout, rate-limit, cost, and fallback handling.
-- [ ] Implement Kokoro chunked synthesis, browser-compatible audio, sequencing, interruption, and cancellation.
-- [ ] Implement final recording, immutable transcript, LLM evaluation, score validation, results, replay, and deletion.
-- [x] Run the real programmatic recruiter and technical agent-to-agent journeys against the configured stack and save redacted evidence. Browser execution is deferred; deterministic/offline results cannot satisfy beta evidence.
+- [x] Exercise real resume PDF parsing, job-description parsing, source-linked context, and live prompt context using the committed fixtures.
+- [x] Implement and exercise programmatic timestamped audio-buffer ingress and interviewer egress; browser microphone, WebRTC, and TURN remain deferred.
+- [x] Exercise CPU WhisperX small transcription with partial/final timestamped events.
+- [x] Exercise OpenRouter interviewer responses and evaluator operation through the configured adapter.
+- [x] Exercise Kokoro English synthesis, sequencing, and stored replay audio.
+- [x] Exercise final recording, transcript persistence, evaluation, score validation, results, replay, and deletion.
+- [x] Run the real programmatic recruiter and technical agent-to-agent journeys against the configured stack, save redacted evidence, and save a readable transcript under `tests/` by default.
+- [x] Add flushed opt-in progress markers to identify heavyweight provider initialization or rehearsal stalls.
 
-A deterministic test pass cannot mark Phase 16 complete. Every selected provider and the full browser journey must produce an exercised result; missing configuration is skipped and configured failure is failed.
+A deterministic test pass cannot mark Phase 16 complete. The authoritative programmatic gate must produce exercised results for the selected live providers and both journeys; missing configuration is skipped and configured failure is failed. Phase 16 is complete for programmatic beta evidence, while browser media, browser-token owner isolation, and Phase 17 operational release controls remain open.
 
 ### Phase 17: Coverage and operational release gate
 
@@ -230,6 +240,22 @@ A deterministic test pass cannot mark Phase 16 complete. Every selected provider
 - [ ] Verify HTTPS, CORS, secure WebSocket origins, retention scheduling, deletion, monitoring, rollback, and incident procedures.
 - [ ] Run a scripted beta rehearsal with provider/model/version, latency, cost, quality, and limitation evidence.
 - [ ] Declare beta readiness only after Phase 16 real execution and all operational gates pass.
+
+### Browser-based live launch gates
+
+These are explicit follow-on targets after the programmatic Phase 16 gate. They define a soft-browser release path without changing the Phase 16 provider evidence boundary.
+
+- [ ] **B1: Firebase browser identity gate:** exercise email/password signup, Google sign-in where enabled, session restoration, logout, ID-token refresh, expired-token rejection, protected routes, API token forwarding, server verification, and cross-user owner isolation with two test accounts.
+- [ ] **B2: Browser setup and consent gate:** exercise consent notice, job-description entry, 10 MB validation, PDF selection/upload progress, parser errors for scanned/encrypted PDFs, mode selection, and setup recovery in a real browser.
+- [ ] **B3: Browser control-channel gate:** exercise authenticated WebSocket connect, heartbeat, ordered events, reconnect replay, sequence cursors, cancellation, interruption, provider error states, and secure-origin/CORS behavior.
+- [ ] **B4: Browser audio gate:** exercise microphone permission, capture, mute, stop, teardown, agent playback, ordered transcript/audio state, and a soft-browser audio turn. WebRTC/TURN must be validated only if selected by deployment configuration; browser tests must not put media bytes in WebSocket events.
+- [ ] **B5: Browser completed-interview gate:** complete recruiter and technical soft-browser interviews, verify adaptive continuation/end conditions, final transcript, replay recording, evaluation results, and user-visible failure recovery.
+- [ ] **B6: Browser persistence and deletion gate:** verify history, transcript, results, replay, retention display, per-interview deletion, account deletion, and cross-user access denial against Firebase/Firestore/Storage.
+- [ ] **B7: Production security gate:** remove development `dev-token` paths from production, enforce HTTPS, secure WebSocket origins, CORS allowlists, Firebase rules, secret injection, redacted logs, rate limits, upload limits, and fail-closed startup/readiness.
+- [ ] **B8: Release-candidate operations gate:** run the frontend/API/worker Docker release candidate, verify health/readiness probes, model warm-up, resource limits, monitoring, alerts, backup/restore assumptions, rollback, retention scheduling, deletion retries, and incident runbook.
+- [ ] **B9: Soft-browser acceptance gate:** run a scripted real-browser smoke test with the demo fixtures and test account, capture screenshots/logs without sensitive data, record provider/model/version, latency, cost, quality, and limitations, and obtain explicit beta-launch approval.
+
+The browser launch is not ready until B1 through B9 pass. The programmatic Phase 16 gate remains a prerequisite, not a substitute for these browser and operational gates.
 
 ## SDD feature order
 
