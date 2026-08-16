@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from interviewer_domain.phase16_rehearsal import Phase16Rehearsal, write_rehearsal_evidence
+from interviewer_domain.phase16_rehearsal import Phase16Rehearsal, write_rehearsal_evidence, write_rehearsal_transcript
 from interviewer_domain.adapters.persistence import InMemoryPersistentDataStore
 from interviewer_domain.evaluation import DeterministicEvaluator
 from interviewer_domain.models import InterviewMode, TranscriptSegment
@@ -71,6 +71,24 @@ class AgentRoleFlowTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(providers.data.list_transcripts("firebase-user", record.id))
             await interviewer.delete(record)
             self.assertEqual(providers.data.interviews, {})
+
+    async def test_transcript_writer_preserves_roles_timestamps_and_turns(self):
+        providers = _providers()
+        interviewer = InterviewerAgent(providers, "firebase-id-token")
+        _, turns, _ = await interviewer.run(
+            InterviewMode.TECHNICAL,
+            Path("tests/demo_resume.pdf"),
+            Path("tests/demo_jobdescription.txt"),
+            IntervieweeAgent((b"candidate audio buffer",)),
+            turn_count=2,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            output = write_rehearsal_transcript(directory + "/transcript.txt", ((InterviewMode.TECHNICAL, turns),))
+            transcript = Path(output).read_text(encoding="utf-8")
+        self.assertIn("Interviewee / candidate (final):", transcript)
+        self.assertIn("Interviewer / technical:", transcript)
+        self.assertIn("00:00.000", transcript)
+        self.assertEqual(transcript.count("[turn "), 4)
 
     def test_dotenv_loader_preserves_existing_environment_without_output(self):
         with tempfile.TemporaryDirectory() as directory:

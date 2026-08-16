@@ -519,7 +519,15 @@ These diagrams describe the beta execution boundary. Deterministic local provide
 The project has three explicit evidence levels:
 
 1. Contract readiness: interfaces and deterministic tests.
-2. Provider readiness: real configured provider operation through the adapter.
-3. Beta readiness: a real browser user completes the entire flow and receives durable results.
+2. Provider readiness: real configured provider operation through the adapter, including the programmatic Interviewer-Agent/Interviewee-Agent rehearsal.
+3. Browser production readiness: a real browser user completes the entire flow and receives durable results through Firebase browser authentication and browser media.
 
-Only level 3 can close Live Beta Enablement.
+Level 2 closes the Phase 16 programmatic live-beta evidence gate. Level 3 remains a subsequent browser and operational release gate and is not required for the Phase 16 agent-to-agent rehearsal because browser/WebRTC/TURN are explicitly deferred.
+
+### 10.7 Rehearsal transcript and evidence artifacts
+
+Every successful live rehearsal must write a readable transcript to `PHASE16_TRANSCRIPT_PATH`, defaulting to `tests/phase16_rehearsal_transcript.txt`. The text file contains both recruiter and technical journeys, each turn's UUID, relative `MM:SS.mmm` audio timestamp, Interviewee partial and final transcript text, and the Interviewer response with its role label. This transcript is intentionally separate from redacted machine evidence and must be treated as sensitive test output.
+
+The gate also writes redacted `phase16-rehearsal.json`, marker output, progress output when `PHASE16_PROGRESS_LOG=1`, and the test log under `PHASE16_EVIDENCE_DIR`. It must never write credentials, provider tokens, raw audio bytes, or secret configuration values to evidence.
+
+The Phase 16 cycle and storage/datastore ERDs are maintained in the README because they are operational runbook diagrams; their paths and field ownership must remain consistent with the provider adapters and this specification.

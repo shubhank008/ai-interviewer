@@ -322,6 +322,43 @@ def write_rehearsal_evidence(path: str | Path, results: tuple[RehearsalResult, .
     return output
 
 
+
+def _relative_timestamp(milliseconds: int) -> str:
+    """Format a rehearsal-relative millisecond offset for transcript readers."""
+    seconds, remainder = divmod(milliseconds, 1000)
+    minutes, seconds = divmod(seconds, 60)
+    return f"{minutes:02d}:{seconds:02d}.{remainder:03d}"
+
+
+def write_rehearsal_transcript(
+    path: str | Path,
+    journeys: tuple[tuple[InterviewMode, tuple[AgentTurn, ...]], ...],
+) -> Path:
+    """Write the full readable Interviewer/Interviewee rehearsal transcript."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "Phase 16 live beta rehearsal transcript",
+        "Timestamps are relative to each journey's audio timeline.",
+        "",
+    ]
+    for mode, turns in journeys:
+        lines.extend((f"=== {mode.value.upper()} INTERVIEW ===", ""))
+        for number, turn in enumerate(turns, start=1):
+            candidate = turn.final
+            lines.extend(
+                (
+                    f"[turn {number} | {candidate.turn_id} | {_relative_timestamp(candidate.start_ms)}]",
+                    f"Interviewee / candidate (partial): {turn.partial.text}",
+                    f"Interviewee / candidate (final): {candidate.text}",
+                    f"[turn {number} | {candidate.turn_id} | {_relative_timestamp(candidate.end_ms)}]",
+                    f"Interviewer / {mode.value}: {turn.interviewer_text}",
+                    "",
+                )
+            )
+    target.write_text("\n".join(lines), encoding="utf-8")
+    return target
+
 class InternalRehearsalAuth:
     """Provide a stable backend-only owner when Firebase signup is unavailable."""
 
@@ -451,9 +488,10 @@ async def _execute_live(
     resume: Path,
     job: Path,
     environ: Mapping[str, str],
-) -> dict[str, str]:
+) -> tuple[dict[str, str], tuple[tuple[InterviewMode, tuple[AgentTurn, ...]], ...]]:
     """Exercise every selected live capability and both required agent journeys."""
     completed: dict[str, str] = {}
+    journeys: list[tuple[InterviewMode, tuple[AgentTurn, ...]]] = []
     _progress(environ, "auth-validation=start")
     auth_user = await composition.providers.auth.validate(composition.token)
     _progress(environ, "auth-validation=complete")
@@ -465,6 +503,7 @@ async def _execute_live(
     for mode, marker in ((InterviewMode.RECRUITER, "agent-recruiter-journey-ok"), (InterviewMode.TECHNICAL, "agent-technical-journey-ok")):
         _progress(environ, f"journey={mode.value} start")
         _, turns = await _run_live_journey(composition, mode, resume, job, environ)
+        journeys.append((mode, turns))
         journey_buffer_count += sum(len(turn.buffers) for turn in turns)
         completed[marker] = f"{mode.value} InterviewerAgent and IntervieweeAgent journey completed"
         _progress(environ, f"journey={mode.value} complete buffers={journey_buffer_count}")
@@ -475,7 +514,7 @@ async def _execute_live(
     for marker in ("composition-production-ok", "firestore-session-lifecycle-ok", "resume-rag-context-ok", "stt-partial-final-timestamps-ok", "llm-interviewer-stream-ok", "kokoro-audio-playback-ok", "transcript-recording-persisted-ok", "llm-evaluation-score-ok", "retention-deletion-ok", "beta-evidence-redacted-ok"):
         completed[marker] = "live provider operation exercised"
     completed["storage-local-lifecycle-ok" if composition.storage_backend == "local" else "storage-firebase-lifecycle-ok"] = "selected storage lifecycle exercised"
-    return completed
+    return completed, tuple(journeys)
 
 
 def run_live_rehearsal(environ: Mapping[str, str], resume: Path, job: Path) -> tuple[RehearsalResult, ...]:
@@ -486,7 +525,10 @@ def run_live_rehearsal(environ: Mapping[str, str], resume: Path, job: Path) -> t
         _progress(environ, "composition-build=complete")
         import asyncio
         _progress(environ, "live-execution=start")
-        completed = asyncio.run(_execute_live(composition, resume, job, environ))
+        completed, journeys = asyncio.run(_execute_live(composition, resume, job, environ))
+        transcript_path = environ.get("PHASE16_TRANSCRIPT_PATH", "tests/phase16_rehearsal_transcript.txt")
+        write_rehearsal_transcript(transcript_path, journeys)
+        _progress(environ, f"transcript-written path={transcript_path}")
         _progress(environ, "live-execution=complete")
         error: str | None = None
     except Exception as exc:

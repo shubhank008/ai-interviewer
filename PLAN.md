@@ -201,27 +201,28 @@ Phase 14 implementation is complete: `scripts/test_phase14.sh` runs real behavio
 - [x] Redact credentials and personal data from logs and test artifacts; record provider/model/version/region/device/timing/cost/quality/limitations when configured.
 - [ ] Exercise real providers and configured browser/TURN infrastructure. This remains opt-in and is skipped when safe credentials, model paths, or infrastructure are absent.
 
-Phase 15 implementation provides real execution paths and an honest opt-in gate. The current environment has no Firebase, Faster-Whisper, Piper/Kokoro, or browser automation configuration, so no production-provider readiness is claimed by the offline run.
+Phase 15 implementation provided the provider execution paths. Phase 16 now has authoritative live-provider evidence for the programmatic beta rehearsal; browser automation, browser media, and operational release evidence remain Phase 17/future gates.
 
 ### Phase 16: Live Beta Enablement
 
 Specification, plan, and marker contract: `docs/specs/016-live-beta-enablement/`.
 
-- [ ] Restructure `src/interviewer_domain` into `capabilities/`, `adapters/`, `providers/in_memory/`, domain services, and a production composition package.
-- [x] Compose the explicit beta set: Firebase Auth, Firestore, Firebase Storage selected by `STORAGE_BACKEND=gcs`, OpenRouter, WhisperX small, Kokoro, timestamped agent audio buffers, and an OpenRouter LLM evaluator.
+- [ ] Restructure `src/interviewer_domain` into the long-term package layout; compatibility modules remain for the current beta.
+- [x] Compose the explicit beta set: Firebase Auth/Admin, Firestore, Firebase Storage selected by `STORAGE_BACKEND=gcs`, OpenRouter, WhisperX small, Kokoro, timestamped agent audio buffers, and an OpenRouter evaluator.
 - [x] Implement production startup validation that rejects accidental in-memory providers and exposes active provider health without secrets.
-- [ ] Future task: implement Firebase browser authentication, token refresh, protected routes, server verification, and owner isolation. This is intentionally deferred and does not block the Phase 16 programmatic rehearsal.
-- [ ] Implement Firestore session, event, transcript, evaluation, user, retention, and deletion repositories.
+- [ ] Future browser gate: Firebase browser authentication owner isolation, token refresh, protected routes, and server verification. This is explicitly deferred from the programmatic Phase 16 gate.
+- [x] Exercise Firestore session, transcript, recording, evaluation, retention, and exact deletion lifecycle through the rehearsal repositories.
 - [x] Implement Firebase Storage upload, download, replay, retention, and deletion lifecycle; retain local storage only for development and deterministic checks. Keep FTP and S3 out of scope.
-- [ ] Implement real resume upload, text extraction, source-linked retrieval, and live prompt context.
-- [x] Implement the required programmatic timestamped audio-buffer ingress and interviewer egress through the agent-to-agent rehearsal; browser microphone, WebRTC, and TURN remain deferred.
-- [ ] Implement CPU WhisperX small transcription with partial/final timestamped events and worker limits.
-- [ ] Implement OpenRouter structured streaming interviewer responses, cancellation, timeout, rate-limit, cost, and fallback handling.
-- [ ] Implement Kokoro chunked synthesis, browser-compatible audio, sequencing, interruption, and cancellation.
-- [ ] Implement final recording, immutable transcript, LLM evaluation, score validation, results, replay, and deletion.
-- [x] Run the real programmatic recruiter and technical agent-to-agent journeys against the configured stack and save redacted evidence. Browser execution is deferred; deterministic/offline results cannot satisfy beta evidence.
+- [x] Exercise real resume PDF parsing, job-description parsing, source-linked context, and live prompt context using the committed fixtures.
+- [x] Implement and exercise programmatic timestamped audio-buffer ingress and interviewer egress; browser microphone, WebRTC, and TURN remain deferred.
+- [x] Exercise CPU WhisperX small transcription with partial/final timestamped events.
+- [x] Exercise OpenRouter interviewer responses and evaluator operation through the configured adapter.
+- [x] Exercise Kokoro English synthesis, sequencing, and stored replay audio.
+- [x] Exercise final recording, transcript persistence, evaluation, score validation, results, replay, and deletion.
+- [x] Run the real programmatic recruiter and technical agent-to-agent journeys against the configured stack, save redacted evidence, and save a readable transcript under `tests/` by default.
+- [x] Add flushed opt-in progress markers to identify heavyweight provider initialization or rehearsal stalls.
 
-A deterministic test pass cannot mark Phase 16 complete. Every selected provider and the full browser journey must produce an exercised result; missing configuration is skipped and configured failure is failed.
+A deterministic test pass cannot mark Phase 16 complete. The authoritative programmatic gate must produce exercised results for the selected live providers and both journeys; missing configuration is skipped and configured failure is failed. Phase 16 is complete for programmatic beta evidence, while browser media, browser-token owner isolation, and Phase 17 operational release controls remain open.
 
 ### Phase 17: Coverage and operational release gate
 

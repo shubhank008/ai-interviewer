@@ -1,0 +1,34 @@
+Phase 16 live beta rehearsal transcript
+Timestamps are relative to each journey's audio timeline.
+
+=== RECRUITER INTERVIEW ===
+
+[turn 1 | 7b4fe7e6-593f-4fd3-90d1-0f9616991c42 | 00:00.000]
+Interviewee / candidate (partial): I have already succeeded to discuss my experience, and let a measurable project explain it to
+Interviewee / candidate (final): I have already succeeded to discuss my experience, and let a measurable project explain it to technical trade-offs, collaborate with TTM, and deliver it to clear result for the customer.
+[turn 1 | 7b4fe7e6-593f-4fd3-90d1-0f9616991c42 | 00:01.000]
+Interviewer / recruiter: Next question: "You mentioned using the SG - ATS Auto Resume Generator project to walk through technical trade-offs and measurable customer outcomes. Could you share a specific trade-off you made, how you aligned it with the TTM, and what measurable result that ultimately delivered?"
+
+[turn 2 | a6cb90c9-da8e-48c4-8de7-fb075d46797f | 00:01.000]
+Interviewee / candidate (partial): I have already succeeded to discuss my experience, and let a measurable project explain it to
+Interviewee / candidate (final): I have already succeeded to discuss my experience, and let a measurable project explain it to technical trade-offs, collaborate with TTM, and deliver it to clear result for the customer.
+[turn 2 | a6cb90c9-da8e-48c4-8de7-fb075d46797f | 00:02.000]
+Interviewer / recruiter: Based on your answer, I'd like to dig deeper into the specifics of that measurable project you mentioned. 
+
+You said you navigated technical trade-offs and collaborated with a TTM (Technical Team Manager) to deliver a clear result for the customer. 
+
+**Can you walk me through a specific instance where you had to make a significant technical trade-off? What were the competing options, how did you evaluate them, and what was the exact metric you used to prove the final impact to the customer? Additionally, what was the biggest friction point you encountered when aligning the TTM's priorities with the technical reality, and how did you resolve it?**
+
+=== TECHNICAL INTERVIEW ===
+
+[turn 1 | 20045f79-0456-4b01-b85e-bb18838d4dc6 | 00:00.000]
+Interviewee / candidate (partial): I am excited to discuss my experience, and let a measurable project explain it to techn
+Interviewee / candidate (final): I am excited to discuss my experience, and let a measurable project explain it to technical trade-offs, collaborate with TTAM, and deliver it to clear result for tech-ustomer.
+[turn 1 | 20045f79-0456-4b01-b85e-bb18838d4dc6 | 00:01.000]
+Interviewer / technical: "You mentioned letting a measurable project explain technical trade-offs. Given the context of your ATS Auto Resume Generator—where your logs show a raw binary Skia/PDF m151 output generated in a Chromium/Windows environment—what specific technical trade-off did you have to make regarding the PDF's text layer to ensure it remained ATS-parseable versus maintaining a visually rich design (e.g., custom fonts, vector elements)? And how did you measure the success of that decision for your technical customer, while collaborating with TTAM to align on the final approach?"
+
+[turn 2 | f250816a-d7a1-49a3-8223-bedb706697d0 | 00:01.000]
+Interviewee / candidate (partial): I am excited to discuss my experience, and let a measurable project explain it to techn
+Interviewee / candidate (final): I am excited to discuss my experience, and let a measurable project explain it to technical trade-offs, collaborate with TTAM, and deliver it to clear result for tech-ustomer.
+[turn 2 | f250816a-d7a1-49a3-8223-bedb706697d0 | 00:02.000]
+Interviewer / technical: "Given your work on the ATS Auto Resume Generator, can you walk me through the key technical trade-offs you had to make—especially around parsing reliability, template flexibility, and output compatibility—and how you measured the impact of those decisions for the technical customer?"
