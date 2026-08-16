@@ -652,6 +652,8 @@ def _record_from_json(value: dict[str, Any]) -> InterviewRecord:
         if value.get("expires_at")
         else None,
         str(value.get("status", "created")),
+        str(value.get("end_reason")) if value.get("end_reason") is not None else None,
+        str(value.get("end_rationale", "")),
     )
 
 

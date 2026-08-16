@@ -43,6 +43,8 @@ class InterviewEndingPolicy:
         if self.evaluator is not None:
             decision = await self.evaluator.evaluate_end(answer, token)
             if decision.should_end:
+                if decision.reason == "continue":
+                    return EndDecision(True, EndReason.LLM_DECISION.value, decision.rationale)
                 return decision
         if self.clock() - self.started_at >= self.max_duration:
             return EndDecision(True, EndReason.TIME_LIMIT.value, "maximum interview duration reached")
