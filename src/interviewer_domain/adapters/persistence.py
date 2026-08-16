@@ -37,6 +37,8 @@ class InterviewRecord:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: datetime | None = None
     status: str = "created"
+    end_reason: str | None = None
+    end_rationale: str = ""
 
     def with_retention(self, days: int = DEFAULT_RETENTION_DAYS) -> InterviewRecord:
         """Return this record with a deterministic retention boundary."""
@@ -49,6 +51,8 @@ class InterviewRecord:
             self.created_at,
             self.created_at + timedelta(days=days),
             self.status,
+            self.end_reason,
+            self.end_rationale,
         )
 
 

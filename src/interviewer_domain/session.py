@@ -4,8 +4,9 @@ from dataclasses import replace
 from hashlib import sha256
 from uuid import UUID, uuid4
 
+from .adapters.ending import EndEvaluator, InterviewEndingPolicy
 from .contracts import CancellationToken, DataStore, ErrorCode, EventBus, LLMProvider, ProviderError, STTProvider, TTSProvider
-from .models import EndDecision, InterviewSession, LifecycleEvent, QuestionPlan, SessionStatus, Turn
+from .models import InterviewSession, LifecycleEvent, QuestionPlan, SessionStatus, Turn
 
 
 class SessionStateError(ValueError):
@@ -52,7 +53,7 @@ class QuestionPlanner:
 class InterviewSessionEngine:
     """Run ordered interview turns through Phase 1 capability interfaces."""
 
-    def __init__(self, session: InterviewSession, stt: STTProvider, llm: LLMProvider, tts: TTSProvider, store: DataStore, events: EventBus, planner: QuestionPlanner | None = None, ending: object | None = None) -> None:
+    def __init__(self, session: InterviewSession, stt: STTProvider, llm: LLMProvider, tts: TTSProvider, store: DataStore, events: EventBus, planner: QuestionPlanner | None = None, ending: EndEvaluator | InterviewEndingPolicy | None = None) -> None:
         self.session = replace(session, status=SessionStatus.CREATED.value)
         self.stt = stt
         self.llm = llm
@@ -61,6 +62,7 @@ class InterviewSessionEngine:
         self.events = events
         self.planner = planner or QuestionPlanner()
         self.ending = ending
+        self.ending_policy = ending if isinstance(ending, InterviewEndingPolicy) else InterviewEndingPolicy(ending, self.session.created_at)
         self._next_event_sequence = 0
         self._expected_turn = 1
         self._last_answer = ""
@@ -97,14 +99,13 @@ class InterviewSessionEngine:
             self._last_answer = transcript.text
             response = await self.llm.generate(transcript.text, operation_token)
             audio = await self.tts.synthesize(response, operation_token)
-            decision = EndDecision(False)
-            if self.ending is not None:
-                try:
-                    decision = await self.ending.evaluate_end(transcript.text, operation_token)
-                except ProviderError as error:
-                    if error.code is ErrorCode.CANCELLED:
-                        raise
-                    await self._emit("ending.evaluation_failed", {"code": error.code.value}, turn.id)
+            try:
+                decision = await self.ending_policy.evaluate(transcript.text, turn.sequence, operation_token)
+            except ProviderError as error:
+                if error.code is ErrorCode.CANCELLED:
+                    raise
+                await self._emit("ending.evaluation_failed", {"code": error.code.value}, turn.id)
+                decision = self.ending_policy.evaluate_without_provider(turn.sequence)
             self._expected_turn += 1
             await self._emit("turn.completed", correlation=turn.id)
             if decision.should_end:

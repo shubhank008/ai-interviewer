@@ -18,7 +18,7 @@
 3. Add `DOCUMENT_LLM_MODEL` configuration, diagnostics, readiness metadata, environment template documentation, and adapter tests.
 4. Add structured end-decision models and planner validation, then enforce adaptive ending and hard limits in the session engine with an injectable clock.
 5. Update the rehearsal orchestration to share the policy and produce end-reason and trigger evidence for both journeys.
-6. Run focused tests, full backend gates, lint/typecheck, and mock-turn verification; update roadmap and invariants if needed.
+6. [x] Run focused tests, full backend gates, lint/typecheck, and mock-turn verification; update roadmap and invariants if needed. Evidence: 222 repository tests, 17 focused ending/rehearsal tests, lint/typecheck, and deterministic Phase 16 checks pass. Live provider rehearsal reached WhisperX/Kokoro startup but timed out before provider execution in this environment.
 
 ## Files expected to change
 

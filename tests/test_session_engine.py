@@ -3,9 +3,11 @@
 import asyncio
 import sys
 import unittest
+from datetime import timedelta
 
 sys.path.insert(0, "src")
 
+from interviewer_domain.adapters.ending import InterviewEndingPolicy
 from interviewer_domain.contracts import CancellationToken, ErrorCode, ProviderError
 from interviewer_domain.models import InterviewMode, InterviewSession, SessionStatus, Turn
 from interviewer_domain.providers import InMemoryDataStore, InMemoryEndDecisionProvider, InMemoryEventBus, InMemoryLLM, InMemorySTT, InMemoryTTS
@@ -91,6 +93,28 @@ class SessionEngineTests(unittest.TestCase):
         self.assertTrue(any(event.name == "ending.decided" for event in events.events))
         self.assertTrue(any(event.name == "session.completed" for event in events.events))
         print("[PHASE17] adaptive-ending-ok")
+
+    def test_time_limit_uses_injected_clock(self) -> None:
+        """The shared policy ends after the configured wall-clock boundary."""
+        engine, _, _ = self.build()
+        policy = InterviewEndingPolicy(
+            None,
+            engine.session.created_at,
+            clock=lambda: engine.session.created_at + timedelta(minutes=30),
+        )
+        engine.ending_policy = policy
+        asyncio.run(engine.start())
+        asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"audio")))
+        self.assertEqual(engine.session.end_reason, "time_limit")
+
+    def test_turn_limit_ends_after_current_turn(self) -> None:
+        """The shared policy protects the maximum interviewer turn count."""
+        engine, _, _ = self.build()
+        engine.ending_policy = InterviewEndingPolicy(None, engine.session.created_at, max_interviewer_turns=1)
+        asyncio.run(engine.start())
+        asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"audio")))
+        self.assertEqual(engine.session.end_reason, "turn_limit")
+
         print("[PHASE17] adaptive-ending-evidence-ok")
 
     def test_cancellation_is_terminal_without_completion(self) -> None:
