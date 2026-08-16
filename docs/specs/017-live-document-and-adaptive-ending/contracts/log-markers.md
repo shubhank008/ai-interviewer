@@ -3,6 +3,7 @@
 ## Required success markers
 
 - `[DOC17] vision-parser-contract-ok`
+- `[DOC17] document-source-boundary-ok`
 - `[DOC17] document-model-config-ok`
 - `[END17] llm-directed-ending-ok`
 - `[END17] time-limit-ending-ok`

@@ -19,8 +19,8 @@ from uuid import UUID, uuid4
 
 from .adapters.integrations import IntegrationEvidence, ProviderMetadata, redact_evidence
 from .adapters.persistence import InterviewRecord, PersistentDataStore
-from .capabilities.contracts import CancellationToken, ErrorCode, ProviderError
-from .documents import LocalDocumentParser
+from .capabilities.contracts import CancellationToken, DocumentParser, ErrorCode, ProviderError
+from .documents import LocalDocumentParser, VisionDocumentParser
 from .evaluation import Evaluation, Evaluator, InterviewContext
 from .adapters.ending import EndEvaluator, InterviewEndingPolicy
 from .models import EndDecision, EndReason, InterviewMode, Recording, TranscriptSegment
@@ -79,7 +79,7 @@ class RehearsalProviders:
     data: PersistentDataStore
     storage: RehearsalStorage
     evaluator: Evaluator
-    parser: LocalDocumentParser = field(default_factory=LocalDocumentParser)
+    parser: DocumentParser = field(default_factory=LocalDocumentParser)
     ending: EndEvaluator | None = None
 
 
@@ -519,6 +519,11 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
         )
         tts = KokoroTTS(KokoroPythonBackend("en", "default"), settings.tts_model)
         llm = OpenRouterLLM(OpenRouterHTTPTransport(timeout=60.0), settings.llm_api_key, settings.llm_model)
+        document_parser = VisionDocumentParser(
+            SyncOpenRouterHTTPTransport(timeout=60.0),
+            settings.llm_api_key or "",
+            settings.document_llm_model,
+        )
         evaluator = OpenRouterEvaluator(SyncOpenRouterHTTPTransport(timeout=60.0), settings.llm_api_key or "", settings.llm_model)
     except (IntegrationSkipped, ValueError) as exc:
         raise RuntimeError(str(exc)) from exc
@@ -527,7 +532,7 @@ def build_live_composition(environ: Mapping[str, str]) -> LivePhase16Composition
     else:
         token = rehearsal_identity
     return LivePhase16Composition(
-        RehearsalProviders(auth, stt, llm, tts, data, storage, evaluator),
+        RehearsalProviders(auth, stt, llm, tts, data, storage, evaluator, document_parser),
         token,
         settings.storage_backend,
         auth_mode,

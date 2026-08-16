@@ -97,8 +97,34 @@ class LiveDocumentParserTests(unittest.TestCase):
         self.assertFalse(parser.used_fallback)
         self.assertIn("role", parser.primary.last_fields)
         self.assertEqual(transport.payload["model"], "vision-model")
-        print("[PHASE17] live-document-parser-ok")
-        print("[PHASE17] live-document-source-boundary-ok")
+        print("[DOC17] vision-parser-contract-ok")
+
+    def test_malformed_vision_response_fails_closed(self) -> None:
+        from interviewer_domain.documents import VisionDocumentParser
+
+        class MalformedTransport:
+            def complete(self, payload: dict, api_key: str) -> dict:
+                return {"choices": [{"message": {"content": "not-json"}}]}
+
+        with self.assertRaises(ProviderError) as raised:
+            VisionDocumentParser(MalformedTransport(), "test-key").parse(
+                b"%PDF-1.7\n(binary)", "application/pdf", "resume"
+            )
+        self.assertEqual(raised.exception.code, ErrorCode.INTERNAL)
+
+    def test_unavailable_vision_parser_explicitly_falls_back(self) -> None:
+        from interviewer_domain.documents import FallbackDocumentParser, LocalDocumentParser, VisionDocumentParser
+
+        parser = FallbackDocumentParser(VisionDocumentParser(object(), ""), LocalDocumentParser())
+        chunks = parser.parse(
+            b"%PDF-1.7\n(Backend engineer with reliable API experience.)",
+            "application/pdf",
+            "resume",
+        )
+        self.assertTrue(parser.used_fallback)
+        self.assertIn("Backend engineer", chunks[0].text)
+
+        print("[DOC17] document-source-boundary-ok")
 
 
 if __name__ == "__main__":
