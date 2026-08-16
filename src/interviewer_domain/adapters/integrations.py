@@ -451,18 +451,21 @@ class FirebaseStorageBackend:
         except ImportError as exc:
             raise IntegrationSkipped("firebase-admin package is not installed") from exc
         try:
-            if not firebase_admin._apps:
-                if not credential_path and not project_id:
-                    raise IntegrationSkipped("Firebase Storage requires credentials or project ID")
-                options = {"projectId": project_id} if project_id else None
-                credential = (
-                    credentials.Certificate(credential_path)
-                    if credential_path
-                    else credentials.ApplicationDefault()
-                )
-                firebase_admin.initialize_app(credential, options)
+            if not credential_path and not project_id:
+                raise IntegrationSkipped("Firebase Storage requires credentials or project ID")
+            options = {"projectId": project_id} if project_id else None
+            credential = (
+                credentials.Certificate(credential_path)
+                if credential_path
+                else credentials.ApplicationDefault()
+            )
+            app_name = "phase16-storage"
+            try:
+                app = firebase_admin.get_app(app_name)
+            except ValueError:
+                app = firebase_admin.initialize_app(credential, options, name=app_name)
             normalized_bucket = bucket_name.removeprefix("gs://") if bucket_name else None
-            self.bucket = storage.bucket(normalized_bucket)
+            self.bucket = storage.bucket(normalized_bucket, app=app)
         except IntegrationSkipped:
             raise
         except Exception as exc:

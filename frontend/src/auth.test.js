@@ -38,3 +38,16 @@ test('configuredAuthProvider delegates to the adapter and returns null for falsy
   assert.equal(typeof provider.signUp, 'function')
   assert.equal(typeof provider.signOut, 'function')
 })
+
+test('configured auth delegates Google sign-in', async () => {
+  const calls = []
+  const provider = configuredAuthProvider({
+    restore: async () => null,
+    signIn: async () => null,
+    signUp: async () => null,
+    signInWithGoogle: async () => { calls.push('google'); return { provider: 'firebase' } },
+    signOut: async () => {},
+  })
+  assert.deepEqual(await provider.signInWithGoogle(), { provider: 'firebase' })
+  assert.deepEqual(calls, ['google'])
+})

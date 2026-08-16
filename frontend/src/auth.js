@@ -22,8 +22,9 @@ export function configuredAuthProvider(adapter) {
   if (!adapter) return null
   return {
     restore: () => adapter.restore(),
-    signIn: email => adapter.signIn(email),
-    signUp: email => adapter.signUp(email),
+    signIn: (email, password) => adapter.signIn(email, password),
+    signUp: (email, password) => adapter.signUp(email, password),
+    ...(adapter.signInWithGoogle ? { signInWithGoogle: () => adapter.signInWithGoogle() } : {}),
     signOut: () => adapter.signOut(),
   }
 }
@@ -63,6 +64,11 @@ export function firebaseAuthProvider(config) {
     async signUp(email, password) {
       const { auth, createUserWithEmailAndPassword } = await load()
       const result = await createUserWithEmailAndPassword(auth, email.trim(), password)
+      return normalize(result.user)
+    },
+    async signInWithGoogle() {
+      const { auth, GoogleAuthProvider, signInWithPopup } = await load()
+      const result = await signInWithPopup(auth, new GoogleAuthProvider())
       return normalize(result.user)
     },
     async signOut() {

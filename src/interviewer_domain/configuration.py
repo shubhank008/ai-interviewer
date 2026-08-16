@@ -371,14 +371,22 @@ def validate_beta_composition(settings: RuntimeSettings) -> None:
         name
         for name, value in (
             ("FIREBASE_PROJECT_ID", settings.firebase_project_id),
+            ("FIREBASE_CREDENTIALS_PATH", settings.firebase_credentials_path),
+            ("STORAGE_BUCKET", settings.storage_bucket),
             ("STT_MODEL", settings.stt_model),
         )
         if not value
     ]
-    if settings.stt_provider not in {"faster-whisper", "openai-whisper", "whisperx"}:
-        missing.append("STT_PROVIDER=one of faster-whisper, openai-whisper, whisperx")
+    if settings.storage_backend != "gcs":
+        missing.append("STORAGE_BACKEND=gcs")
+    if settings.stt_provider != "whisperx":
+        missing.append("STT_PROVIDER=whisperx")
+    if settings.stt_model not in {"small", "small.en"}:
+        missing.append("STT_MODEL=small or small.en")
     if settings.tts_provider != "kokoro":
         missing.append("TTS_PROVIDER=kokoro")
+    if settings.tts_language != "en":
+        missing.append("TTS_LANGUAGE=en")
     if settings.llm_provider != "openrouter":
         missing.append("LLM_PROVIDER=openrouter")
     if not settings.llm_api_key:

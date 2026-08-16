@@ -16,6 +16,25 @@ class Beta16Tests(unittest.TestCase):
         self.assertNotIn("fixture-key", str(RuntimeSettings.from_env({"APP_PROFILE": "local"}).diagnostics()))
         print("[BETA16] composition-production-skipped")
 
+
+    def test_production_beta_requires_locked_provider_tuple(self) -> None:
+        values = {
+            "APP_PROFILE": "production",
+            "FIREBASE_PROJECT_ID": "project",
+            "FIREBASE_CREDENTIALS_PATH": "/tmp/firebase.json",
+            "STORAGE_BACKEND": "local",
+            "STORAGE_BUCKET": "bucket",
+            "STT_PROVIDER": "whisperx",
+            "STT_MODEL": "small",
+            "TTS_PROVIDER": "kokoro",
+            "TTS_LANGUAGE": "en",
+            "LLM_PROVIDER": "openrouter",
+            "LLM_API_KEY": "fixture-key",
+        }
+        from interviewer_domain.configuration import validate_beta_composition
+        with self.assertRaisesRegex(ConfigurationError, "STORAGE_BACKEND=gcs"):
+            validate_beta_composition(RuntimeSettings.from_env(values))
+
     def test_firestore_delete_uses_exact_document_identity(self) -> None:
         """Deleting one interview must not issue a broad owner collection delete."""
         class Backend:

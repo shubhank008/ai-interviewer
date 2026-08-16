@@ -99,6 +99,22 @@ class ProviderIntegrationContractTests(unittest.TestCase):
             )
         self.assertEqual(context.exception.code, ErrorCode.INTERNAL)
 
+    def test_openrouter_evaluator_accepts_fenced_and_content_part_json(self) -> None:
+        class Transport:
+            def __init__(self, content: object) -> None:
+                self.content = content
+            def complete(self, payload: dict, api_key: str) -> dict:
+                return {"choices": [{"message": {"content": self.content}}]}
+
+        value = {"score": 70, "dimensions": [{"dimension": "Communication", "assessment": "Clear"}]}
+        fenced = "```json\n" + json.dumps(value) + "\n```"
+        parts = [{"type": "text", "text": json.dumps(value)}]
+        segment = TranscriptSegment(uuid4(), "candidate", "An answer.")
+        context = InterviewContext(InterviewMode.RECRUITER, "Engineer", "mid")
+        self.assertEqual(OpenRouterEvaluator(Transport(fenced), "key", "model").evaluate(context, (segment,)).score, 70)
+        self.assertEqual(OpenRouterEvaluator(Transport(parts), "key", "model").evaluate(context, (segment,)).score, 70)
+
+
     def test_local_model_constructor_never_downloads_missing_model(self) -> None:
         from interviewer_domain.provider_integration import FasterWhisperLocalBackend
 
