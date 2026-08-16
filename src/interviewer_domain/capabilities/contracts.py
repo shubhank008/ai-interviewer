@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from typing import Protocol
 from uuid import UUID
 
-from ..models import DocumentChunk, LifecycleEvent, Recording, RetrievedEvidence, TranscriptSegment
+from ..models import DocumentChunk, EndDecision, LifecycleEvent, Recording, RetrievedEvidence, TranscriptSegment
 
 
 class ErrorCode(StrEnum):
@@ -114,6 +114,13 @@ class LLMProvider(Protocol):
     def capabilities(self) -> CapabilityDescriptor: ...
 
     async def health(self) -> HealthStatus: ...
+
+
+class EndDecisionProvider(Protocol):
+    """Evaluate whether the current candidate turn should end the interview."""
+
+    async def evaluate_end(self, answer: str, token: CancellationToken) -> EndDecision: ...
+
 
 
 class STTProvider(Protocol):

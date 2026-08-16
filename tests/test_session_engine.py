@@ -8,14 +8,14 @@ sys.path.insert(0, "src")
 
 from interviewer_domain.contracts import CancellationToken, ErrorCode, ProviderError
 from interviewer_domain.models import InterviewMode, InterviewSession, SessionStatus, Turn
-from interviewer_domain.providers import InMemoryDataStore, InMemoryEventBus, InMemoryLLM, InMemorySTT, InMemoryTTS
+from interviewer_domain.providers import InMemoryDataStore, InMemoryEndDecisionProvider, InMemoryEventBus, InMemoryLLM, InMemorySTT, InMemoryTTS
 from interviewer_domain.session import InterviewSessionEngine, QuestionPlanner, SessionStateError
 
 
 class SessionEngineTests(unittest.TestCase):
     """Exercise the real provider-independent session state machine."""
 
-    def build(self, mode: InterviewMode = InterviewMode.RECRUITER, stt=None) -> tuple[InterviewSessionEngine, InMemoryDataStore, InMemoryEventBus]:
+    def build(self, mode: InterviewMode = InterviewMode.RECRUITER, stt=None, ending=None) -> tuple[InterviewSessionEngine, InMemoryDataStore, InMemoryEventBus]:
         """Build an engine with deterministic Phase 1 providers."""
         store = InMemoryDataStore()
         events = InMemoryEventBus()
@@ -26,6 +26,7 @@ class SessionEngineTests(unittest.TestCase):
             InMemoryTTS(),
             store,
             events,
+            ending=ending,
         )
         return engine, store, events
 
@@ -78,6 +79,19 @@ class SessionEngineTests(unittest.TestCase):
         self.assertFalse(engine.planner.is_current(current, "I changed direction to compensation.", 1))
         self.assertEqual(current.topic, "technical-depth")
         print("[ENGINE] guarded-planning-ok")
+
+    def test_adaptive_ending_persists_reason_and_emits_markers(self) -> None:
+        """A validated ending decision completes the session without another question."""
+        engine, _, events = self.build(ending=InMemoryEndDecisionProvider(True, "llm_decision", "answer is sufficiently evidenced"))
+        asyncio.run(engine.start())
+        asyncio.run(engine.process_turn(Turn(engine.session.id, 1, "candidate", b"audio")))
+        self.assertEqual(engine.session.status, SessionStatus.COMPLETED.value)
+        self.assertEqual(engine.session.end_reason, "llm_decision")
+        self.assertIn("answer is sufficiently evidenced", engine.session.end_rationale)
+        self.assertTrue(any(event.name == "ending.decided" for event in events.events))
+        self.assertTrue(any(event.name == "session.completed" for event in events.events))
+        print("[PHASE17] adaptive-ending-ok")
+        print("[PHASE17] adaptive-ending-evidence-ok")
 
     def test_cancellation_is_terminal_without_completion(self) -> None:
         """Cancellation transitions explicitly and never reports completion."""

@@ -73,5 +73,33 @@ class DocumentRagTests(unittest.TestCase):
         print("[RAG] mock-ingestion-ok")
 
 
+
+class VisionTransportFixture:
+    """Return bounded structured output without network access."""
+
+    def complete(self, payload: dict, api_key: str) -> dict:
+        """Return a provider-shaped JSON response."""
+        self.payload = payload
+        return {"choices": [{"message": {"content": '{"text":"EXPERIENCE:\\nBuilt reliable APIs for customers.","sections":["EXPERIENCE"],"fields":{"role":"Backend Engineer"}}'}}]}
+
+
+class LiveDocumentParserTests(unittest.TestCase):
+    """Exercise the injected vision path and explicit fallback behavior."""
+
+    def test_vision_parser_returns_safe_attributed_chunks_and_fields(self) -> None:
+        from interviewer_domain.documents import FallbackDocumentParser, VisionDocumentParser
+
+        transport = VisionTransportFixture()
+        parser = FallbackDocumentParser(VisionDocumentParser(transport, "test-key", "vision-model"))
+        chunks = parser.parse(b"%PDF-1.7\n(binary)", "application/pdf", "resume")
+        self.assertEqual(chunks[0].source, DocumentSource.RESUME)
+        self.assertEqual(chunks[0].section, "EXPERIENCE")
+        self.assertFalse(parser.used_fallback)
+        self.assertIn("role", parser.primary.last_fields)
+        self.assertEqual(transport.payload["model"], "vision-model")
+        print("[PHASE17] live-document-parser-ok")
+        print("[PHASE17] live-document-source-boundary-ok")
+
+
 if __name__ == "__main__":
     unittest.main()

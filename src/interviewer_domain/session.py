@@ -5,7 +5,7 @@ from hashlib import sha256
 from uuid import UUID, uuid4
 
 from .contracts import CancellationToken, DataStore, ErrorCode, EventBus, LLMProvider, ProviderError, STTProvider, TTSProvider
-from .models import InterviewSession, LifecycleEvent, QuestionPlan, SessionStatus, Turn
+from .models import EndDecision, InterviewSession, LifecycleEvent, QuestionPlan, SessionStatus, Turn
 
 
 class SessionStateError(ValueError):
@@ -52,7 +52,7 @@ class QuestionPlanner:
 class InterviewSessionEngine:
     """Run ordered interview turns through Phase 1 capability interfaces."""
 
-    def __init__(self, session: InterviewSession, stt: STTProvider, llm: LLMProvider, tts: TTSProvider, store: DataStore, events: EventBus, planner: QuestionPlanner | None = None) -> None:
+    def __init__(self, session: InterviewSession, stt: STTProvider, llm: LLMProvider, tts: TTSProvider, store: DataStore, events: EventBus, planner: QuestionPlanner | None = None, ending: object | None = None) -> None:
         self.session = replace(session, status=SessionStatus.CREATED.value)
         self.stt = stt
         self.llm = llm
@@ -60,6 +60,7 @@ class InterviewSessionEngine:
         self.store = store
         self.events = events
         self.planner = planner or QuestionPlanner()
+        self.ending = ending
         self._next_event_sequence = 0
         self._expected_turn = 1
         self._last_answer = ""
@@ -96,9 +97,27 @@ class InterviewSessionEngine:
             self._last_answer = transcript.text
             response = await self.llm.generate(transcript.text, operation_token)
             audio = await self.tts.synthesize(response, operation_token)
-            self._plan = self.planner.follow_up(self.session, transcript.text, turn.sequence)
+            decision = EndDecision(False)
+            if self.ending is not None:
+                try:
+                    decision = await self.ending.evaluate_end(transcript.text, operation_token)
+                except ProviderError as error:
+                    if error.code is ErrorCode.CANCELLED:
+                        raise
+                    await self._emit("ending.evaluation_failed", {"code": error.code.value}, turn.id)
             self._expected_turn += 1
             await self._emit("turn.completed", correlation=turn.id)
+            if decision.should_end:
+                self.session = replace(
+                    self.session,
+                    status=SessionStatus.COMPLETED.value,
+                    end_reason=decision.reason,
+                    end_rationale=decision.rationale,
+                )
+                await self._emit("ending.decided", {"reason": decision.reason, "rationale": decision.rationale}, turn.id)
+                await self._emit("session.completed", {"reason": decision.reason})
+                return response, audio
+            self._plan = self.planner.follow_up(self.session, transcript.text, turn.sequence)
             await self._emit("question.prepared", {"topic": self._plan.topic}, turn.id)
             return response, audio
         except ProviderError as error:
