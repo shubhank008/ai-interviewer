@@ -527,7 +527,7 @@ The project has three explicit evidence levels:
 
 Level 2 closes the Phase 16 programmatic live-beta evidence gate. Level 3 remains a subsequent browser and operational release gate and is not required for the Phase 16 agent-to-agent rehearsal because browser/WebRTC/TURN are explicitly deferred.
 
-The live resume path validates the PDF signature and size, then selects between a `VisionDocumentParser` (which sends the PDF to a configured vision-capable model through an injected OpenRouter transport and validates bounded structured output) and the local `LocalDocumentParser` (which extracts text operators only). A `FallbackDocumentParser` explicitly falls back to local parsing when the vision provider is unavailable; production never silently claims hosted parsing succeeded. Extracted chunks are always marked as untrusted source text. OCR for scanned or encrypted resumes is a future adapter requirement.
+The live document path uses a `RoutedDocumentParser` that selects a parser by source type: resume PDFs route to a `VisionDocumentParser` (which sends the PDF to a configured vision-capable model through an injected OpenRouter transport using the verified file-payload contract and validates bounded structured output), while job-description text routes to the local `LocalDocumentParser` (which extracts text operators only). The vision adapter retries once on transient malformed responses and normalizes provider error envelopes; production never silently claims hosted parsing succeeded. Extracted chunks are always marked as untrusted source text. OCR for scanned or encrypted resumes is a future adapter requirement.
 
 ### 10.7 Rehearsal transcript and evidence artifacts
 

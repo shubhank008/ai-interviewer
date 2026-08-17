@@ -137,20 +137,40 @@ class VisionDocumentParser:
             "response_format": {"type": "json_object"},
             "messages": [
                 {"role": "system", "content": self.SYSTEM_PROMPT},
-                {"role": "user", "content": [{"type": "text", "text": "Parse this resume PDF."}, {"type": "image_url", "image_url": {"url": "data:application/pdf;base64," + base64.b64encode(content).decode("ascii")}}]},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Parse this resume PDF."},
+                        {
+                            "type": "file",
+                            "file": {
+                                "filename": "resume.pdf",
+                                "file_data": "data:application/pdf;base64," + base64.b64encode(content).decode("ascii"),
+                            },
+                        },
+                    ],
+                },
             ],
         }
-        try:
-            response = self.transport.complete(payload, self.api_key)
-            content_value = response["choices"][0]["message"]["content"]
-            value = json.loads(content_value) if isinstance(content_value, str) else content_value
-            return self._normalize(value)
-        except ProviderError:
-            raise
-        except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise ProviderError(ErrorCode.INTERNAL, "vision document response was malformed") from exc
-        except Exception as exc:
-            raise ProviderError(ErrorCode.UNAVAILABLE, "vision document request failed", True) from exc
+        for attempt in range(2):
+            try:
+                response = self.transport.complete(payload, self.api_key)
+                if isinstance(response.get("error"), dict):
+                    raise ProviderError(ErrorCode.UNAVAILABLE, "vision document provider returned an error", True)
+                content_value = response["choices"][0]["message"]["content"]
+                value = json.loads(content_value) if isinstance(content_value, str) else content_value
+                return self._normalize(value)
+            except ProviderError as error:
+                if error.code is ErrorCode.INTERNAL and attempt == 0:
+                    continue
+                raise
+            except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                if attempt == 0:
+                    continue
+                raise ProviderError(ErrorCode.INTERNAL, "vision document response was malformed") from exc
+            except Exception as exc:
+                raise ProviderError(ErrorCode.UNAVAILABLE, "vision document request failed", True) from exc
+        raise ProviderError(ErrorCode.INTERNAL, "vision document response was malformed")
 
     def _normalize(self, value: object) -> list[DocumentChunk]:
         """Validate bounded model fields and retain only safe source-attributed text."""
@@ -188,3 +208,18 @@ class FallbackDocumentParser:
                 raise
             self.used_fallback = True
             return self.fallback.parse(content, content_type, source)
+
+
+class RoutedDocumentParser:
+    """Route resumes to vision and text documents to the local parser."""
+
+    def __init__(self, resume_parser: VisionDocumentParser, text_parser: LocalDocumentParser | None = None) -> None:
+        self.resume_parser = resume_parser
+        self.text_parser = text_parser or LocalDocumentParser()
+
+    def parse(self, content: bytes, content_type: str, source: str) -> list[DocumentChunk]:
+        """Select a parser by source while preserving each parser's contract."""
+        document_source = LocalDocumentParser._source(source)
+        if document_source is DocumentSource.RESUME:
+            return self.resume_parser.parse(content, content_type, source)
+        return self.text_parser.parse(content, content_type, source)
