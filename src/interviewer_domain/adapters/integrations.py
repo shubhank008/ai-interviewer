@@ -400,6 +400,10 @@ class FirestoreGoogleBackend:
     def list(self, collection: str, field: str, value: str) -> list[dict[str, Any]]:
         return [doc.to_dict() for doc in self._collection(collection).where(field, "==", value).stream()]
 
+    def list_all(self, collection: str) -> list[dict[str, Any]]:
+        """Return all documents in a collection for retention administration."""
+        return [doc.to_dict() for doc in self._collection(collection).stream()]
+
     def delete_collection_value(self, collection: str, field: str, value: str) -> None:
         for doc in self._collection(collection).where(field, "==", value).stream():
             doc.reference.delete()
