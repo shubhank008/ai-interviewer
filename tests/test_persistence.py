@@ -55,6 +55,17 @@ class FakeFirestoreBackend:
         """List documents matching one owner field."""
         return [item for (name, _), item in self.values.items() if name == collection and item.get(field) == value]
 
+    def list_range(self, collection: str, field: str, op: str, value: str) -> "list[dict]":
+        """List documents matching a range condition on one field."""
+        import operator as op_mod
+        ops = {"<=": op_mod.le, ">=": op_mod.ge, "<": op_mod.lt, ">": op_mod.gt}
+        cmp = ops[op]
+        return [item for (name, _), item in self.values.items() if name == collection and item.get(field) is not None and cmp(item[field], value)]
+
+    def list_all(self, collection: str) -> "list[dict]":
+        """List every document in one collection for retention administration."""
+        return [item for (name, _), item in self.values.items() if name == collection]
+
     def delete_collection_value(self, collection: str, field: str, value: str) -> None:
         """Delete matching documents from the fixture."""
         for key, item in list(self.values.items()):
@@ -149,8 +160,15 @@ class PersistenceTests(unittest.TestCase):
             self.assertNotIn(record.id, data.transcripts)
             self.assertNotIn(record.id, data.recordings)
             self.assertNotIn(record.id, data.evaluations)
-            expired = service.create_interview("alice", InterviewMode.TECHNICAL, now - timedelta(days=15))
-            self.assertEqual(data.purge_expired(now), [expired.id])
+            expired = InterviewRecord("alice", InterviewMode.TECHNICAL, created_at=now - timedelta(days=15)).with_retention()
+            data.save_interview(expired)
+            expired_key = f"users/alice/interviews/{expired.id}/audio.wav"
+            storage = LocalFilesystemStorage(directory)
+            storage.put(expired_key, b"audio", "audio/wav")
+            self.assertEqual(service.purge_expired(now), [expired.id])
+            with self.assertRaises(ProviderError):
+                storage.get(expired_key)
+            self.assertNotIn(expired.id, data.interviews)
         print("[PERSISTENCE] auth-isolation-ok")
         print("[PERSISTENCE] retention-deletion-ok")
 

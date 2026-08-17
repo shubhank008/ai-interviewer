@@ -19,6 +19,7 @@ export default [
         window: 'readonly',
         navigator: 'readonly',
         CustomEvent: 'readonly',
+        console: 'readonly',
       },
     },
     plugins: { react: reactPlugin },

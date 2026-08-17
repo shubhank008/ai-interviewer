@@ -14,7 +14,7 @@ import random
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, List, Mapping
 
 from ..contracts import ErrorCode, ProviderError
 
@@ -399,6 +399,13 @@ class FirestoreGoogleBackend:
 
     def list(self, collection: str, field: str, value: str) -> list[dict[str, Any]]:
         return [doc.to_dict() for doc in self._collection(collection).where(field, "==", value).stream()]
+
+    def list_range(self, collection: str, field: str, op: str, value: str) -> List[dict[str, Any]]:
+        return [doc.to_dict() for doc in self._collection(collection).where(field, op, value).stream()]
+
+    def list_all(self, collection: str) -> List[dict[str, Any]]:
+        """Return all documents in a collection for retention administration."""
+        return [doc.to_dict() for doc in self._collection(collection).stream()]
 
     def delete_collection_value(self, collection: str, field: str, value: str) -> None:
         for doc in self._collection(collection).where(field, "==", value).stream():

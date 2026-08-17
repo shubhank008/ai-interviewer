@@ -29,6 +29,11 @@ export function signalingWebSocketUrl(id, token, locationObject = globalThis.loc
   return `${protocol}//${locationObject?.host || 'localhost'}/ws/v1/sessions/${id}/signaling?token=${encodeURIComponent(token)}`
 }
 
+export function mediaWebSocketUrl(id, token, locationObject = globalThis.location) {
+  const protocol = locationObject?.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${locationObject?.host || 'localhost'}/ws/v1/sessions/${id}/media?token=${encodeURIComponent(token)}`
+}
+
 export function completeSessionRequest(id, token) {
   return { url: `${API_BASE}/sessions/${id}/complete`, init: { method: 'POST', headers: authHeaders(token) } }
 }

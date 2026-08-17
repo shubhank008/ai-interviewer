@@ -8,7 +8,7 @@ import shutil
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any, Protocol
+from typing import Any, List, Protocol
 from uuid import UUID, uuid4
 
 from ..contracts import ErrorCode, ProviderError
@@ -106,7 +106,9 @@ class FirestoreBackend(Protocol):
 
     def set(self, collection: str, document_id: str, value: dict[str, Any]) -> None: ...
     def get(self, collection: str, document_id: str) -> dict[str, Any] | None: ...
-    def list(self, collection: str, field: str, value: str) -> list[dict[str, Any]]: ...
+    def list(self, collection: str, field: str, value: str) -> List[dict[str, Any]]: ...
+    def list_range(self, collection: str, field: str, op: str, value: str) -> List[dict[str, Any]]: ...
+    def list_all(self, collection: str) -> List[dict[str, Any]]: ...
     def delete_collection_value(
         self, collection: str, field: str, value: str
     ) -> None: ...
@@ -145,6 +147,7 @@ class PersistentDataStore(Protocol):
         self, user_id: str, interview_id: UUID, key: str
     ) -> None: ...
     def delete_interview(self, user_id: str, interview_id: UUID) -> None: ...
+    def expired_interviews(self, now: datetime) -> list[InterviewRecord]: ...
 
 
 class PersistentStorageProvider(Protocol):
@@ -293,13 +296,17 @@ class InMemoryPersistentDataStore:
         self.evaluations.pop(interview_id, None)
         self.documents.pop(interview_id, None)
 
+    def expired_interviews(self, now: datetime) -> list[InterviewRecord]:
+        """Return expired records with owners preserved for scoped deletion."""
+        return [
+            record
+            for record in self.interviews.values()
+            if record.expires_at is not None and record.expires_at <= now
+        ]
+
     def purge_expired(self, now: datetime) -> list[UUID]:
         """Delete expired metadata and dependent in-store records."""
-        expired = [
-            r
-            for r in self.interviews.values()
-            if r.expires_at is not None and r.expires_at <= now
-        ]
+        expired = self.expired_interviews(now)
         for record in expired:
             self.interviews.pop(record.id, None)
             self.transcripts.pop(record.id, None)
@@ -346,6 +353,15 @@ class FirestoreDataStore:
                 for v in self.backend.list(self.collection, "user_id", user_id)
             )
             if r.expires_at is None or r.expires_at > now
+        ]
+
+    def expired_interviews(self, now: datetime) -> list[InterviewRecord]:
+        """Return expired Firestore records for owner-scoped cleanup."""
+        return [
+            _record_from_json(value)
+            for value in self.backend.list_range(
+                self.collection, "expires_at", "<=", now.isoformat()
+            )
         ]
 
     def save_transcript(
@@ -581,6 +597,14 @@ class PersistenceService:
         """Delete metadata and all opaque files for one authorized interview."""
         self.storage.delete_prefix(f"users/{user_id}/interviews/{interview_id}")
         self.data.delete_interview(user_id, interview_id)
+
+    def purge_expired(self, now: datetime | None = None) -> list[UUID]:
+        """Delete expired interviews and their owner-scoped storage artifacts."""
+        current = now or datetime.now(timezone.utc)
+        expired = self.data.expired_interviews(current)
+        for record in expired:
+            self.delete_interview(record.user_id, record.id)
+        return [record.id for record in expired]
 
     def resource(
         self,

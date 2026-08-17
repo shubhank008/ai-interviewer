@@ -9,7 +9,7 @@ Supported interview modes:
 
 The intended post-interview experience includes replayable audio, a timestamped speaker-labeled transcript, a score out of 100, a summary, strengths, missed opportunities, role-specific feedback, and concrete improvements.
 
-> **Current status:** Phase 16 has produced programmatic live-beta evidence: the agent-to-agent rehearsal exercises WhisperX, OpenRouter, Kokoro, Firebase Auth/Admin, Firestore, Firebase Storage, vision-document parsing, and adaptive interview ending. Browser authentication owner isolation, browser media, and Phase 17 operational release controls remain open.
+> **Current status:** Phase 20 connects browser microphone capture, turn start, completion, and owner-scoped retention cleanup. Phase 17 adds a repeatable release-candidate gate. This is not a live launch: browser authentication owner isolation, WebRTC/TURN, HTTPS, deployed providers, CORS, rate limits, deployment security, observability, rollback, and incident procedures remain open blockers.
 
 ## Contents
 
@@ -37,10 +37,10 @@ The intended post-interview experience includes replayable audio, a timestamped 
 | LLM | Deterministic providers | OpenRouter through `LLM_API_KEY` | Exercised in Phase 16 |
 | Auth and data | Development fixtures | Firebase Admin, Firestore, internal rehearsal UID | Firebase lifecycle exercised; browser token isolation deferred |
 | Storage | Local filesystem | Firebase Storage/GCS via `STORAGE_BACKEND=gcs` | Lifecycle exercised in Phase 16 |
-| Browser media | Deferred transport contract | Not a Phase 16 gate | WebRTC/TURN deferred |
+| Browser media | Microphone capture via authenticated media WebSocket | WebRTC/TURN deferred | Phase 20 browser media path |
 | Evaluation | Deterministic evaluator | OpenRouter post-interview evaluator | Exercised in Phase 16 |
 
-Phase 16 is ready for the documented programmatic live beta rehearsal, not yet a production launch. Browser authentication owner isolation, browser media, deployment operations, and Phase 17 release controls remain open. Requirements are in [`SPEC.md`](SPEC.md), implementation status is in [`PLAN.md`](PLAN.md), and provider operations are in [`docs/provider-readiness.md`](docs/provider-readiness.md).
+Phase 16 is ready for the documented programmatic live beta rehearsal, and Phases 17 through 20 add release evidence and browser media, but the platform is not yet ready for a live launch. Browser authentication owner isolation, WebRTC/TURN, HTTPS, deployed providers, deployment security, observability, rollback, and incident procedures remain open. Run `scripts/test_phase17.sh` to generate redacted evidence. Requirements are in [`SPEC.md`](SPEC.md), implementation status is in [`PLAN.md`](PLAN.md), and provider operations are in [`docs/provider-readiness.md`](docs/provider-readiness.md).
 
 ## How it works
 
@@ -137,14 +137,15 @@ npm run build
 
 ### Run with Docker
 
-The supplied Compose file runs the API only. It does not serve React, provide Firebase, start model workers, or provision durable storage.
+The supplied Compose file runs the API and a production frontend container with health checks. It does not provide Firebase, start model workers, or provision durable storage.
 
 ```bash
 docker compose up --build
 curl http://127.0.0.1:8000/healthz
+curl http://127.0.0.1:8080/
 ```
 
-Run the frontend separately or serve its built `frontend/dist` through an HTTPS reverse proxy.
+The frontend container serves the built `frontend/dist` through nginx and proxies `/api` and `/ws` to the API container.
 
 ## API and browser boundaries
 
@@ -389,14 +390,14 @@ Resumes, job descriptions, voice recordings, transcripts, and evaluations may co
 
 Phases 1 through 16 establish product specifications, capability contracts, local PDF/RAG, live voice orchestration, persistence/evaluation boundaries, browser transport, offline acceptance, concrete opt-in provider transports, and programmatic live-beta evidence.
 
-Phase 16 has closed the programmatic live-beta evidence gate: the agent-to-agent rehearsal exercises WhisperX, OpenRouter, Kokoro, Firebase Auth/Admin, Firestore, Firebase Storage, and the post-interview evaluator. Browser authentication owner isolation, browser media, and Phase 17 operational release controls remain open.
+Phase 16 has closed the programmatic live-beta evidence gate: the agent-to-agent rehearsal exercises WhisperX, OpenRouter, Kokoro, Firebase Auth/Admin, Firestore, Firebase Storage, and the post-interview evaluator. Phase 17 adds a repeatable release-candidate gate with redacted evidence. Phase 19 adds browser lifecycle markers, frontend production container, and fail-closed operational configuration. Phase 20 connects browser microphone capture, turn start/completion, and owner-scoped retention cleanup. Browser authentication owner isolation, HTTPS, TURN/WebRTC, deployed providers, CORS, rate limits, observability, rollback, and incident procedures remain open.
 
 ## Known limitations
 
-- Browser authentication owner isolation, browser media, and production operations remain deferred from the Phase 16 programmatic gate.
+- Browser authentication owner isolation, WebRTC/TURN media connectivity, HTTPS, deployed providers, and production operations remain open.
 - Password-protected, scanned, or encrypted PDFs require a graceful text-only parser error in Phase 16; OCR is deferred.
 - The initial deployment is a single Docker container; separate worker containers are a roadmap item.
-- Browser audio transport remains selected by the Phase 16 deployment configuration; benchmark evidence must document latency, quality, and limitations.
+- Browser WebRTC/TURN media transport is deferred; browser microphone capture uses the authenticated media WebSocket.
 - The repository contains no model weights, Firebase credentials, FTP credentials, or production secrets.
 
 ## Contributing
