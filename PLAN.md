@@ -325,3 +325,16 @@ Each phase may contain smaller implementation slices, but no phase may be marked
 - [ ] Verify HTTPS, durable operations, live providers, monitoring, rollback, and incident procedures.
 
 Phase 19 is not a live-launch declaration. Owner-isolation browser testing remains deferred, and no target-environment evidence exists yet.
+
+### Phase 20: Browser live blocker resolution
+
+Specification, plan, and marker contract: `docs/specs/020-browser-live-blocker-resolution/`.
+
+- [x] Connect browser microphone capture to the authenticated binary media WebSocket.
+- [x] Start live turns only after control and microphone readiness.
+- [x] Complete interviews through the authenticated API before navigating to results.
+- [x] Add owner-scoped expired-record and storage-prefix cleanup for local and Firestore data stores.
+- [ ] Prove HTTPS, Firebase login, TURN/WebRTC, configured providers, deployed CORS, rate limits, and observability in the target environment.
+- [ ] Run target-environment browser rehearsal and update launch status from evidence.
+
+Phase 20 is not launch-ready: local deterministic validation passes, but Docker access is permission-blocked and no target browser/deployment/provider evidence has passed.
