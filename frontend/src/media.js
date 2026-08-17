@@ -27,8 +27,10 @@ export function createMediaTransport({
     if (!mediaUrl || !mediaSocketFactory || !mediaRecorderFactory) throw new Error('media capture is unavailable')
     mediaSocket = new mediaSocketFactory(mediaUrl)
     mediaSocket.onerror = () => { setState('error') }
+    mediaSocket.onclose = () => { if (recorder && recorder.state !== 'inactive') { recorder.stop() } setState('error') }
     recorder = new mediaRecorderFactory(stream)
     recorder.ondataavailable = event => { if (event.data?.size && mediaSocket.readyState === 1) mediaSocket.send(event.data) }
+    recorder.onerror = () => { setState('error') }
     recorder.start(250)
     setState('capturing')
   }
