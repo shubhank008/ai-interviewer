@@ -51,6 +51,34 @@ test('media negotiate throws when peerConnectionFactory is missing', async () =>
   assert.equal(media.getState(), 'unavailable')
 })
 
+test('media transport sends recorder chunks over the authenticated media socket', async () => {
+  const sent = []
+  const stream = { getTracks: () => [{ stop: () => {} }] }
+  class MediaSocket {
+    static OPEN = 1
+    constructor() { this.readyState = MediaSocket.OPEN; this.close = () => {} }
+    send(chunk) { sent.push(chunk) }
+  }
+  class Recorder {
+    constructor() { Recorder.instance = this }
+    start(interval) { this.interval = interval }
+    stop() {}
+  }
+  const media = createMediaTransport({
+    navigatorImpl: { mediaDevices: { getUserMedia: async () => stream } },
+    mediaRecorderFactory: Recorder,
+    mediaSocketFactory: MediaSocket,
+    mediaUrl: 'wss://example.test/media',
+  })
+  await media.requestMicrophone()
+  media.startCapture()
+  const chunk = { size: 3 }
+  Recorder.instance.ondataavailable({ data: chunk })
+  assert.deepEqual(sent, [chunk])
+  assert.equal(Recorder.instance.interval, 250)
+  media.teardown()
+})
+
 test('media teardown stops stream tracks and closes peer', () => {
   const stopped = []
   const closed = []

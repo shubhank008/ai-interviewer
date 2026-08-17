@@ -1,8 +1,17 @@
 import { markBrowser } from './observability.js'
 
-export function createMediaTransport({ navigatorImpl = globalThis.navigator, peerConnectionFactory = globalThis.RTCPeerConnection, onState = () => {} } = {}) {
+export function createMediaTransport({
+  navigatorImpl = globalThis.navigator,
+  peerConnectionFactory = globalThis.RTCPeerConnection,
+  mediaRecorderFactory = globalThis.MediaRecorder,
+  mediaSocketFactory = globalThis.WebSocket,
+  mediaUrl = '',
+  onState = () => {},
+} = {}) {
   let stream = null
   let peer = null
+  let recorder = null
+  let mediaSocket = null
   let state = 'idle'
   const setState = value => { state = value; onState(value) }
   async function requestMicrophone() {
@@ -13,6 +22,16 @@ export function createMediaTransport({ navigatorImpl = globalThis.navigator, pee
     if (!peerConnectionFactory) { setState('unavailable'); throw new Error('webrtc unavailable') }
     peer = new peerConnectionFactory(); if (stream) stream.getTracks().forEach(track => peer.addTrack(track, stream)); setState('negotiating'); return peer
   }
-  function teardown() { stream?.getTracks().forEach(track => track.stop()); peer?.close(); stream = null; peer = null; setState('closed'); markBrowser('MEDIA_CLOSED') }
-  return { requestMicrophone, negotiate, teardown, getState: () => state }
+  function startCapture() {
+    if (!stream) throw new Error('microphone is required before capture')
+    if (!mediaUrl || !mediaSocketFactory || !mediaRecorderFactory) throw new Error('media capture is unavailable')
+    mediaSocket = new mediaSocketFactory(mediaUrl)
+    recorder = new mediaRecorderFactory(stream)
+    recorder.ondataavailable = event => { if (event.data?.size && mediaSocket.readyState === 1) mediaSocket.send(event.data) }
+    recorder.start(250)
+    setState('capturing')
+  }
+  function stopCapture() { recorder?.stop?.(); recorder = null; mediaSocket?.close?.(); mediaSocket = null }
+  function teardown() { stopCapture(); stream?.getTracks().forEach(track => track.stop()); peer?.close(); stream = null; peer = null; setState('closed'); markBrowser('MEDIA_CLOSED') }
+  return { requestMicrophone, negotiate, startCapture, stopCapture, teardown, getState: () => state }
 }
