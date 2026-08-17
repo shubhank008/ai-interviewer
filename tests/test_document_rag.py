@@ -97,7 +97,22 @@ class LiveDocumentParserTests(unittest.TestCase):
         self.assertFalse(parser.used_fallback)
         self.assertIn("role", parser.primary.last_fields)
         self.assertEqual(transport.payload["model"], "vision-model")
+        content = transport.payload["messages"][1]["content"]
+        self.assertEqual(content[1]["type"], "file")
+        self.assertEqual(content[1]["file"]["filename"], "resume.pdf")
+        self.assertTrue(content[1]["file"]["file_data"].startswith("data:application/pdf;base64,"))
         print("[DOC17] vision-parser-contract-ok")
+
+    def test_routed_parser_keeps_resume_vision_and_job_local(self) -> None:
+        from interviewer_domain.documents import RoutedDocumentParser, VisionDocumentParser
+
+        transport = VisionTransportFixture()
+        parser = RoutedDocumentParser(VisionDocumentParser(transport, "test-key", "vision-model"))
+        resume = parser.parse(b"%PDF-1.7\n(binary)", "application/pdf", "resume")
+        job = parser.parse(b"REQUIREMENTS:\nPython platform engineering.", "text/plain", "job_description")
+        self.assertEqual(resume[0].source, DocumentSource.RESUME)
+        self.assertEqual(job[0].source, DocumentSource.JOB_DESCRIPTION)
+        self.assertEqual(transport.payload["model"], "vision-model")
 
     def test_malformed_vision_response_fails_closed(self) -> None:
         from interviewer_domain.documents import VisionDocumentParser
@@ -111,6 +126,20 @@ class LiveDocumentParserTests(unittest.TestCase):
                 b"%PDF-1.7\n(binary)", "application/pdf", "resume"
             )
         self.assertEqual(raised.exception.code, ErrorCode.INTERNAL)
+
+    def test_provider_error_envelope_fails_as_unavailable(self) -> None:
+        from interviewer_domain.documents import VisionDocumentParser
+
+        class ProviderErrorTransport:
+            def complete(self, payload: dict, api_key: str) -> dict:
+                return {"error": {"code": 429, "message": "temporarily unavailable"}}
+
+        with self.assertRaises(ProviderError) as raised:
+            VisionDocumentParser(ProviderErrorTransport(), "test-key").parse(
+                b"%PDF-1.7\n(binary)", "application/pdf", "resume"
+            )
+        self.assertEqual(raised.exception.code, ErrorCode.UNAVAILABLE)
+        self.assertTrue(raised.exception.retryable)
 
     def test_unavailable_vision_parser_explicitly_falls_back(self) -> None:
         from interviewer_domain.documents import FallbackDocumentParser, LocalDocumentParser, VisionDocumentParser
