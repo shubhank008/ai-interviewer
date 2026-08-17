@@ -9,7 +9,7 @@ Supported interview modes:
 
 The intended post-interview experience includes replayable audio, a timestamped speaker-labeled transcript, a score out of 100, a summary, strengths, missed opportunities, role-specific feedback, and concrete improvements.
 
-> **Current status:** Phase 16 has produced programmatic live-beta evidence: the agent-to-agent rehearsal exercises WhisperX, OpenRouter, Kokoro, Firebase Auth/Admin, Firestore, Firebase Storage, vision-document parsing, and adaptive interview ending. Browser authentication owner isolation, browser media, and Phase 17 operational release controls remain open.
+> **Current status:** Phase 17 now provides a repeatable, redacted release-candidate gate and confirms the deterministic code paths. This is not a live launch: browser authentication owner isolation, browser media, deployment security, durable operations, observability, rollback, and incident procedures remain open blockers.
 
 ## Contents
 
@@ -40,7 +40,7 @@ The intended post-interview experience includes replayable audio, a timestamped 
 | Browser media | Deferred transport contract | Not a Phase 16 gate | WebRTC/TURN deferred |
 | Evaluation | Deterministic evaluator | OpenRouter post-interview evaluator | Exercised in Phase 16 |
 
-Phase 16 is ready for the documented programmatic live beta rehearsal, not yet a production launch. Browser authentication owner isolation, browser media, deployment operations, and Phase 17 release controls remain open. Requirements are in [`SPEC.md`](SPEC.md), implementation status is in [`PLAN.md`](PLAN.md), and provider operations are in [`docs/provider-readiness.md`](docs/provider-readiness.md).
+Phase 16 is ready for the documented programmatic live beta rehearsal, and Phase 17 adds deterministic release evidence, but the platform is not yet ready for a live launch. Browser authentication owner isolation, browser media, deployment security, durable operations, observability, rollback, and incident procedures remain open. Run `scripts/test_phase17.sh` to generate redacted evidence. Requirements are in [`SPEC.md`](SPEC.md), implementation status is in [`PLAN.md`](PLAN.md), and provider operations are in [`docs/provider-readiness.md`](docs/provider-readiness.md).
 
 ## How it works
 

@@ -235,11 +235,18 @@ A deterministic test pass cannot mark Phase 16 complete. The authoritative progr
 
 ### Phase 17: Coverage and operational release gate
 
+Specification, plan, and marker contract: `docs/specs/018-phase17-operational-release-gate/`.
+
+- [x] Add a repeatable release-candidate gate with redacted JSON and Markdown evidence.
+- [x] Validate the Docker Compose definition, production fail-closed configuration, backend quality/tests/mock turn, and frontend quality/tests/build.
+- [x] Record browser identity/media, deployment security, durable operations, observability, rollback, and incident-runbook blockers explicitly.
 - [ ] Enforce separate backend domain, API, frontend, provider, and browser E2E coverage thresholds.
 - [ ] Run a clean Docker release candidate with frontend, API, CPU workers, durable services, and media infrastructure.
 - [ ] Verify HTTPS, CORS, secure WebSocket origins, retention scheduling, deletion, monitoring, rollback, and incident procedures.
 - [ ] Run a scripted beta rehearsal with provider/model/version, latency, cost, quality, and limitation evidence.
 - [ ] Declare beta readiness only after Phase 16 real execution and all operational gates pass.
+
+Phase 17 currently provides deterministic release evidence only. The gate exits nonzero while the documented live-launch blockers remain open.
 
 ### Browser-based live launch gates
 
