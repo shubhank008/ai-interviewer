@@ -190,3 +190,50 @@ test('transport reconnecting state is set on second connect after close', () => 
   const states = events.filter(e => e.type === 'connection').map(e => e.payload.state)
   assert.ok(states.includes('reconnecting'))
 })
+
+test('media setOnState allows replacing the state callback after creation', async () => {
+  const first = []
+  const second = []
+  const media = createMediaTransport({
+    navigatorImpl: { mediaDevices: { getUserMedia: async () => { throw new Error('denied') } } },
+    onState: state => first.push(state),
+  })
+  await assert.rejects(media.requestMicrophone(), /denied/)
+  assert.deepEqual(first, ['denied'])
+  media.setOnState(state => second.push(state))
+  const media2 = createMediaTransport({
+    navigatorImpl: { mediaDevices: { getUserMedia: async () => { throw new Error('denied') } } },
+  })
+  await assert.rejects(media2.requestMicrophone(), /denied/)
+  assert.equal(second.length, 0)
+  await assert.rejects(media.requestMicrophone(), /denied/)
+  assert.deepEqual(second, ['denied'])
+})
+
+test('media socket error triggers onState error via setOnState', async () => {
+  const states = []
+  const stream = { getTracks: () => [{ stop: () => {} }] }
+  class MediaSocket {
+    static OPEN = 1
+    constructor() { this.readyState = MediaSocket.OPEN; this.close = () => {}; MediaSocket.last = this }
+    send() {}
+  }
+  class Recorder {
+    constructor() { Recorder.instance = this }
+    start() {}
+    stop() {}
+  }
+  const media = createMediaTransport({
+    navigatorImpl: { mediaDevices: { getUserMedia: async () => stream } },
+    mediaRecorderFactory: Recorder,
+    mediaSocketFactory: MediaSocket,
+    mediaUrl: 'wss://example.test/media',
+  })
+  media.setOnState(state => states.push(state))
+  await media.requestMicrophone()
+  media.startCapture()
+  Recorder.instance.ondataavailable({ data: { size: 3 } })
+  MediaSocket.last.onerror()
+  assert.ok(states.includes('error'))
+  media.teardown()
+})

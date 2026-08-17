@@ -34,5 +34,5 @@ export function createMediaTransport({
   }
   function stopCapture() { recorder?.stop?.(); recorder = null; mediaSocket?.close?.(); mediaSocket = null }
   function teardown() { stopCapture(); stream?.getTracks().forEach(track => track.stop()); peer?.close(); stream = null; peer = null; setState('closed'); markBrowser('MEDIA_CLOSED') }
-  return { requestMicrophone, negotiate, startCapture, stopCapture, teardown, getState: () => state }
+  return { requestMicrophone, negotiate, startCapture, stopCapture, teardown, getState: () => state, setOnState: callback => { onState = callback } }
 }
