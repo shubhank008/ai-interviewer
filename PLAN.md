@@ -90,6 +90,7 @@ The Phase 4 slice is specified in `docs/specs/004-provider-benchmark-harness/`. 
 - [x] Implement WebSocket session events and reconnect behavior.
 - [x] Implement WebRTC signaling and browser media transport.
 - [x] Keep media on WebRTC and control/state events on WebSocket.
+
 - [ ] Add an optional backend Pub/Sub or event-bus workflow for asynchronous jobs and fan-out.
 - [x] Add deterministic transport tests and marker evidence; no visual browser frame is needed for this seam-only slice.
 
@@ -312,3 +313,15 @@ Each phase may contain smaller implementation slices, but no phase may be marked
 - Linting and type checking pass.
 - Documentation is updated.
 - Surprises and durable constraints are recorded in `AGENTS.md`.
+
+### Phase 19: Browser live-launch operations
+
+- [x] Add redacted browser lifecycle markers and deterministic marker tests.
+- [x] Add frontend production container and API/frontend Compose health checks.
+- [x] Fail closed for insecure production origins, ephemeral storage, and disabled metrics.
+- [x] Pass backend/frontend quality, tests, builds, Compose parsing, and the Phase 17 deterministic gate.
+- [ ] Run Docker images and Compose in a target environment with health evidence.
+- [ ] Exercise browser Firebase identity, microphone, WebSocket, WebRTC, and completed-interview flows.
+- [ ] Verify HTTPS, durable operations, live providers, monitoring, rollback, and incident procedures.
+
+Phase 19 is not a live-launch declaration. Owner-isolation browser testing remains deferred, and no target-environment evidence exists yet.

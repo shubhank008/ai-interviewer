@@ -1,19 +1,27 @@
+import { markBrowser } from './observability.js'
+
 const LOCAL_KEY = 'interview-studio.local-session'
 
 export function localAuthProvider(storage = globalThis.sessionStorage) {
   return {
     async restore() {
-      const raw = storage?.getItem(LOCAL_KEY)
-      return raw ? JSON.parse(raw) : null
+      const user = storage?.getItem(LOCAL_KEY) ? JSON.parse(storage.getItem(LOCAL_KEY)) : null
+      markBrowser('AUTH_RESTORED')
+      return user
     },
     async signIn(email) {
-      return persist({ uid: 'local-user', email: email.trim(), provider: 'local' }, storage)
+      const user = await persist({ uid: 'local-user', email: email.trim(), provider: 'local' }, storage)
+      markBrowser('AUTH_SIGN_IN')
+      return user
     },
     async signUp(email) {
-      return persist({ uid: 'local-user', email: email.trim(), provider: 'local' }, storage)
+      const user = await persist({ uid: 'local-user', email: email.trim(), provider: 'local' }, storage)
+      markBrowser('AUTH_SIGN_UP')
+      return user
     },
     async signOut() {
       storage?.removeItem(LOCAL_KEY)
+      markBrowser('AUTH_SIGN_OUT')
     },
   }
 }
@@ -21,11 +29,11 @@ export function localAuthProvider(storage = globalThis.sessionStorage) {
 export function configuredAuthProvider(adapter) {
   if (!adapter) return null
   return {
-    restore: () => adapter.restore(),
-    signIn: (email, password) => adapter.signIn(email, password),
-    signUp: (email, password) => adapter.signUp(email, password),
-    ...(adapter.signInWithGoogle ? { signInWithGoogle: () => adapter.signInWithGoogle() } : {}),
-    signOut: () => adapter.signOut(),
+    restore: async () => { const user = await adapter.restore(); markBrowser('AUTH_RESTORED'); return user },
+    signIn: async (email, password) => { const user = await adapter.signIn(email, password); markBrowser('AUTH_SIGN_IN'); return user },
+    signUp: async (email, password) => { const user = await adapter.signUp(email, password); markBrowser('AUTH_SIGN_UP'); return user },
+    ...(adapter.signInWithGoogle ? { signInWithGoogle: async () => { const user = await adapter.signInWithGoogle(); markBrowser('AUTH_GOOGLE_SIGN_IN'); return user } } : {}),
+    signOut: async () => { const result = await adapter.signOut(); markBrowser('AUTH_SIGN_OUT'); return result },
   }
 }
 
@@ -55,28 +63,36 @@ export function firebaseAuthProvider(config, loadFn = defaultFirebaseLoader) {
       return new Promise((resolve, reject) => {
         const unsubscribe = onAuthStateChanged(auth, user => {
           unsubscribe()
-          normalize(user).then(resolve, reject)
+          normalize(user).then(result => { markBrowser('AUTH_RESTORED'); resolve(result) }, reject)
         }, reject)
       })
     },
     async signIn(email, password) {
       const { auth, signInWithEmailAndPassword } = await load()
       const result = await signInWithEmailAndPassword(auth, email.trim(), password)
-      return normalize(result.user)
+      const user = await normalize(result.user)
+      markBrowser('AUTH_SIGN_IN')
+      return user
     },
     async signUp(email, password) {
       const { auth, createUserWithEmailAndPassword } = await load()
       const result = await createUserWithEmailAndPassword(auth, email.trim(), password)
-      return normalize(result.user)
+      const user = await normalize(result.user)
+      markBrowser('AUTH_SIGN_UP')
+      return user
     },
     async signInWithGoogle() {
       const { auth, GoogleAuthProvider, signInWithPopup } = await load()
       const result = await signInWithPopup(auth, new GoogleAuthProvider())
-      return normalize(result.user)
+      const user = await normalize(result.user)
+      markBrowser('AUTH_GOOGLE_SIGN_IN')
+      return user
     },
     async signOut() {
       const { auth, signOut } = await load()
-      return signOut(auth)
+      const result = await signOut(auth)
+      markBrowser('AUTH_SIGN_OUT')
+      return result
     },
   }
 }

@@ -216,6 +216,21 @@ class RuntimeSettings:
             raise ConfigurationError(
                 f"LLM_FALLBACK_PROVIDER must be one of {sorted(recognized_llm)}"
             )
+        if self.storage_backend == "local":
+            raise ConfigurationError(
+                "production storage must be durable; STORAGE_BACKEND=local is not allowed"
+            )
+        if not self.cors_origins or any(
+            not origin.startswith("https://")
+            or "localhost" in origin
+            or "127.0.0.1" in origin
+            for origin in self.cors_origins
+        ):
+            raise ConfigurationError(
+                "production CORS_ORIGINS must contain only HTTPS non-local origins"
+            )
+        if not self.metrics_enabled:
+            raise ConfigurationError("production metrics must be enabled")
 
     def diagnostics(self) -> dict[str, object]:
         """Return safe startup details with secret values represented only by presence."""

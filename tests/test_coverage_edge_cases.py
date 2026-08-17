@@ -1508,6 +1508,10 @@ class ConfigurationEdgeCases(unittest.TestCase):
 
         settings = RuntimeSettings.from_env({
             "APP_PROFILE": "production",
+            "STORAGE_BACKEND": "gcs",
+            "STORAGE_BUCKET": "fixture-bucket",
+            "CORS_ORIGINS": "https://interview.example.com",
+            "METRICS_ENABLED": "true",
             "FIREBASE_PROJECT_ID": "proj",
             "FIRESTORE_DATABASE": "(default)",
             "STT_PROVIDER": "faster-whisper",
@@ -1526,6 +1530,10 @@ class ConfigurationEdgeCases(unittest.TestCase):
 
         settings = RuntimeSettings.from_env({
             "APP_PROFILE": "production",
+            "STORAGE_BACKEND": "gcs",
+            "STORAGE_BUCKET": "fixture-bucket",
+            "CORS_ORIGINS": "https://interview.example.com",
+            "METRICS_ENABLED": "true",
             "FIREBASE_PROJECT_ID": "proj",
             "FIRESTORE_DATABASE": "(default)",
             "STT_PROVIDER": "faster-whisper",
@@ -1544,6 +1552,10 @@ class ConfigurationEdgeCases(unittest.TestCase):
 
         settings = RuntimeSettings.from_env({
             "APP_PROFILE": "production",
+            "STORAGE_BACKEND": "gcs",
+            "STORAGE_BUCKET": "fixture-bucket",
+            "CORS_ORIGINS": "https://interview.example.com",
+            "METRICS_ENABLED": "true",
             "FIREBASE_PROJECT_ID": "proj",
             "FIRESTORE_DATABASE": "(default)",
             "STT_PROVIDER": "faster-whisper",

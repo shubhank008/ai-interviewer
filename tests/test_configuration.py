@@ -47,6 +47,26 @@ class LLMFixture:
 class RuntimeConfigurationTests(unittest.TestCase):
     """Exercise public configuration and composition behavior."""
 
+    @staticmethod
+    def production_env() -> dict[str, str]:
+        """Return the minimum safe production-shaped fixture."""
+        return {
+            "APP_PROFILE": "production",
+            "FIREBASE_PROJECT_ID": "demo-project",
+            "FIRESTORE_DATABASE": "(default)",
+            "STORAGE_BACKEND": "gcs",
+            "STORAGE_BUCKET": "demo-bucket",
+            "CORS_ORIGINS": "https://interview.example.com",
+            "METRICS_ENABLED": "true",
+            "STT_PROVIDER": "faster-whisper",
+            "STT_FALLBACK_PROVIDER": "in-memory",
+            "TTS_PROVIDER": "piper",
+            "TTS_FALLBACK_PROVIDER": "in-memory",
+            "LLM_PROVIDER": "openrouter",
+            "LLM_FALLBACK_PROVIDER": "in-memory",
+            "LLM_API_KEY": "runtime-only-test-key",
+        }
+
     def test_local_defaults_are_explicit_and_secret_free(self) -> None:
         """Local settings select deterministic providers and safe defaults."""
         settings = RuntimeSettings.from_env({})
@@ -87,6 +107,23 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertNotIn("private-key-material", str(diagnostics))
         print("[DOC17] document-model-config-ok")
 
+    def test_production_rejects_local_storage(self) -> None:
+        """Production refuses ephemeral storage before launch."""
+        values = self.production_env()
+        values["STORAGE_BACKEND"] = "local"
+        with self.assertRaisesRegex(ConfigurationError, "durable"):
+            RuntimeSettings.from_env(values)
+
+    def test_production_rejects_non_https_origins_and_disabled_metrics(self) -> None:
+        """Production refuses browser and observability fail-open settings."""
+        values = self.production_env()
+        values["CORS_ORIGINS"] = "http://localhost:5173"
+        with self.assertRaisesRegex(ConfigurationError, "HTTPS"):
+            RuntimeSettings.from_env(values)
+        values = self.production_env()
+        values["METRICS_ENABLED"] = "false"
+        with self.assertRaisesRegex(ConfigurationError, "metrics"):
+            RuntimeSettings.from_env(values)
 
     def test_production_missing_required_configuration_fails_safely(self) -> None:
         """Production never silently falls back to the local profile."""
@@ -101,20 +138,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
 
     def test_production_shaped_adapters_and_health_contract(self) -> None:
         """Injected adapter seams work without optional imports or network access."""
-        settings = RuntimeSettings.from_env(
-            {
-                "APP_PROFILE": "production",
-                "FIREBASE_PROJECT_ID": "demo-project",
-                "FIRESTORE_DATABASE": "(default)",
-                "STT_PROVIDER": "faster-whisper",
-                "STT_FALLBACK_PROVIDER": "in-memory",
-                "TTS_PROVIDER": "piper",
-                "TTS_FALLBACK_PROVIDER": "in-memory",
-                "LLM_PROVIDER": "openrouter",
-                "LLM_FALLBACK_PROVIDER": "in-memory",
-                "LLM_API_KEY": "runtime-only-test-key",
-            }
-        )
+        settings = RuntimeSettings.from_env(self.production_env())
         providers = compose_providers(
             settings, ProviderBackends(WhisperFixture(), SpeechFixture(), LLMFixture())
         )
@@ -144,20 +168,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
 
     def test_provider_fallback_runs_after_unavailable_primary(self) -> None:
         """A provider-shaped primary failure uses the configured deterministic fallback."""
-        settings = RuntimeSettings.from_env(
-            {
-                "APP_PROFILE": "production",
-                "FIREBASE_PROJECT_ID": "demo-project",
-                "FIRESTORE_DATABASE": "(default)",
-                "STT_PROVIDER": "faster-whisper",
-                "STT_FALLBACK_PROVIDER": "in-memory",
-                "TTS_PROVIDER": "piper",
-                "TTS_FALLBACK_PROVIDER": "in-memory",
-                "LLM_PROVIDER": "openrouter",
-                "LLM_FALLBACK_PROVIDER": "in-memory",
-                "LLM_API_KEY": "runtime-only-test-key",
-            }
-        )
+        settings = RuntimeSettings.from_env(self.production_env())
         providers = compose_providers(settings)
         stt_router, _, _ = providers.routers()
 

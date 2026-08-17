@@ -32,7 +32,7 @@ class Beta16Tests(unittest.TestCase):
             "LLM_API_KEY": "fixture-key",
         }
         from interviewer_domain.configuration import validate_beta_composition
-        with self.assertRaisesRegex(ConfigurationError, "STORAGE_BACKEND=gcs"):
+        with self.assertRaisesRegex(ConfigurationError, "durable"):
             validate_beta_composition(RuntimeSettings.from_env(values))
 
     def test_firestore_delete_uses_exact_document_identity(self) -> None:
