@@ -26,6 +26,7 @@ export function createMediaTransport({
     if (!stream) throw new Error('microphone is required before capture')
     if (!mediaUrl || !mediaSocketFactory || !mediaRecorderFactory) throw new Error('media capture is unavailable')
     mediaSocket = new mediaSocketFactory(mediaUrl)
+    mediaSocket.onerror = () => { setState('error') }
     recorder = new mediaRecorderFactory(stream)
     recorder.ondataavailable = event => { if (event.data?.size && mediaSocket.readyState === 1) mediaSocket.send(event.data) }
     recorder.start(250)

@@ -107,6 +107,7 @@ class FirestoreBackend(Protocol):
     def set(self, collection: str, document_id: str, value: dict[str, Any]) -> None: ...
     def get(self, collection: str, document_id: str) -> dict[str, Any] | None: ...
     def list(self, collection: str, field: str, value: str) -> list[dict[str, Any]]: ...
+    def list_range(self, collection: str, field: str, op: str, value: str) -> list[dict[str, Any]]: ...
     def list_all(self, collection: str) -> List[dict[str, Any]]: ...
     def delete_collection_value(
         self, collection: str, field: str, value: str
@@ -357,12 +358,10 @@ class FirestoreDataStore:
     def expired_interviews(self, now: datetime) -> list[InterviewRecord]:
         """Return expired Firestore records for owner-scoped cleanup."""
         return [
-            record
-            for record in (
-                _record_from_json(value)
-                for value in self.backend.list_all(self.collection)
+            _record_from_json(value)
+            for value in self.backend.list_range(
+                self.collection, "expires_at", "<=", now.isoformat()
             )
-            if record.expires_at is not None and record.expires_at <= now
         ]
 
     def save_transcript(

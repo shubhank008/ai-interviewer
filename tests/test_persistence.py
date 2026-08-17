@@ -55,6 +55,13 @@ class FakeFirestoreBackend:
         """List documents matching one owner field."""
         return [item for (name, _), item in self.values.items() if name == collection and item.get(field) == value]
 
+    def list_range(self, collection: str, field: str, op: str, value: str) -> "list[dict]":
+        """List documents matching a range condition on one field."""
+        import operator as op_mod
+        ops = {"<=": op_mod.le, ">=": op_mod.ge, "<": op_mod.lt, ">": op_mod.gt}
+        cmp = ops[op]
+        return [item for (name, _), item in self.values.items() if name == collection and item.get(field) is not None and cmp(item[field], value)]
+
     def list_all(self, collection: str) -> "list[dict]":
         """List every document in one collection for retention administration."""
         return [item for (name, _), item in self.values.items() if name == collection]
