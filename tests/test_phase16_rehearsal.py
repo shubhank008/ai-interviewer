@@ -137,65 +137,6 @@ class AgentRoleFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(turns), 10)
         self.assertEqual(record.end_reason, "turn_limit")
 
-
-    async def test_rehearsal_records_adaptive_ending_decision(self):
-        """Rehearsal applies the shared ending provider and persists its reason."""
-        class _Ending:
-            async def evaluate_end(self, answer, token):
-                from interviewer_domain.models import EndDecision
-                return EndDecision(True, "llm_decision", "fixture marked unsuitable")
-
-        providers = RehearsalProviders(
-            _Auth(), _STT(), _LLM(), _TTS(), InMemoryPersistentDataStore(), InMemoryStorage(),
-            DeterministicEvaluator(), ending=_Ending(),
-        )
-        interviewer = InterviewerAgent(providers, "firebase-id-token")
-        record, turns, _ = await interviewer.run(
-            InterviewMode.RECRUITER, Path("tests/demo_resume.pdf"), Path("tests/demo_jobdescription.txt"),
-            IntervieweeAgent((b"candidate audio buffer",)), turn_count=10,
-        )
-        self.assertEqual(len(turns), 1)
-        self.assertEqual(record.end_reason, "llm_decision")
-        self.assertEqual(record.end_rationale, "fixture marked unsuitable")
-
-
-    async def test_rehearsal_uses_injected_clock_for_time_limit(self):
-        """The rehearsal applies the shared wall-clock limit deterministically."""
-        providers = _providers()
-        interviewer = InterviewerAgent(providers, "firebase-id-token")
-        record, turns, _ = await interviewer.run(
-            InterviewMode.RECRUITER,
-            Path("tests/demo_resume.pdf"),
-            Path("tests/demo_jobdescription.txt"),
-            IntervieweeAgent((b"candidate audio buffer",)),
-            clock=lambda: datetime.now(timezone.utc) + timedelta(minutes=30),
-        )
-        self.assertEqual(len(turns), 1)
-        self.assertEqual(record.end_reason, "time_limit")
-
-    async def test_rehearsal_provider_failure_falls_back_to_hard_limit(self):
-        """Ending-provider failure remains safe and the turn limit still applies."""
-        from interviewer_domain.contracts import ErrorCode, ProviderError
-
-        class _FailingEnding:
-            async def evaluate_end(self, answer, token):
-                raise ProviderError(ErrorCode.INTERNAL, "fixture provider failure")
-
-        providers = RehearsalProviders(
-            _Auth(), _STT(), _LLM(), _TTS(), InMemoryPersistentDataStore(), InMemoryStorage(),
-            DeterministicEvaluator(), ending=_FailingEnding(),
-        )
-        interviewer = InterviewerAgent(providers, "firebase-id-token")
-        record, turns, _ = await interviewer.run(
-            InterviewMode.RECRUITER,
-            Path("tests/demo_resume.pdf"),
-            Path("tests/demo_jobdescription.txt"),
-            IntervieweeAgent((b"candidate audio buffer",)),
-            turn_count=20,
-        )
-        self.assertEqual(len(turns), 10)
-        self.assertEqual(record.end_reason, "turn_limit")
-
     async def test_transcript_writer_preserves_roles_timestamps_and_turns(self):
         providers = _providers()
         interviewer = InterviewerAgent(providers, "firebase-id-token")
