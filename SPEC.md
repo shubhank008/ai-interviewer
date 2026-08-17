@@ -92,7 +92,7 @@ The local deterministic browser profile may use in-memory providers, but it must
 
 ### 2.7 Phase 12 implementation status
 
-The React frontend now provides a protected, responsive application shell, deterministic local identity journey, setup validation, PDF selection and progress/error surfaces, live interview control states, history and feedback states, and a provider-neutral configured-auth seam. The local journey is verified with behavior tests and browser frames. Firebase Auth, Firestore, Storage, and post-interview evaluation are now exercised through the Phase 16 programmatic live gate; browser media (microphone/WebRTC/WebSocket) and Firebase browser-token owner isolation remain deferred.
+The React frontend now provides a protected, responsive application shell, deterministic local identity journey, setup validation, PDF selection and progress/error surfaces, live interview control states, history and feedback states, and a provider-neutral configured-auth seam. The local journey is verified with behavior tests and browser frames. Firebase Auth, Firestore, Storage, and post-interview evaluation are now exercised through the Phase 16 programmatic live gate. Browser microphone capture through the authenticated media WebSocket, turn start, completion, and owner-scoped retention cleanup are implemented in Phase 20; WebRTC/TURN media connectivity, Firebase browser-token owner isolation, HTTPS, deployed providers, and production operations remain deferred.
 
 ### 2.8 Phase 13 implementation status
 
